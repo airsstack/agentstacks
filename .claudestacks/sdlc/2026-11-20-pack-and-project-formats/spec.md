@@ -42,8 +42,35 @@ or a `file:line` opened in this session. `P/` abbreviates `../claudestacks/plugi
 | `journal-capture`, `journal-note`, `journal-recall` are each both a skill and an agent. No two plugins ship the same skill name. | `comm -12 <(ls */skills) <(ls */agents \| sed 's/\.md$//')` → those three; reviewer probe `ls */skills \| sort \| uniq -d` → empty |
 | `{{` does not occur in any plugin `.md` or `.json`; `[[` does (28 hits). | candidate-syntax grep → `\{\{ files=0 hits=0`, `\[\[ files=7 hits=28` |
 | All 48 plugin, skill and agent names match `^[a-z][a-z0-9-]{0,63}$`. | `ls P/ P/*/skills P/*/agents \| … \| grep -vE '^[a-z][a-z0-9-]{0,63}$'` → no output, exit 1; total `48` |
-| A YAML value that starts with `{{` is a YAML syntax error unless quoted; a token later in the value parses. | `ruby -ryaml`: `description: {{skill status}} runs it` → `Psych::SyntaxError … did not find expected key while parsing a block mapping`; `description: "{{skill status}} runs it"` → `{"description"=>"{{skill status}} runs it"}`; `description: run {{skill status}} now` → parses |
 | A `.DS_Store` file sits in the plugins directory. | `find . -name '.*'` → `./.DS_Store` |
+
+### 1.1 Parser facts (probed this session)
+
+Probes: throwaway crates built with `cargo build --offline` against serde-saphyr `2.1.1`, toml
+`1.2.0+spec-1.1.0` and semver `1.0.28` (versions from the probe's `Cargo.lock`). `SY/`, `T/` and `S/`
+abbreviate `~/.cargo/registry/src/*/serde-saphyr-2.1.1/src/`, `toml-1.2.0/src/` and
+`semver-1.0.28/src/`. Raw output:
+`/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/f6313af9-24e7-452d-b5aa-2740e0bbaa85/scratchpad/probe-{yaml,toml}-results.md`.
+
+| Fact | Proof |
+|---|---|
+| serde-saphyr refuses an unquoted value or list item that starts with `{{`, with a line and column; a quoted one is a plain string | `description: {{skill status}} runs it` → `line 1 column 15: expected string scalar`; `tools:\n  - {{skill x}}` → `line 2 column 6: expected string scalar`; `description: "{{skill status}} runs it"` → `Str("{{skill status}} runs it")` |
+| A token later in a plain value, or at the start of a folded block value, parses; one inside a flow sequence is refused | `description: run {{skill status}} now` → `"run {{skill status}} now"`; `description: >\n  {{skill status}} runs it` → `"{{skill status}} runs it\n"`; `tools: [a, {{skill x}}]` → `expected string scalar` on line 1 (probe `probe-mid`, raw output in `…/scratchpad/probe-msg-results.md`) |
+| The bare message comes from `DefaultMessageFormatter.format_message(&err)` (no location, no snippet); `location().line()` is stable, columns are not (they differ between `Display` and `location()` and with the target type); line numbers count from the YAML text, not the file | `description: {{skill status}} runs it` → `loc=(1, 14) msg="expected string scalar"`, while `Display` says column 15; `a: 1\na: 2` → `loc=(2, 1) msg="duplicate mapping key: a, set DuplicateKeyPolicy in Options if acceptable"` (probe `probe-msg`, `…/scratchpad/probe-msg-results.md`; exports `SY/lib.rs:32,44`; trait `SY/de/error.rs:89-114`) |
+| Errors expose an optional location | `Error::location() -> Option<Location>` (`SY/de/error.rs:1801`), `.line()`/`.column()` 1-based (`SY/location.rs:176,183`); `a: [1, 2` → `unclosed bracket '['` at (1,4) |
+| No generic value type is exported; `deserialize_any` fills an own enum | own enum `{Null, Bool, Int, Float, Str, Seq, Map(Vec<(String, Value)>)}` filled from a nested mapping (`SY/de/deserializer.rs:917`) |
+| Duplicate mapping keys are an error by default | `a: 1\na: 2` → `line 2 column 1: duplicate mapping key: a` (`SY/de/message_formatters.rs:257`) |
+| Plain scalars follow YAML 1.1 booleans: `yes`, `on`, `y`, `True` → true; `no`, `off` → false; `~`, `null` → null | probe Q8 (`SY/parse_scalars.rs:34-47`) |
+| Empty, whitespace-only and comment-only YAML is `Null`, not an error | probe Q9 |
+| Anchors and aliases are accepted under a default budget | `a: &x 1\nb: *x` → `b = Int(1)`; `Budget` (`SY/budget.rs:103`) |
+| toml syntax errors carry a byte span; a 1-based line is the count of `\n` before `span().start` plus 1 | `a = [1,` → message `unclosed array, expected ']'`, span `7..7`, `Display` "line 1, column 8" (`T/de/error.rs:64,69,116`) |
+| Duplicate keys and duplicate tables are toml syntax errors; an integer beyond i64 is a syntax error | `a = 1\na = 2` and `[x]\n[x]` → `duplicate key`; `a = 9223372036854775808` → `u64 value was too large` |
+| A `deny_unknown_fields` struct parse stops at the first error | two unknown keys plus a wrong-typed field → exactly one error, `unknown field 'bar'` |
+| A raw `toml::Table` holds `Datetime` values and is sorted by key (`preserve_order` off by default) | `1979-05-27` → `Datetime`; input order z,b,a,m → iteration a,b,m,z (`T/Cargo.toml:113`, `T/map.rs:11-43`) |
+| Empty, whitespace-only and comment-only toml is an empty table | probe Q6 → `Ok({})` |
+| semver's `Op` is `#[non_exhaustive]` with 8 variants: Exact, Greater, GreaterEq, Less, LessEq, Tilde, Caret, Wildcard | `S/lib.rs:246-257` (attribute on `:247`) |
+| globset `Glob::new` refuses malformed globs but accepts absolute ones, so "relative" is checked by agentstacks itself (leading `/`) | globset `0.4.21`: `"["` → `error parsing glob '[': unclosed character class; missing ']'`; `"/tmp/**"` → Ok; `"**/*.md"` matches `skills/discuss/SKILL.md` (probe `probe-glob`, `…/scratchpad/probe-glob-results.md`) |
+| `*` parses to no comparators (matches everything); `""` is an error; `0.1` is Caret; `>= 0.1.4` (space) parses; `Version::parse("1.2")` is an error | probe Q8, Q9 |
 
 ## 2. Pack layout
 
@@ -66,15 +93,22 @@ a skill's directory is written with `{{skill_dir …}}` (§3).
 | `pack.toml` exists at the pack root | `<dir>: not a pack (no pack.toml)` |
 | `commands/` and `rules/` are reserved | `<pack>/commands: reserved, not supported in api 0` |
 | a skill directory contains `SKILL.md` | `<pack>/skills/<name>: missing SKILL.md` |
+| `skills/` holds only directories, each named per §4.1 | `<pack>/skills/README.md: only skill directories belong in skills/` / `<pack>/skills/My_Skill: "My_Skill" is not a valid name` |
+| `agents/` holds only `<name>.md` files (no subdirectories), stem per §4.1 | `<pack>/agents/notes.txt: agents/ holds only <name>.md files` / `<pack>/agents/Coder.md: "Coder" is not a valid name` |
 | a skill's `name` equals its directory name; an agent's `name` its file stem | `<file>: name "x" does not match "y"` |
-| at least one skill, agent or hook, counting only files not excluded | `<pack>: pack declares nothing to install` |
-| no symlinks anywhere | `<path>: symlinks are not allowed in a pack` |
+| at least one skill, agent, hook or native hook (`native/<tool>/hooks.toml` entry), counting only files not excluded | `<pack>: pack declares nothing to install` |
+| no symlinks anywhere | `<path>: symlinks are not allowed in a pack` (in an extension: `<path>: symlinks are not allowed in an extension`) |
+| only regular files and directories (no FIFOs, sockets, devices) | `<path>: only regular files and directories are allowed` |
+| empty directories are ignored: not installed, not hashed, never a refusal (an empty `skills/a/` is not a skill) | — |
+| the dot-entry rule below is applied first: a dot entry is ignored even when it is a symlink, a special file or a non-UTF-8 name | — |
 | paths are valid UTF-8 | `<path>: path is not valid UTF-8` |
 | entries whose name starts with `.` (e.g. `.DS_Store`, `.git/`) are ignored: not hashed, not installed; `plan` lists them once | (not an error) |
 | a skill and an agent may share a name; two skills (or two agents) in one pack cannot, by construction | — |
 
 ### 2.2 `native/<tool>/`
 
+- `native/` holds only directories (`<pack>/native/README.md: only tool directories belong in
+  native/`), each named per §4.1 (`<pack>/native/Claude: "Claude" is not a valid name`).
 - `<tool>` must match the name rule (§4.1); it is not checked against a list of known tools,
   because extensions come from git. `plan` lists each unused `native/<tool>/` once
   (`native/cluade: not for claude`), so a typo is visible.
@@ -82,10 +116,15 @@ a skill's directory is written with `{{skill_dir …}}` (§3).
   rules as neutral files (§3.4) and appear in `plan`. Native `.md` files are not held to §5,
   because their frontmatter is tool-specific.
 - `native/<tool>/hooks.toml` declares tool-native hooks with the `[[hooks]]` schema of §6, except
-  that `event` and `match` are opaque tool strings. Grants, `policy`, `may_block`, forced
-  fail-open and `exec ⊆ requires.binaries` apply unchanged.
+  that `event` and `match` are opaque tool strings and `agents` is not accepted (generic
+  `unknown key`). Grants, `policy`, `may_block`, forced
+  fail-open, `exec ⊆ requires.binaries` and the `run` rules apply unchanged. The file itself is
+  never installed (like `pack.toml`); its hooks reach the tool through the extension.
 - Neutral content must not reach into `native/`: a `root` token followed by `/native/` in neutral
-  content is refused: `<file>:<line>: neutral content must not reference native/`.
+  content is refused: `<file>:<line>: neutral content must not reference native/` (key-path
+  location for frontmatter and hook fields). The scanner decides "followed by `/native/`" while it
+  has the text and records it on the token, so the rule runs over every token, wherever it came
+  from.
 
 ## 3. Tokens
 
@@ -136,7 +175,8 @@ Limitation (accepted): a literal backslash immediately before a token cannot be 
 | `{{skill core/x` / a newline before `}}` | `<file>:<line>: unterminated token` |
 | `{{}}`, `{{ }}` | `<file>:<line>: empty token` |
 | `{{skill}}` (also `agent`, `skill_dir`, `var`, `option`) | `<file>:<line>: token "skill" needs a target` |
-| `{{root core extra}}` | `<file>:<line>: token "root" takes one target` |
+| `{{root core extra}}` (any kind given two or more target words) | `<file>:<line>: token "root" takes one target` (with that kind's name) |
+| `{{root Core}}` | `<file>:<line>: "Core" is not a valid name` |
 | `{{skill a/b/c}}` | `<file>:<line>: "a/b/c" is not a valid target (expected [pack/]name)` |
 | `{{skill /x}}`, `{{skill core/}}` | same message, with that target |
 | `{{skill Core/x}}` | `<file>:<line>: "Core" is not a valid name` |
@@ -145,6 +185,7 @@ Limitation (accepted): a literal backslash immediately before a token cannot be 
 | `{{var arguments}}` outside a `SKILL.md` | `<file>:<line>: var "arguments" is only valid in SKILL.md` |
 | `{{option a-b}}` | `<file>:<line>: "a-b" is not a valid option name` |
 | `{{option core/archive_keep}}` | `<file>:<line>: option tokens name this pack's options only` |
+| `{{option archive_kep}}` where the pack declares no such option | `<file>:<line>: pack "core" has no option "archive_kep"` |
 | `{{skill_dir core/coder}}` where `coder` is only an agent | `<file>:<line>: pack "core" has no skill "coder"` |
 
 ### 3.3 Target rules (cross-pack)
@@ -160,8 +201,10 @@ Limitation (accepted): a literal backslash immediately before a token cannot be 
 
 - Every `.md` file that is not excluded, and every file listed in `render`.
 - In `pack.toml` (and `native/<tool>/hooks.toml`): hook `text`, `args`, `run` and grant paths.
-- **Frontmatter is parsed first, then its string values are scanned.** A value that starts with a
-  token must be quoted, as YAML requires (§1); the YAML error for an unquoted one gets the hint
+- **Frontmatter is parsed first, then its string values are scanned.** A value or list item that
+  starts with a token (including a flow-sequence item) must be quoted, as YAML requires (§1.1).
+  When serde-saphyr refuses the frontmatter and the line it reports has `{{` right after `:`, `-`,
+  `[` or `,` (spaces between allowed), the diagnostic gets the hint
   `(a value starting with {{ must be quoted)`. `name` may not contain a token:
   `<file>: name must be a literal`.
 - `render` may not list `.lua` or `.sh` files: `render: "x.lua" is code; code is installed
@@ -176,6 +219,13 @@ The core scans, validates every token and splices values in. The extension never
 returns the tool's name, invocation form or path for the items the core asks about, and the tool's
 runtime expression for each var. If it cannot supply a value, the item holding that token becomes a
 skip with a reason, shown in `plan`.
+
+Each text is scanned exactly once. The frontmatter parser scans frontmatter string values; the
+Markdown body scan starts after the closing `---`. The manifest parsers scan hook fields. The
+pack loader scans bodies and `render` files. Every token found is kept on the loaded `Pack` with
+its location. The pack-local rules (§3.2 placement and option-name rows, §2.2 no `native/` from
+neutral content, own-pack targets) and the set-level target rules (§3.3) run over all of them,
+wherever they came from.
 
 ## 4. `pack.toml`
 
@@ -217,14 +267,15 @@ description = "Discussions kept per project besides the current one"
 | any unknown key | refused with its key path | `packs/core/pack.toml: hooks[2].grant: unknown key` |
 | `pack.name` | required, §4.1 | `pack.name: "Core" is not a valid name` |
 | `pack.version` | required, semver | `pack.version: "1.2" is not semver` |
-| `pack.api` | required, `0` | `sdlc: api 1 not supported (this agentstacks speaks 0)` |
+| `pack.api` | required, `0` | `sdlc: api 1 not supported (this agentstacks speaks 0)`; when `pack.name` is missing or invalid: `pack.api: 1 not supported (this agentstacks speaks 0)` |
 | `pack.description` | required, not empty or whitespace-only | `pack.description: empty` |
 | `requires.packs` | names; no duplicates; not itself | `requires.packs: "core" listed twice` / `requires.packs: a pack cannot require itself` |
-| `requires.airsl` | semver range; required when the pack has any non-excluded `.lua` file | `sdlc: contains .lua files but declares no requires.airsl` |
+| `requires.airsl` | semver range (§4.3); required when the pack has any non-excluded `.lua` file (checked at pack load) | `requires.airsl: "nope" is not a version range` / `requires.airsl: required (the pack contains .lua files)` |
 | `requires.binaries` | names; no duplicates | `requires.binaries: "git" listed twice` |
-| `render` | each path exists, relative, no `..`; not code (§3.4); not excluded | `render: "enforcment.json" does not exist` / `render: "x.json" is also excluded` |
-| `exclude` | valid globs, relative; may not match `pack.toml`, a `SKILL.md`, an agent file, a hook `run` target or a `render` file | `exclude: "[" is not a valid glob` / `exclude: "**/*.md" excludes skills/discuss/SKILL.md` |
-| `options.<n>.type` | `boolean`, `integer` (i64), `string` | `options.keep.type: "number" (expected boolean, integer, string)` |
+| `render` | each path relative, no `..`; exists; not code (§3.4); not excluded | `render: "/x" must be relative` / `render: "../x" must stay inside the pack` / `render: "enforcment.json" does not exist` / `render: "x.json" is also excluded` |
+| `exclude` | valid globs; relative (no leading `/`); may not match `pack.toml`, a `SKILL.md`, an agent file or an own-pack hook `run` target. A glob that matches a `render` file reports only the `render` refusal above | `exclude: "[" is not a valid glob` / `exclude: "/tmp/**" must be relative` / `exclude: "**/*.md" excludes skills/discuss/SKILL.md` |
+| `options.<n>` | `<n>` follows the option rule (§4.1) | `options.archive-keep: "archive-keep" is not a valid option name` |
+| `options.<n>.type` | required; `boolean`, `integer` (i64), `string` | `options.keep.type: "number" (expected boolean, integer, string)` |
 | `options.<n>.default` | optional; matches `type` | `options.archive_keep.default: expects integer, got string` |
 | `options.<n>.description` | required, not empty | `options.archive_keep.description: empty` |
 
@@ -232,7 +283,11 @@ Excluded files are not scanned and not installed; the tree hash still covers the
 
 ### 4.3 `airsl` range
 
-The core intersects every pack's `requires.airsl` (Cargo-flavour ranges, `semver` crate). No
+The core intersects every pack's `requires.airsl` (Cargo-flavour ranges, `semver` crate). Each
+comparator becomes a version interval; the 8 operators of §1.1 are supported, and `*` (no
+comparators) is unbounded. `Op` is `#[non_exhaustive]` (§1.1), so an operator added by a later
+`semver` release is refused at `pack.toml` parse, naming the range:
+`requires.airsl: ">=0.1" uses an operator this agentstacks does not support`. No
 common version → `airsl: core needs >=0.2, sdlc needs <0.2`. Installed airsl outside it →
 `airsl 0.1.3 installed, packs need >=0.1.4`. Probing the binary and pinning it belong to
 `core-plan-and-apply` and `extension-host-and-hooks`.
@@ -264,8 +319,9 @@ entry       = "adapter.lua"
 | Rule | Refusal |
 |---|---|
 | file present | `<dir>: not an extension (no extension.toml)` |
-| `name` §4.1; `version` semver; `api` = 0; `description` not empty | same shapes as §4.2, prefixed `extension.` |
-| `entry` relative, no `..`, an existing `.lua` file | `extension.entry: "adapter.lua" does not exist` |
+| `name` §4.1; `version` semver; `description` not empty | same shapes as §4.2, prefixed `extension.` |
+| `api` = 0; refused here, at load, only: a refused extension fails to load and the set check never sees it (§9) | `extension.api: 1 not supported (this agentstacks speaks 0)` |
+| `entry` relative, no `..`, ends in `.lua`, an existing file | `extension.entry: "../a.lua" must stay inside the extension` (same message for an absolute `entry`) / `extension.entry: "adapter.js" is not a .lua file` / `extension.entry: "adapter.lua" does not exist` |
 | unknown key | `extension.toml: extension.foo: unknown key` |
 | no symlinks; non-UTF-8 paths refused; dot entries ignored | as §2.1 |
 
@@ -274,7 +330,11 @@ What the adapter exports and how it is run belong to `extension-host-and-hooks`.
 ## 5. Skill and agent frontmatter
 
 YAML between `---` lines at the top of `SKILL.md` or `agents/<name>.md`; strict keys; parsed
-before token scanning (§3.4).
+before token scanning (§3.4). The YAML is deserialised with serde-saphyr into an own value enum
+(`deserialize_any`, §1.1), never straight into a struct; keys and types are then checked by hand so
+every field error in the file is reported, not only the first. YAML 1.1 booleans apply (§1.1): an
+unquoted `argument_hint: yes` is a boolean and refused as `argument_hint: expected a string, got
+boolean`.
 
 ```yaml
 # skill                                   # agent
@@ -290,16 +350,17 @@ native:                                   tools: [read, edit, write, grep, glob,
 | Rule | Refusal |
 |---|---|
 | frontmatter missing, not first, or unterminated | `<file>: missing frontmatter` |
-| YAML syntax error | `<file>:<line>: <parser message>` (stops this file only) |
-| `name`, `description` required, not empty; `name` literal | `<file>: description: empty` / `<file>: name must be a literal` |
+| YAML syntax error, including a duplicate key (§1.1) | `<file>:<line>: <parser message>`, where `<parser message>` is `DefaultMessageFormatter.format_message` and `<line>` is `location().line()` plus 1 (the opening `---` line), so it counts from the file; `<file>: <parser message>` when the parser gives no location. No column is reported (§1.1). Stops this file only |
+| frontmatter is a mapping (empty frontmatter parses as null, §1.1) | `<file>: frontmatter: expected a mapping, got null` |
+| `name`, `description` required, not empty; `name` literal | `<file>: name: required` / `<file>: description: required` / `<file>: description: empty` / `<file>: name must be a literal` |
 | `name` = directory (skill) or file stem (agent) | `<file>: name "x" does not match "y"` |
 | unknown key | `<file>: unknown key "disable-model-invocation"` |
 | `invocation` ∈ {user, any}, default `any` | `<file>: invocation: "manual" (expected user, any)` |
-| `argument_hint` string | `<file>: argument_hint: expected a string` |
+| `argument_hint` string | `<file>: argument_hint: expected a string, got <type>` |
 | `model` ∈ {fast, balanced, deep}, optional | `<file>: model: "sonnet" (expected fast, balanced, deep)` |
 | `effort` ∈ {low, medium, high}, optional | `<file>: effort: "max" (expected low, medium, high)` |
 | `tools` ⊆ {read, write, edit, grep, glob, shell, skill}, no duplicates, optional | `<file>: tools: unknown "bash"` / `<file>: tools: "read" listed twice` |
-| `native` keys follow §4.1; contents opaque, passed to that extension only | `<file>: native: "Claude" is not a valid tool name` |
+| `native` keys follow §4.1; contents opaque (never scanned for tokens), passed to that extension only | `<file>: native: "Claude" is not a valid tool name` |
 
 The vocabulary covers what the plugins use (§1) plus `effort: medium`, which completes the scale.
 A field the tool cannot express is dropped with a reason in `plan`. A `native.<tool>` value wins
@@ -349,10 +410,13 @@ events share one set. A Claude event or tool with no neutral form (today: `PreTo
 |---|---|
 | `kind` ∈ {message, lua} | `hooks[0].kind: "sh" (expected message, lua)` |
 | `event` in §6.1 | `hooks[0].event: "tool.pre" unknown` |
-| `match` only where §6.1 allows; values from that set; not empty; no duplicates; omitted = all | `hooks[1].match: "bash" not valid for tool.before` / `hooks[1].match: empty list never fires` / `hooks[1].match: "read" listed twice` |
-| `agents` only on `agent.stop`; this pack's agents; omitted = any agent | `hooks[3].agents: pack "core" has no agent "task-briefer"` |
-| `message`: `text` required, not empty; `run`, `args`, `grants`, `may_block` refused | `hooks[0].text: empty` / `hooks[0].may_block: message hooks cannot block` |
-| `lua`: `run` required, an existing, non-excluded `.lua` file in this pack (pack-relative or `{{root}}/…`) or in a required pack (`{{root <pack>}}/…`) | `hooks[1].run: "{{root core}}/hooks/enforc.lua" does not exist in core` |
+| `match` only where §6.1 allows; values from that set; not empty; no duplicates; omitted = all | `hooks[1].match: not allowed on session.end` / `hooks[1].match: "bash" not valid for tool.before` / `hooks[1].match: empty list never fires` / `hooks[1].match: "read" listed twice` |
+| `agents` only on `agent.stop`; this pack's agents (checked at pack load); omitted = any agent | `hooks[0].agents: only allowed on agent.stop` / `hooks[3].agents: pack "core" has no agent "task-briefer"` |
+| `message`: `text` required, not empty; `run`, `args`, `grants`, `may_block` refused | `hooks[0].text: required` / `hooks[0].text: empty` / `hooks[0].run: not allowed on a message hook` (same shape for `args`, `grants`) / `hooks[0].may_block: message hooks cannot block` |
+| `lua`: `text` refused | `hooks[1].text: not allowed on a lua hook` |
+| `lua`: `run` required, ends in `.lua`, written pack-relative (`hooks/x.lua`, no leading `/`, no `..`), `{{root}}/…` or `{{root <pack>}}/…`; nothing else (absolute paths, `{{skill_dir …}}`) | `hooks[1].run: required` / `hooks[1].run: "x.sh" is not a .lua file` / `hooks[1].run: must be pack-relative, {{root}}/… or {{root <pack>}}/…` |
+| own-pack `run` (pack-relative, `{{root}}/…`, or `{{root <this pack>}}/…`): an existing, non-excluded file among the `{{root}}` files (§2: not `pack.toml`, not under `skills/`, `agents/` or `native/`), checked at pack load | `hooks[1].run: "hooks/missing.lua" does not exist` |
+| other-pack `run` (`{{root <pack>}}/…`): `<pack>` is required (§3.3) and the file exists and is not excluded there, checked by the set check (§9) | `hooks[1].run: "{{root core}}/hooks/enforc.lua" does not exist in core` |
 | `grants.policy` ∈ {confined, pure}, default confined | `hooks[1].grants.policy: "trusted" is not allowed for pack hooks` |
 | grant paths absolute or starting with `{{root…}}`, `{{skill_dir …}}` or `{{var …}}` | `hooks[1].grants.read: "data" must be absolute or start with a token` |
 | `grants.env` names `^[A-Z_][A-Z0-9_]*$` | `hooks[1].grants.env: "home" is not an environment variable name` |
@@ -400,12 +464,13 @@ path = "packs/team-lint"
 | `git` needs exactly one of `tag` / `rev`; `rev` 40 or 64 lowercase hex; no `branch` | `packs.core: needs exactly one of tag, rev` / `packs.core.rev: not a commit id` |
 | a `git` URL starting with `-` | `packs.core.git: URL must not start with "-"` |
 | `subdir` relative, no `..` segment, no leading `/` | `packs.core.subdir: must stay inside the repository` |
+| `tag`, `rev`, `subdir` only on `git` sources; an entry with both `git` and `path` gets only the `git, path` refusal (plus any malformed field values), not this one | `packs.team-lint: tag, rev and subdir apply only to git sources` |
+| "resolving inside" for `path` is decided lexically on the declared string; symlinks are resolved by `core-plan-and-apply` | — |
 | `path` relative to the directory holding `agentstacks.toml`, resolving inside it | `packs.team-lint.path: absolute paths are not portable` / `packs.team-lint.path: must stay inside the project` |
 | `options` only under `[packs.*]`; checked per §4.4 | `tools.claude.options: unknown key` |
 | any string empty or whitespace-only | `packs.core.tag: empty` |
 | unknown key | `packs.core.branch: unknown key` |
 | key = fetched `pack.name` / `extension.name` | `packs.core: source contains pack "kore"` / `tools.claude: source contains extension "claud"` |
-| fetched `extension.toml` api = 0 | `tools.claude: api 1 not supported (this agentstacks speaks 0)` |
 | every `requires.packs` entry is listed | `sdlc requires pack "core", which agentstacks.toml does not list (add it: --pack core)` |
 | `requires.packs` has no cycle | `requires cycle: a → b → a` |
 
@@ -452,9 +517,9 @@ path    = "packs/team-lint"
 tree    = "sha256:<64 hex>"
 
 [[file]]
-path = ".claude/skills/status/SKILL.md"
+path = ".claude/skills/discuss/SKILL.md"
 hash = "sha256:<64 hex>"
-by   = "sdlc"
+by   = "core"
 
 [[merge]]
 file = ".claude/settings.json"
@@ -465,16 +530,19 @@ by   = "core"
 
 | Rule | Refusal |
 |---|---|
-| `api` required, `0` | `agentstacks.lock: api 1 not supported …` |
-| `[airsl]` present iff a locked pack declares `requires.airsl`; `version` exact semver | `agentstacks.lock: airsl.version: "0.1" is not a version` |
-| `[[tool]]`/`[[pack]]`: `name`, `version`, `tree` required; exactly one of `git`/`path`; git entries need `rev`, plus `tag` when `agentstacks.toml` pinned one; §7 source rules apply | `agentstacks.lock: pack core: missing rev` / `… pack core: needs exactly one of git, path` |
-| `[[file]]`: `path`, `hash`, `by` required; `path` relative, `/`-separated, no `..`; unique | `agentstacks.lock: file ".claude/x" listed twice` |
-| `[[merge]]`: `file`, `key` (non-empty), `hash`, `by` required; unique by (`file`, `key`) | `agentstacks.lock: merge ".claude/settings.json" "<key>" listed twice` |
-| hashes `^sha256:[0-9a-f]{64}$` | `agentstacks.lock:<line>: bad hash` |
-| `by` names a locked pack or tool | `agentstacks.lock: file …: by "kore" is not a locked pack or tool` |
-| tool names unique; pack names unique | `agentstacks.lock: pack "core" listed twice` |
-| syntax error / unknown key | `agentstacks.lock:<line>: …` (recovery: delete the lock and re-plan) |
-| written sorted: tools and packs by name, files by path, merges by (file, key) | (writer rule) |
+| `api` required, `0` | `agentstacks.lock: api 1 not supported (this agentstacks speaks 0)` |
+| `[airsl]` `version` exact semver | `agentstacks.lock: airsl.version: "0.1" is not a version` |
+| `[airsl]` present iff a locked pack declares `requires.airsl`. Deciding it needs the loaded packs, so this chain provides `check_airsl_presence` and `core-plan-and-apply` calls it (§13) | `agentstacks.lock: [airsl] missing, but locked packs require airsl` / `agentstacks.lock: [airsl] present, but no locked pack requires airsl` |
+| `[[tool]]`/`[[pack]]`: `name`, `version`, `tree` required; exactly one of `git`/`path`; git entries need `rev` and carry `tag` only when `agentstacks.toml` pins a tag (a missing or extra `tag` makes the lock stale, not malformed); `tag`, `rev`, `subdir` refused on path entries; the other §7 source rules apply | `agentstacks.lock: pack[1].rev: required` / `agentstacks.lock: pack[1].tree: required` / `agentstacks.lock: pack[1]: needs exactly one of git, path` / `agentstacks.lock: pack[2]: tag, rev and subdir apply only to git sources` |
+| `[[file]]`: `path`, `hash`, `by` required; `path` relative, `/`-separated, no `..`; unique | `agentstacks.lock: file[0].path: "/x" must be relative` / `agentstacks.lock: file[0].path: "../x" must stay inside the project` / `agentstacks.lock: file ".claude/x" listed twice` |
+| `[[merge]]`: `file`, `key` (non-empty), `hash`, `by` required; unique by (`file`, `key`) | `agentstacks.lock: merge[0].key: empty` / `agentstacks.lock: merge ".claude/settings.json" "<key>" listed twice` |
+| hashes `^sha256:[0-9a-f]{64}$` | `agentstacks.lock: file[0].hash: bad hash (expected sha256:<64 lowercase hex>)` |
+| `by` names a locked pack or tool | `agentstacks.lock: file[0].by: "kore" is not a locked pack or tool` (same shape for `merge[i].by`) |
+| tool names unique; pack names unique | `agentstacks.lock: pack "core" listed twice` / `agentstacks.lock: tool "claude" listed twice` |
+| entry `name` §4.1, `version` semver; `[[merge]].file` a non-empty string | §4.2 shapes with the entry key path: `agentstacks.lock: pack[1].name: "Core" is not a valid name` / `agentstacks.lock: pack[1].version: "1.2" is not semver` |
+| syntax error | `agentstacks.lock:<line>: <parser message>` (recovery: delete the lock and re-plan) |
+| unknown key | `agentstacks.lock: pack[1].branch: unknown key` |
+| written sorted: tools and packs by name, files by path, merges by (file, key); fields in the order shown above, the comment line after `api = 0` | (writer rule) The writer formats the text itself: a serialised `toml::Table` would sort fields alphabetically (§1.1) |
 
 A missing lock is not an error. A lock that disagrees with `agentstacks.toml` is stale, not
 malformed. `rev` wins over a tag that has since moved. Reconciliation, the meaning of
@@ -521,27 +589,66 @@ After each file parses, `pack_set::check` validates the project as a whole and r
 skipped, so their failures produce no follow-on errors.
 
 1. every `requires.packs` entry is listed in `agentstacks.toml`; no cycles (§7);
-2. every `skill`/`agent`/`skill_dir`/`root` token targets this pack or a required pack, and the
-   item exists (§3.3);
-3. every `option` token names a declared option; option values resolve (§4.4);
-4. every hook `run` and `agents` entry resolves (§6.2);
+2. every `skill`/`agent`/`skill_dir`/`root` token that names **another** pack targets a required
+   pack, and the item exists there (§3.3); own-pack targets are checked at pack load and not
+   re-checked here;
+3. every `option` token names a declared option of its pack (`pack "core" has no option
+   "archive_kep"`, at the token's location); option values resolve (§4.4);
+4. every other-pack hook `run` (`{{root <pack>}}/…`) resolves in that required pack (§6.2;
+   own-pack `run` and `agents` are checked at pack load);
 5. the `airsl` ranges intersect (§4.3);
 6. no two packs ship a skill with the same name, and no two packs ship an agent with the same name:
    `skill "status" is shipped by both sdlc and team-lint`. A skill and an agent may share a name.
+   Agents use the same shape (`agent "coder" is shipped by both core and team-lint`). Three or
+   more packs give one diagnostic per name, packs in name order: `skill "status" is shipped by
+   sdlc, team-lint and x`.
+
+Message shapes for several packs: the disjoint-range refusal lists every pack that declares
+`requires.airsl`, in name order, each with its range as written (`airsl: core needs >=0.2, sdlc
+needs <0.2`); the installed-version refusal joins the ranges with `, ` in the same order
+(`airsl 0.1.3 installed, packs need >=0.1.4, <0.3`).
 
 ## 10. Errors
 
-- Every refusal carries a location: `<file>:<line>: <what>`, or `<file>: <key.path>: <what>` when
-  there is no line. Messages name the offending value and, where a set is fixed, the allowed set.
+- Every refusal carries a location: `<file>:<line>: <what>` for syntax errors and for tokens in
+  Markdown and `render` files; `<file>: <key.path>: <what>` for TOML and frontmatter field errors
+  and for tokens in TOML fields and frontmatter values (key paths: `hooks[2].grants.read[0]`,
+  `description`,
+  `options.archive_keep.default`, `pack[1].rev`). Messages name the offending value and, where a
+  set is fixed, the allowed set.
+- Set-level refusals (§9) about **one token or one hook field** keep that token's or field's own
+  location: `<file>:<line>` for a token in Markdown or a `render` file, `<pack>/pack.toml: <key.path>`
+  for a token or `run` in a hook (the §3.3 and §6.2 messages). Every other set-level refusal is
+  located at `agentstacks.toml`, with the key path of the entry it concerns when there is one:
+  `agentstacks.toml: packs.sdlc: sdlc requires pack "core", …`; option resolution (§4.4) at
+  `agentstacks.toml: packs.core.options.archive_keep: …`, or `agentstacks.toml: packs.core: …` for a
+  required option that is not set. A refusal spanning several packs (cycle, airsl range, name
+  clash) carries the file only.
+- Generic shapes, used by every field not given a message elsewhere: missing required key
+  `<key.path>: required`; wrong type `<key.path>: expected <type>, got <type>`; empty or
+  whitespace-only string `<key.path>: empty`; unknown key `<key.path>: unknown key`.
+- "Exact message" in tests means the `Diagnostic`'s `Display`: location plus message.
+- Type words in `expected <type>, got <type>`: `boolean`, `integer`, `float`, `string`,
+  `datetime`, `array`, `table`, and `null` (YAML only). YAML uses the same words: a sequence is
+  `array`, a mapping is `table`.
+- An I/O failure is `<path>: <the std::io::Error Display>`.
+- Sort order: by file path as a `/`-separated string, byte order; within a file, key-path and
+  no-line diagnostics first in the order they were found (stable sort), then by line.
 - **All errors per run**, sorted by file; within a file, key-path errors (no line) first, then by
   line. A TOML or YAML syntax error stops only that file.
+- Every TOML file is parsed into a raw `toml::Table`, then validated by hand; never a
+  `deny_unknown_fields` struct parse, which stops at the first error (§1.1). Syntax errors (which
+  include duplicate keys, duplicate tables and integers beyond i64, §1.1) take their line from the
+  error span. Empty TOML is an empty table, so it is refused field by field (`api: required`). A
+  value of a TOML type no field accepts (datetime, float) gets the generic wrong-type message.
 - One `thiserror` enum per module, no string errors, so `cli-commands` can map them to exit codes.
   A validation run returns a list of `Diagnostic { location, error }`.
 
 ## 11. Architecture
 
 Modules in `crates/agentstacks` (export-only `mod.rs`, one item per file, newtypes for domain
-values per the Rust guidelines):
+values per the Rust guidelines). The tree groups items by concern; where a line names several
+items, each item gets its own file:
 
 ```text
 model/
@@ -571,11 +678,12 @@ agentstacks.lock ► Lockfile ─────┘
 ```
 
 Dependencies (latest stable per `cargo search <name> --limit 1` this session): `serde` 1 (derive),
-`toml` 1 (`1.2.1+spec-1.1.0`), `serde-saphyr` 2 (claudestacks uses `{ version = "2.0",
+`toml` 1 (`1.2.1+spec-1.1.0`; probed at `1.2.0`, §1.1), `serde-saphyr` 2 (probed at `2.1.1`, §1.1; claudestacks uses `{ version = "2.0",
 default-features = false, features = ["deserialize"] }`, chosen there because it parses YAML in
 safe Rust — Proof: `../claudestacks/Cargo.toml` `[workspace.dependencies]`; `3.0.0-rc.1` is a
 pre-release, not used), `sha2` 0.11 (`0.11.1`), `semver` 1 (`1.0.28`), `globset` 0.4 (`0.4.21`),
-`thiserror` 2 (`2.0.21`). Licences are checked by `cargo make deny` when added.
+`thiserror` 2 (`2.0.21`); dev-only `tempfile` 3 (`3.27.0`) for test directories. Licences are
+checked by `cargo make deny` when added.
 
 ## 12. Testing
 
@@ -592,7 +700,7 @@ pre-release, not used), `sha2` 0.11 (`0.11.1`), `semver` 1 (`1.0.28`), `globset`
 
 | Chain | Receives |
 |---|---|
-| `core-plan-and-apply` | source resolution with `git` (URLs after `--`; tree listed with `ls-tree`, blobs read with `cat-file`, never a working-tree checkout); a **delete** operation for files of a removed pack; the meaning of `[[merge]].key`; stale-lock reconciliation; tree mismatches (§8.2); `rev` over a moved tag |
+| `core-plan-and-apply` | source resolution with `git` (URLs after `--`; tree listed with `ls-tree`, blobs read with `cat-file`, never a working-tree checkout); a **delete** operation for files of a removed pack; the meaning of `[[merge]].key`; stale-lock reconciliation (including a lock `tag` that disagrees with `agentstacks.toml`); tree mismatches (§8.2); `rev` over a moved tag; calling `check_airsl_presence` with the locked packs (§8) |
 | `extension-host-and-hooks` | the adapter contract behind `extension.entry`; the neutral hook payload and result protocol; enforcing `may_block`; airsl as a require-binary operation and its pin; a runtime warning when airsl disappears after install (today `preflight.sh:40`) |
 | `claude-extension` | mapping the neutral vocabulary (events, `match`, tiers, tools, `invocation`, vars) to Claude Code; invocation forms, names and paths for tokens; `native/claude/hooks.toml` for `SubagentHandback` |
 | `plugins-to-packs` | the three example guideline refs rewritten as prose; the `SubagentStop` matcher split per pack; the registry gate removed from `enforce.lua`; hooks ported to the neutral protocol; options via `args`; the user-facing name in `P/claudestacks-sdlc/scripts/lib/status.lua:825` passed via `args` or called out as a change |

@@ -46,6 +46,8 @@ and no way to turn a lock entry back into the exact bytes it pinned.
   operation list gains a delete.
 - A config-key merge has a defined identity (the `key` the lock records for it), and a lock that
   disagrees with `agentstacks.toml` is reconciled as stale rather than refused.
+- The lock's `[airsl]` table is present exactly when a locked pack needs airsl; the check
+  `pack-and-project-formats` provides is called here, where the locked packs are loaded.
 - A third-party command never runs unannounced: every run-command operation appears in the plan.
 
 ## Constraints
