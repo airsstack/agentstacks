@@ -1,0 +1,91 @@
+#
+# cargo-deny policy for the agentstacks workspace.
+#
+#   cargo make deny        # all four checks
+#   cargo deny check bans  # one of them
+#
+# Four independent checks: security advisories, license acceptability, dependency
+# bans/duplicates, and source registries. `deny` is deliberately not part of `dod`.
+#
+# Install: cargo install --locked cargo-deny
+#
+
+[graph]
+# Deliberately no `targets` list. Restricting it would silence findings on
+# platforms this workspace has not ruled out, and the whole-graph view costs
+# nothing while every license present resolves to something permissive.
+all-features = true
+
+[output]
+feature-depth = 1
+
+# ---------------------------------------------------------------------------
+# Security advisories — RustSec
+# ---------------------------------------------------------------------------
+
+[advisories]
+# Everything the database reports is a failure. Suppressions are per-advisory
+# and belong here with a note saying why the exposure does not apply, never as
+# a blanket severity threshold.
+ignore = []
+
+# ---------------------------------------------------------------------------
+# Licenses
+# ---------------------------------------------------------------------------
+
+[licenses]
+# The permissive set claudestacks and openrouter-rs allow. Anything arriving outside it fails the
+# check, which is the point: a copyleft dependency should be a decision, not a
+# silent transitive addition. Entries that no crate in the graph uses yet are
+# kept so the policy matches claudestacks and openrouter-rs.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "Unicode-3.0",
+    "Unlicense",
+]
+confidence-threshold = 0.8
+exceptions = []
+
+[licenses.private]
+# Workspace members are not published yet, but their own Apache-2.0 license is
+# still checked against the allow list like any dependency's.
+ignore = false
+
+# ---------------------------------------------------------------------------
+# Bans and duplicate versions
+# ---------------------------------------------------------------------------
+
+[bans]
+# Duplicates are denied rather than warned, so a second copy of a crate has to
+# be acknowledged here. The `skip` list below is empty, so any duplicate fails
+# until it is added with a reason.
+multiple-versions = "deny"
+# No `version = "*"` dependencies. The root manifest declares every direct one once, in
+# `[workspace.dependencies]`.
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+allow = []
+deny = []
+skip = []
+skip-tree = []
+
+# ---------------------------------------------------------------------------
+# Sources
+# ---------------------------------------------------------------------------
+
+[sources]
+# crates.io only. A git or vendored dependency slipping into the lock file is a
+# supply-chain change worth failing over.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
