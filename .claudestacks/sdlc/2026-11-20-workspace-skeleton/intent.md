@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 spec: skipped
 milestone: foundation/01

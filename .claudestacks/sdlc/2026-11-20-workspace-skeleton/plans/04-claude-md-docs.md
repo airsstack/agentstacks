@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01, 02, 03]
 built-on: 5c6b28af8487
@@ -72,3 +72,38 @@ Commit `docs(repo): describe the working workspace in CLAUDE.md`.
 
 - `CLAUDE.md` reads consistently with `git ls-files` on the branch: every file it says exists is
   tracked.
+
+## Review findings
+
+One `claudestacks:reviewer` pass over the plans 03 and 04 diff. It re-ran `cargo make dod`,
+`dod-crate agentstacks`, `dod-crate agentstacks-cli` and `cargo make deny`; all exited 0.
+
+- 🟡 blocking, CLAUDE.md:16 — "Everything below the Status section describes the agreed design, not
+  existing files" contradicted the present-tense Commands section. **Fixed**: the sentence now
+  reads "…below the Status section except Commands…".
+- 🔵 CLAUDE.md:11 — "answers --version only" left out `--help`. **Fixed**: it now reads "answers --version and --help only".
+- 🔵 CLAUDE.md:12 — the `deny.toml` row read as a run-on phrase. **Fixed**: the files are now
+  separated by a comma and aligned.
+- 🔵 CLAUDE.md:108 — "every push to `main`" overstated the trigger and left out manual dispatch. **Fixed**: the line now lists push to
+  `main`, pull requests and manual dispatch.
+- 🔵 CLAUDE.md:13 — it lists ci.yml as existing while the file was untracked. This is resolved by
+  committing plan 03 before plan 04.
+- 🔵 open — the org root `CLAUDE.md:106` still says `cargo make fmt` is "the only task that rewrites
+  the tree". That is an org-root follow-up outside this repo.
+- Verified after the fixes: `cargo make dod` → exit 0. `grep -nE 'pre-code|None work yet|no Cargo
+  workspace' CLAUDE.md` → no output (exit 1). `cargo make dod-crate agentstacks`, `cargo make fmt`
+  (no source diff) and `cargo make deny` → exit 0 each, from the pre-review run.
+
+## Deviations
+
+- 2026-11-20 — The plan said "the command block stays". The `cargo make fmt` comment changed anyway,
+  from "the only task that rewrites the tree" to "rewrite formatting (clippy-fix is the other task
+  that edits sources)". The old claim was false: `Makefile.toml` also has `clippy-fix`. The reviewer
+  confirmed the new wording is accurate.
+- 2026-11-20 — Built inline by the main thread rather than by a `claudestacks:coder` spawn. It is a
+  docs-only edit.
+- 2026-11-20 — The chain is complete, so `intent.md` was flipped to `done`. The milestone roll-up (§12)
+  was **not** applied to `foundation/01`. This chain is that milestone's only member, so the
+  mechanical rule would flip it to `done`. But the milestone's goal (claude extension, packs,
+  claudevs move, a 0.x release) is unmet, and milestone `done` is final. More chains have to join
+  `foundation/01` before it can roll up.

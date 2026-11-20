@@ -2,13 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: pre-code
+## Status: workspace skeleton
 
-The repo was created on 2026-11-20 and so far holds `README.md`, `LICENSE` and a Rust `.gitignore`.
-There is no Cargo workspace, no `Makefile.toml`, and no `.claudestacks/sdlc/` chain yet. Everything
-below describes the agreed design. Until code lands, treat it as the contract to build toward, not a
-description of existing files. The code that will move here still lives in
+The Cargo workspace and its gate exist; the product does not yet.
+
+```text
+crates/agentstacks/       library; six empty seams (model, validation, plan, executor, lock, extension_host)
+crates/agentstacks-cli/   the `agentstacks` binary; answers --version and --help only
+Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
+.github/workflows/ci.yml  CI: `cargo make dod` and `cargo deny check`
+```
+
+Everything below the Status section except Commands describes the agreed design. Treat it as the
+contract to build toward, not a description of existing files. `extensions/`, `packs/`, `book/` and the claudevs move
+have not landed, and the code that will move here still lives in
 [claudestacks](https://github.com/airsstack/claudestacks) (`../claudestacks` in the org workspace).
+`/claudestacks-sdlc:status` shows progress.
 
 ## What agentstacks is
 
@@ -85,16 +94,19 @@ marketplace still point there).
 
 ## Commands
 
-None work yet. When the workspace exists, it uses the airsstack gate shared by every Rust project
+These run today. The workspace uses the airsstack gate shared by every Rust project
 (`cargo install --locked cargo-make cargo-deny`):
 
 ```bash
 cargo make dod                 # Definition of Done: fmt-check, clippy, rustdoc, tests, doctests (warnings = errors)
 cargo make dod-crate <crate>   # the same steps scoped with -p
-cargo make fmt                 # the only task that rewrites the tree
+cargo make fmt                 # rewrite formatting (clippy-fix is the other task that edits sources)
 cargo make deny                # cargo-deny; deliberately not part of dod
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
+
+CI runs `cargo make dod` and `cargo deny check` on push to `main`, on pull requests and on manual
+dispatch.
 
 A run short of `cargo make dod` counts as iteration, not a green result. The source of truth for the
 gate is the `claudestacks-guideline-rust:rust-guidelines` skill. Workspace lints: `unsafe_code =
