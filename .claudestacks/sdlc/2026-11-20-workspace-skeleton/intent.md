@@ -23,7 +23,8 @@ toolchain and CI pattern) and makes no new design decision.
 - agentstacks repository root: workspace manifest, toolchain, formatting, lint policy, cargo-make
   tasks, cargo-deny config, CI workflow.
 - New crates `crates/agentstacks` (library) and `crates/agentstacks-cli` (binary).
-- `CLAUDE.md` Commands section, which today says no command works yet.
+- `CLAUDE.md`: the Commands section, which today says no command works yet, and the "Status:
+  pre-code" section, which today says there is no Cargo workspace or `Makefile.toml`.
 - Reference only, not changed: `../claudestacks` (`Cargo.toml`, `Makefile.toml`, `deny.toml`,
   `rust-toolchain.toml`, `rustfmt.toml`, `.github/workflows/ci.yml`).
 
@@ -36,10 +37,11 @@ toolchain and CI pattern) and makes no new design decision.
 - The workspace enforces the shared lint policy (`unsafe_code = "forbid"`, `unwrap_used` denied,
   pedantic + nursery clippy), edition 2024, and the toolchain pinned exactly to 1.94.1 with
   `rust-version = "1.94"`, matching claudestacks.
-- `crates/agentstacks` exists as a library with the module seams the README names (model, plan,
-  executor, lock, extension host), with no behaviour yet. `crates/agentstacks-cli` builds an
+- `crates/agentstacks` exists as a library with the module seams the README names (model,
+  validation, plan, executor, lock, extension host), with no behaviour yet. `crates/agentstacks-cli` builds an
   `agentstacks` binary that answers `--version` and nothing more.
-- `CLAUDE.md` Commands describes what now runs, with no "none work yet" caveat.
+- `CLAUDE.md` Commands describes what now runs, with no "none work yet" caveat, and its status
+  section no longer claims the repository is pre-code or has no workspace.
 
 ## Constraints
 
