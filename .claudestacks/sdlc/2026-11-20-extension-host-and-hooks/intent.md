@@ -34,6 +34,9 @@ pinned and declared.
 - Pack hooks run on an airsl binary whose version the lock pins and whose presence is a declared
   requirement, never an ambient one.
 - When a tool demands another language for hooks, only a thin generated shim forwards to airsl.
+- A tool-neutral hook protocol: the shim turns the tool's hook payload into a neutral event and the
+  hook's neutral result (context, block with a reason, or nothing) into the tool's protocol. Only a
+  hook declared `may_block` can block; a block from any other hook is dropped and reported.
 
 ## Constraints
 
