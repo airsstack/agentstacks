@@ -1,0 +1,10 @@
+[toolchain]
+# Pinned to an exact patch release, not "stable". It matches `rust-version` in the workspace
+# manifest, so the MSRV claim is exercised by every ordinary build rather than asserted and never
+# checked, and it matches the pin in claudestacks and openrouter-rs.
+#
+# `rust-analyzer` and `rust-src` let an editor's language server run on this same pinned
+# toolchain; without them the rustup proxy has no `rust-analyzer` binary for 1.94.1.
+channel    = "1.94.1"
+components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]
+profile    = "minimal"

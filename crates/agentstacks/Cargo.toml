@@ -1,0 +1,13 @@
+[package]
+name                   = "agentstacks"
+version                = "0.0.0"
+description            = "Core library of agentstacks: packs, tool extensions, plans, and the executor that applies them."
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+publish.workspace      = true
+
+[lints]
+workspace = true
