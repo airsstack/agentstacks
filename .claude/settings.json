@@ -1,0 +1,24 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "disableWorkflows": true,
+  "enabledPlugins": {
+    "claudestacks@claudestacks": true,
+    "claudestacks-sdlc@claudestacks": true,
+    "claudestacks-guideline-rust@claudestacks": true,
+    "claudestacks-journal@claudestacks": true,
+    "claudestacks-cmux@claudestacks": true
+  },
+  "extraKnownMarketplaces": {
+    "claudestacks": {
+      "source": {
+        "source": "github",
+        "repo": "airsstack/claudestacks"
+      }
+    }
+  },
+  "feedbackSurveyRate": 0,
+  "editorMode": "vim"
+}
