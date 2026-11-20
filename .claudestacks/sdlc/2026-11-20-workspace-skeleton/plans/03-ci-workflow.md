@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01]
 built-on: 5c6b28af8487
@@ -75,3 +75,29 @@ green locally. Commit `ci(repo): add definition-of-done and supply-chain workflo
 ## Proof
 
 - The pull request for this chain shows the `Definition of Done` and `Supply chain` checks green.
+
+## Review findings
+
+One `claudestacks:reviewer` pass over the plans 03 and 04 diff. Plan 03 Task 1 was judged compliant: a
+`diff` against claudestacks' ci.yml shows only the planned removals, and both proof greps hold.
+
+- 🟡 ci.yml:33 — the comment said `rustup show` installs the pinned toolchain. That is false since
+  rustup 1.28. The reviewer reproduced it with a scratch `RUSTUP_HOME`. **Fixed**: the step now runs
+  `rustup toolchain install` before `rustup show`, and the comment says why.
+- 🟡 ci.yml:69 — the deny job's bare `rustup show` installs nothing, so the toolchain download
+  landed inside `cargo deny check`, against what its comment says. **Fixed**: `rustup toolchain install`.
+  Verified locally: `rustup toolchain install` (rustup 1.29.1) → "using existing install for
+  1.94.1-aarch64-apple-darwin … overridden by '…/rust-toolchain.toml'", exit 0.
+  `cargo make dod` → exit 0. The forbidden-words grep → 0 matches. YAML parse → jobs `["dod", "deny"]`.
+- 🔵 open — no local workflow linter exists. The first PR run is the only real check.
+
+## Deviations
+
+- 2026-11-20 — The plan said to copy the dod job's toolchain step and the deny job "as-is" from
+  claudestacks. Built instead: `rustup toolchain install` in both jobs, because the reviewer showed
+  that a bare `rustup show` no longer installs a toolchain (rustup ≥ 1.28). claudestacks' ci.yml has
+  the same defect, which is a follow-up there.
+- 2026-11-20 — Built inline by the main thread rather than by a `claudestacks:coder` spawn. It is a
+  one-file config copy with no Rust tests to write first.
+- 2026-11-20 — The proof "the workflow's first run on this branch's pull request is green" is still
+  pending. The branch is not pushed, and pushing is the author's act.
