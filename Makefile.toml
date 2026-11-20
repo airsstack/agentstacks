@@ -147,5 +147,16 @@ cargo fmt -p "${crate}" -- --check
 cargo clippy -p "${crate}" --all-targets --all-features -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc -p "${crate}" --all-features --no-deps
 cargo test -p "${crate}" --all-targets --all-features
-cargo test -p "${crate}" --all-features --doc
+# A binary-only crate has no library, so cargo refuses `--doc` for it; the
+# workspace-wide `dod` skips such members the same way. Any other failure fails.
+if ! out="$(cargo test -p "${crate}" --all-features --doc 2>&1)"; then
+    if printf '%s\n' "${out}" | grep -q 'no library targets found'; then
+        echo "dod-crate: ${crate} has no library target; no doctests to run"
+    else
+        printf '%s\n' "${out}" >&2
+        exit 1
+    fi
+else
+    printf '%s\n' "${out}"
+fi
 '''

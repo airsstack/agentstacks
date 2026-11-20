@@ -10,6 +10,9 @@ repository    = "https://github.com/airsstack/agentstacks"
 authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
 publish       = false
 
+[workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
+
 [workspace.lints.rust]
 unsafe_code        = "forbid"
 missing_docs       = "warn"

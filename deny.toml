@@ -67,7 +67,8 @@ ignore = false
 # be acknowledged here. The `skip` list below is empty, so any duplicate fails
 # until it is added with a reason.
 multiple-versions = "deny"
-# No `version = "*"` dependencies. The root manifest pins every direct one.
+# No `version = "*"` dependencies. The root manifest declares every direct one once, in
+# `[workspace.dependencies]`.
 wildcards = "deny"
 highlight = "all"
 workspace-default-features = "allow"
