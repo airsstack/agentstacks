@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 built-on: 5c6b28af8487
 ---
@@ -189,3 +189,30 @@ green. Commit `build(repo): add cargo-deny supply-chain policy`.
   `cargo make deny` all exit 0.
 - `cargo tree -d` reports no duplicate versions (workspace reference's DoD for
   workspace-touching changes).
+
+## Review findings
+
+Batch 1 (Task 1) — reviewer verdict: compliant, blocking: none.
+- 🟡 `rust-toolchain.toml:2-4` claimed the pin matches "the org's other workspaces" (airsl pins `1.94`, buildl `stable`) — fixed: now "matches the pin in claudestacks and openrouter-rs"; `cargo make dod-crate agentstacks` → exit 0.
+- 🟡 `crates/agentstacks/src/lib.rs` described behaviour the empty seams lack — fixed: reworded to "is the home of …", added "Every module currently holds no items"; `cargo make dod-crate agentstacks` → exit 0.
+- 🔵 `lib.rs:19` named `agentstacks-cli` before it exists — fixed with the item above ("the command-line front end").
+- 🔵 `validation.rs:3-5` exemption sentence folded into the body paragraph — open.
+- 🔵 nothing guards `[lints] workspace = true` / `publish = false` against reversion — open.
+- ❓ `.airsstack/` handoff tree is untracked and not git-ignored — open; see Deviations.
+
+Batch 2 (Tasks 2, 3) — reviewer verdict: compliant, blocking: none.
+- 🟡 `Makefile.toml:13-14` "CI runs `cargo make dod`" is false before plan 03 lands — fixed: "CI is meant to run `cargo make dod`"; `cargo make dod` → exit 0.
+- 🟡 `deny.toml:37-40` "matches the sibling airsstack workspaces" (airsl and buildl allow fewer) — fixed: names claudestacks and openrouter-rs; `cargo make deny` → exit 0.
+- 🟡 the as-is `deny.toml` allow list prints 9 `license-not-encountered` warnings on every `cargo make deny` (exit 0) — open; trimming the list or setting `unused-allowed-license = "allow"` departs from "allow list as-is" and needs a plan amendment.
+- 🔵 `Makefile.toml:6` "the only task that mutates the tree" ignored `clippy-fix` — fixed: names `clippy-fix` as the other source-editing task.
+- 🔵 `deny.toml:46,50` inline notes described crates absent from the graph — fixed: notes dropped; `cargo make deny` → exit 0.
+- 🔵 `deny.toml:70` "The root manifest pins every direct one" is vacuous with no dependencies — open (true once plan 02 adds `[workspace.dependencies]`).
+- 🔵 no check pins the five gate steps to the skill's DoD block — open.
+- 🔵 `deny.toml:8` "CI runs all four" rewritten though not in the plan's comment list — accepted under "comments that would be false here are rewritten".
+
+## Deviations
+
+- 2026-11-20 — The handoff session tree `.airsstack/` is untracked and not git-ignored here; no plan names a `.gitignore` change, so it was left alone. Commits must stage files explicitly.
+- 2026-11-20 — Task 3: copying the `[licenses] allow` list as-is makes `cargo deny check` warn `license-not-encountered` for 9 entries (output: "advisories ok, bans ok, licenses ok, sources ok", exit 0). Built as the plan says; recorded as an open finding.
+- 2026-11-20 — At the author's request, `rust-toolchain.toml` also lists `rust-analyzer` and `rust-src` (the plan named only `rustfmt` and `clippy`), so an editor's language server runs on the pinned toolchain. Before: `rust-analyzer --version` → "Unknown binary 'rust-analyzer' in official toolchain '1.94.1-aarch64-apple-darwin'"; after: "rust-analyzer 1.94.1 (e408947b 2026-03-25)"; `cargo make dod` → exit 0.
+- 2026-11-20 — Each task's "Commit …" step was not run: the execute instruction did not ask for commits. The work is left in the working tree with the commit messages above for the author.

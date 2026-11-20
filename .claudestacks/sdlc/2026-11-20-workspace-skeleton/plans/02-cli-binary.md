@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01]
 built-on: 5c6b28af8487
@@ -107,3 +107,21 @@ Definition of Done) and `cargo make deny` are green. Commit
 
 - `cargo run -p agentstacks-cli -- --version` prints `agentstacks 0.0.0`.
 - `cargo make dod` and `cargo make deny` exit 0 on the whole workspace.
+
+## Review findings
+
+Reviewer verdict: compliant with amendments, blocking: none.
+- 🟡 `cli.rs:13` "The grammar has no subcommands yet; …" is a temporal qualifier and is printed by `--help` — fixed: sentence dropped; `cargo make dod` → exit 0.
+- 🔵 `cli.rs:15` `-h` (manifest `description`) and `--help` (doc comment) printed different one-liners — fixed: the manifest `description` is now the product line; `agentstacks -h` → "Sets up agentic coding tools from one tool-neutral copy of skills, agents, commands, hooks and rules."
+- 🟡 `main.rs:1` header gives the "thin entry point" reason but cites none of the mandate's exempt categories, which the reviewer checklist asks for — open; the plan approved this reading (same as claudevs-cli), and the author should settle rule vs plan.
+- 🔵 `Makefile.toml` `dod-crate` doctest block shows captured output twice under `set -x` and does not stream — open (correct; fails closed).
+- 🔵 the `dod-crate` doctest skip is unguarded by CI — open (a revert fails loudly).
+- 🔵 `deny.toml:69` "pins every direct one" is loose (`clap = "4"` is a caret range) — fixed: "declares every direct one once, in `[workspace.dependencies]`"; `cargo make deny` → exit 0.
+- 🟡 `Makefile.toml` changed outside this plan's file list, with no Deviations entry — fixed: see Deviations.
+- 🔵 `command_definition_is_valid` passed against the stub (a valid definition cannot fail it) — recorded in Deviations.
+
+## Deviations
+
+- 2026-11-20 — Contradicted claim (this plan, "Done when"): `cargo make dod-crate agentstacks-cli` passes. Command: `cargo test -p agentstacks-cli --all-features --doc` → `error: no library targets found in package `agentstacks-cli`` (cargo-make exit 105). Built instead: the `dod-crate` script in `Makefile.toml` skips the doctest step only when cargo prints exactly that message; any other failure still exits 1. After: `cargo make dod-crate agentstacks-cli` → exit 0 ("dod-crate: agentstacks-cli has no library target; no doctests to run"); `cargo make dod-crate nonexistent` → exit 105. The workspace-wide `dod` already skipped bin-only members. The same script in claudestacks has the same gap for `claudevs-cli`.
+- 2026-11-20 — TDD note: `subcommand_is_rejected` and `version_flag_prints_name_and_crate_version` were seen failing on assertions against a stub; `command_definition_is_valid` passed against the stub, since a valid definition cannot fail it.
+- 2026-11-20 — The "Commit …" step was not run: the execute instruction did not ask for commits. The work is left in the working tree for the author.
