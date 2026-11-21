@@ -28,6 +28,10 @@ cross-references, `${CLAUDE_PLUGIN_ROOT}` paths, Lua scripts, references, enforc
 - Rendered through the `claude` extension into a project, each pack behaves as its plugin does
   today. claudevs (`claudevs-move`) or an equivalent check shows this.
 - The plugins' Lua tests run in agentstacks CI under airsl.
+- The plugin model's couplings are gone: hook scripts speak the neutral hook protocol, each pack's
+  hooks name only its own agents, the enforce hook no longer reads the installed-plugins registry,
+  options reach hooks through declared arguments, and the example references to guideline skills
+  become prose. Each resulting behaviour change is called out.
 
 ## Constraints
 

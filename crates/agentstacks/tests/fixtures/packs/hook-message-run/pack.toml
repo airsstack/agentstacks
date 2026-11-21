@@ -1,0 +1,10 @@
+[pack]
+name = "core"
+version = "0.1.0"
+api = 0
+description = "d"
+[[hooks]]
+kind = "message"
+event = "session.end"
+text = "t"
+run = "hooks/a.lua"

@@ -1,0 +1,16 @@
+api = 0
+
+[tools.claude]
+path = "extensions/claude"
+
+[packs.core]
+path = "packs/core"
+
+[packs.core.options]
+archive_keep = 50
+
+[packs.sdlc]
+path = "packs/sdlc"
+
+[packs.guideline-rust]
+path = "packs/guideline-rust"

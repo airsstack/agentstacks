@@ -1,0 +1,11 @@
+[pack]
+name = "sdlc"
+version = "0.1.0"
+api = 0
+description = "d"
+[requires]
+packs = ["core"]
+[options.base_branch]
+type = "string"
+default = "main"
+description = "Branch to diff against"

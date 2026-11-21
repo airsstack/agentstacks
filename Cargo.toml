@@ -12,6 +12,14 @@ publish       = false
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
+globset = "0.4"
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
+sha2 = "0.11"
+tempfile = "3"
+thiserror = "2"
+toml = "1"
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"

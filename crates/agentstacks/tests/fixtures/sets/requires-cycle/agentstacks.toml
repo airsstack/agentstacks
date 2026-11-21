@@ -1,0 +1,10 @@
+api = 0
+
+[tools.claude]
+path = "extensions/claude"
+
+[packs.a]
+path = "packs/a"
+
+[packs.b]
+path = "packs/b"

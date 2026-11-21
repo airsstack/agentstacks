@@ -1,0 +1,5 @@
+[[hooks]]
+kind = "message"
+event = "Stop"
+text = "t"
+agents = ["b"]

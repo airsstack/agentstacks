@@ -1,0 +1,4 @@
+[[hooks]]
+kind = "lua"
+event = "Stop"
+run = "hooks/missing.lua"

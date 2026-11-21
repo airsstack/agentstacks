@@ -1,0 +1,4 @@
+[[hooks]]
+kind = "message"
+event = "Stop"
+text = "t"
