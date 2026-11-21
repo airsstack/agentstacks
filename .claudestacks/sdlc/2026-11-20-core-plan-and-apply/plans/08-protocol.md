@@ -1,8 +1,8 @@
 ---
-status: draft
+status: approved
 created: 2026-11-22
-depends-on: [01]
-built-on: ea104af7451e
+depends-on: [01, 03]
+built-on: f39b2a814319
 ---
 
 # Protocol Implementation Plan
@@ -12,7 +12,7 @@ built-on: ea104af7451e
 **Architecture:** pure values in `types/protocol` (spec §2 table row `types/protocol`). `HookModule` turns
 a hook's `run` into the module name airsl's `require` resolves from `<root>/runtime.lua` (§11.1).
 `HookCommand` builds the exact argv of §11.2 from already-rendered values; rendering tokens and
-quoting the argv for a tool are not done here (§11.2, §16). `RUNTIME_LUA` is the text of
+quoting the argv for a tool are not done here (§11.2, §17). `RUNTIME_LUA` is the text of
 `crates/agentstacks/assets/runtime.lua`, compiled in with `include_str!`, and that asset is the §11.3
 block byte for byte (905 bytes, the same bytes as `probes/runtime-runtime.lua`). One integration test
 runs the shipped runtime with the argv `HookCommand` builds on the real `airsl` binary when present,
@@ -26,14 +26,15 @@ integration test only; no new dependency.
 
 **Content authority:** spec §11.1, §11.2, §11.3 (with `probes/runtime-runtime.lua`,
 `probes/runtime-results.txt`, `probes/runtime.sh`, `probes/runtime-translate.lua`), §14 row
-`runtime.lua`.
+`runtime.lua`, §16 R24 (the run-segment rule `HookModule` relies on, and the plan-level note that no
+doctest uses a fake). §16 R11 (when the core writes `runtime.lua`) is applied by plan 13, not here.
 
 Rust guideline rules applied (claudestacks-guideline-rust 0.1.6): `mod-rs-export-only.md`
 (`types/protocol/mod.rs` holds only docs, `mod` and `pub use`); `modularity.md` Rule 1 (module name,
 kind, blocking, command line and runtime text each in one file); `strong-types.md` (`may_block` is
 the two-variant `Blocking` enum, not a `bool` parameter; kind is `HookKind`; the root is a
 `SubPath`; env and exec grants keep `EnvName` / `BinaryName`); `unit-test-mandate.md` (colocated
-tests in every logic file; the integration test complements them); `doc-comment-discipline.md`;
+tests in every logic file; the integration test complements them); `doc-comment-discipline.md` (doctests build plain values and never use a `#[cfg(test)]` fake, §16 R24 plan-level note);
 `static-dispatch.md` (no trait objects).
 
 ---
@@ -49,7 +50,7 @@ crates/agentstacks/src/types/protocol/blocking.rs       — create: Blocking
 crates/agentstacks/src/types/protocol/module.rs         — create: HookModule
 crates/agentstacks/src/types/protocol/command.rs        — create: HookCommand and its argv
 crates/agentstacks/tests/runtime.rs                     — create: the runtime on the airsl binary
-crates/agentstacks/tests/fixtures/runtime/…             — create: a project with translate.lua and four hook modules
+crates/agentstacks/tests/fixtures/runtime/…             — create: a project with byte copies of the probe's translate.lua and four hook modules
 ```
 
 ## Order of work
@@ -117,7 +118,7 @@ Commit `feat(agentstacks): hook kind and blocking arguments`.
 is that pack's name, then each segment of `run.path()` with `.lua` removed from the last, joined by
 `.` (§11.1: airsl's `require` root is the script's directory, so `{{root core}}/hooks/enforce.lua`
 becomes `core.hooks.enforce`; core root files land at `<root>/<pack>/<rel>`, D7). It cannot fail:
-every segment is require-able because plan 03's `run` segment rule (§12 row 4) refuses the rest at
+every segment is require-able because plan 03's `run` segment rule (§12 row 4, §16 R24) refuses the rest at
 pack load. `as_str()` and `Display` give the name.
 
 **Proof:** hooks are built by parsing a small `pack.toml` with `PackManifest::parse`, as the
@@ -154,7 +155,7 @@ Vec<String>` returns exactly, in this order (§11.2):
 
 Values pass through unchanged: an element holding a `{{var}}` value such as `$TMPDIR` stays as text;
 turning the argv into the tool's command string and setting the working directory are the
-extension's (§11.2 bullets 2 and 5). The same argv is the plan payload's `command` (§4.4); plan 13
+extension's (§11.2 bullets 2 and 5, §17). The same argv is the plan payload's `command` (§4.4); plan 13
 fills it.
 
 **Proof:**
@@ -179,7 +180,8 @@ Commit `feat(agentstacks): hook command line`.
   byte-for-byte copy of `probes/runtime-translate.lua` (made with `cp`).
 - Create `crates/agentstacks/tests/fixtures/runtime/proj/.tool/agentstacks/core/data.txt` — `hello\n`.
 - Create `crates/agentstacks/tests/fixtures/runtime/proj/.tool/agentstacks/core/hooks/{ctx,blk,raw,both}.lua`
-  — four hook modules, described below.
+  — byte-for-byte copies of `probes/runtime-hooks/{ctx,blk,raw,both}.lua`, the four modules the
+  §11.3 probe ran (made with `cp`, never rewritten).
 - Create `crates/agentstacks/tests/runtime.rs` — the integration test.
 
 **Change:** the test copies the fixture project into a `tempfile` directory, writes `RUNTIME_LUA`
@@ -188,20 +190,18 @@ to `.tool/agentstacks/runtime.lua` there, builds each command with `HookCommand:
 working-directory duty of §11.2 bullet 2), piping the payload
 `{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}` on stdin (as
 `probes/runtime.sh`). When `airsl --version` cannot run, each test prints a reason and returns
-without failing (§14 `runtime.lua` row: "when the binary is present"). Fixture modules, each
-returning one function of the event:
-- `ctx.lua` — reads `.tool/agentstacks/core/data.txt` with `airsstack.fs.read` under `pcall` and
-  returns `context` = `event=<event.event> session=<event.session_id> args=<args joined by ,> read=<ok>:<data>`;
-- `blk.lua` — returns `block` = `edits to <event.event> are not allowed`;
-- `raw.lua` — returns `context` = `native payload tool_name=<payload.tool_name> event=<event.event>`;
-- `both.lua` — returns `context` = `keep this context` and `block` = `and drop this block`.
+without failing (§14 `runtime.lua` row: "when the binary is present"). What the copied modules do,
+for the reader: `ctx.lua` returns a context naming the event, session, args, the result of reading
+`.tool/agentstacks/core/data.txt` under `pcall`, and the sorted keys of `airsstack.fs`; `blk.lua`
+returns a `block`; `raw.lua` reports the native payload's `tool_name`; `both.lua` returns a context
+and a block.
 
 **Proof:** each expected output is the §11.3 table's or §11.2's, from `probes/runtime-results.txt`.
 - `runtime_context_with_read_grant` — `--allow-read .tool/agentstacks/core`, module `core.hooks.ctx`,
-  args `--manifest x.json` → stdout is
-  `{"context":"event=tool.before session=s1 args=--manifest,x.json read=true:hello\n"}` (the `\n`
-  there is JSON's two-character escape of the file's line break, as the probe printed it) followed by
-  one real line break from the translator; exit 0 (§11.2 bullet 3, first run; §11.3 row "context").
+  args `--manifest x.json` → stdout equals the first run's stdout line in `probes/runtime-results.txt`
+  byte for byte (it starts `{"context":"event=tool.before session=s1 args=--manifest,x.json read=true:hello\n fs=`,
+  where `\n` is JSON's two-character escape of the file's line break), followed by one real line break
+  from the translator; exit 0 (§11.2 bullet 3, first run; §11.3 row "context").
 - `runtime_read_without_grant_is_denied` — same without the grant → the context holds
   `read=false:fs.read denied:` (§11.2 bullet 3, second run).
 - `runtime_drops_block_when_not_may_block` — `core.hooks.blk`, `MayNot` → stdout empty; stderr is
@@ -235,6 +235,9 @@ returning one function of the event:
   test moves to the hash pin alone.
 - `tests/runtime.rs` is new and not listed in the plan-set map; it is the only home for §14's
   `runtime.lua` row and depends only on this plan's types.
+- `runtime_context_with_read_grant` compares the whole line, which includes the sorted
+  `airsstack.fs` key list airsl 0.1.4 exposes under `confined`; an airsl that adds an `fs` function
+  changes that line. The test prints the `airsl --version` it ran, so a mismatch names the version.
 - `tests/runtime.rs` uses `std::process` and `std::fs`; `tests/isolation.rs` checks `src/` only, so
   this is allowed. The test never touches the network.
 - The test outputs depend on airsl's JSON encoder printing a one-key object as `{"key":"value"}`;

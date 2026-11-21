@@ -1,31 +1,35 @@
 ---
-status: draft
+status: approved
 created: 2026-11-22
 depends-on: [01]
-built-on: ea104af7451e
+built-on: f39b2a814319
 ---
 
 # Formats Implementation Plan
 
 **Goal:** Amend the built formats to the api 0 changes of spec §12.
 
-**Architecture:** Four independent edits to formats already built in `src/types`, one task each.
+**Architecture:** Five independent edits to formats already built in `src/types`, one task each.
 Each refusal is a variant of the format's own error enum, displayed after the built `Location`, so
 the new messages read like the old ones of the same file:
 
 - `extension.reads` is read by `ExtensionManifest` (`src/types/extension/manifest.rs`) with the
   lock's `[[file]].path` rule (formats §8, built in `read_path`,
   `src/types/lock/entry/written.rs:243`): an absolute entry is `MustBeRelative`, a `..` segment is
-  `OutsideProject`, a blank one is `empty`. Entries are kept as `SubPath`
+  `OutsideProject`, a blank one is `empty`, and a `\` is refused as in §16 R16 (R28(n)); naming
+  agentstacks' own files is allowed there (R28(n)). Entries are kept as `SubPath`
   (`src/types/project/path/sub.rs`), whose `normalized()` is the spec §3.3 normalisation, and a
-  repeat after normalising is the shared `ListedTwice` phrase.
+  repeat after normalising is the shared `ListedTwice` phrase, quoting the repeated entry as written
+  (§16 R24).
 - The lock's `[[merge]]` goes: `MergeEntry`, `MergeFile`, `MergeKey`, `EntryKey::Merge` and the
   `merge` top-level key are deleted, so `merge` falls to the built unknown-key refusal.
+- The lock's `[[file]].path` rule, when a lock is read, also refuses a `\` and agentstacks' own two
+  files (§16 R16, R28(e)).
 - `Policy` (`src/types/hooks/policy.rs`) keeps only `Confined`; `pure` gets its own refusal and the
   unknown-value refusal names `confined` alone.
 - `HookRun::read` (`src/types/hooks/run.rs`), which both `pack.toml` hooks and
-  `native/<tool>/hooks.toml` hooks use (`src/types/hooks/native/hook.rs` module doc), refuses a
-  path segment that `require` cannot name (spec §11.1).
+  `native/<tool>/hooks.toml` hooks use (`src/types/hooks/native/hook.rs` module doc), refuses the
+  first path segment that `require` cannot name (spec §11.1, §16 R24).
 
 Guideline rules applied: `modularity.md` Rule 2 (no new phrase type: the built `MustBeRelative`,
 `OutsideProject`, `ListedTwice<Quoted>` and `FieldError` are reused; the lock's dead merge types
@@ -34,12 +38,13 @@ are deleted rather than kept beside the new design); `mod-rs-export-only.md` (`l
 bullets); `unit-test-mandate.md` (every changed rule gets its colocated test); `strong-types.md`
 (`reads` is `Vec<SubPath>`, not `Vec<String>`); `doc-comment-discipline.md` (docs describe the new
 behaviour; no issue number in a doc comment; the issue reference lives only in the user-facing
-message the spec fixes).
+message the spec fixes). No doc-comment example uses a fake (fakes are `#[cfg(test)]`, plan-set
+rule); `FakeFileTree` appears only in unit tests.
 
 **Tech Stack:** Rust 2024, crate `agentstacks`, `toml 1`, `thiserror 2`.
 
 **Content authority:** spec §12 rows 1-4, D14, §11.1 (why a segment must be require-able), §3.3
-"Normalisation" (for `reads`).
+"Normalisation" (for `reads`), §16 R16, R24, R28(e), R28(n).
 
 ---
 
@@ -47,7 +52,7 @@ message the spec fixes).
 
 ```
 crates/agentstacks/src/types/extension/manifest.rs      — modify: read `reads`; accessor; docs; tests
-crates/agentstacks/src/types/extension/error.rs         — modify: variants MustBeRelative, OutsideProject, ListedTwice
+crates/agentstacks/src/types/extension/error.rs         — modify: variants MustBeRelative, OutsideProject, ListedTwice, Separator
 crates/agentstacks/src/types/extension/loaded.rs        — modify: `Extension::reads` forwarding accessor; test
 crates/agentstacks/tests/extension.rs                   — modify: a fixture with reads loads; one invalid reads fixture
 crates/agentstacks/tests/fixtures/extensions/valid/reads/extension.toml        — create
@@ -55,13 +60,13 @@ crates/agentstacks/tests/fixtures/extensions/valid/reads/adapter.lua           �
 crates/agentstacks/tests/fixtures/extensions/invalid/reads-absolute/extension.toml — create
 crates/agentstacks/tests/fixtures/extensions/invalid/reads-absolute/adapter.lua    — create (`return {}`)
 crates/agentstacks/src/types/lock/merge.rs              — delete
-crates/agentstacks/src/types/lock/entry/written.rs      — modify: drop MergeEntry, ReadMerge, MERGE_KEYS and their tests; docs
+crates/agentstacks/src/types/lock/entry/written.rs      — modify: drop MergeEntry, ReadMerge, MERGE_KEYS and their tests; R16 checks in read_path; docs
 crates/agentstacks/src/types/lock/entry/key.rs          — modify: drop EntryKey::Merge; test case; docs
 crates/agentstacks/src/types/lock/entry/locked.rs       — modify: module doc no longer links MergeEntry
 crates/agentstacks/src/types/lock/entry/mod.rs          — modify: drop the MergeEntry re-export; docs
 crates/agentstacks/src/types/lock/file.rs               — modify: drop merges everywhere; TOP_LEVEL_KEYS loses "merge"; tests
 crates/agentstacks/src/types/lock/write.rs              — modify: drop the merge table; tests
-crates/agentstacks/src/types/lock/error.rs              — modify: ListedTwice doc; drop the merge test case
+crates/agentstacks/src/types/lock/error.rs              — modify: drop the merge test case; variants Separator, Managed; docs
 crates/agentstacks/src/types/lock/owner.rs              — modify: docs say "file", not "file or merge"
 crates/agentstacks/src/types/lock/testing.rs            — modify: the example lock loses its [[merge]] table
 crates/agentstacks/src/types/lock/mod.rs                — modify: drop `pub mod merge` and three re-exports; docs
@@ -85,8 +90,9 @@ crates/agentstacks/src/types/manifest/error.rs          — modify: ManifestErro
   `"reads"` joins the allowed keys of `[extension]`; module doc lists `reads`; tests.
 - Modify `crates/agentstacks/src/types/extension/error.rs` — `ExtensionError` gains
   `MustBeRelative(#[from] MustBeRelative)`, `OutsideProject(#[from] OutsideProject)`,
-  `ListedTwice(#[from] ListedTwice<Quoted>)` (all transparent, the phrase module's naming rule);
-  module doc; the display test gets one case each. A blank entry uses the built `FieldError::Empty`
+  `ListedTwice(#[from] ListedTwice<Quoted>)` (all transparent, the phrase module's naming rule) and
+  `Separator { text }` displaying `"<text>" must use / as the separator`; module doc; the display
+  test gets one case each. A blank entry uses the built `FieldError::Empty`
   (`empty`), not a new variant.
 - Modify `crates/agentstacks/src/types/extension/loaded.rs` — `pub fn reads(&self) -> &[SubPath]`
   forwarding to the manifest, so the plan and host code that holds an `Extension` reads it in one
@@ -100,14 +106,17 @@ crates/agentstacks/src/types/manifest/error.rs          — modify: ManifestErro
 empty array is accepted. It is read with the built `optional_string_list`
 (`src/types/format/fields.rs:174`), which already words a non-array value and a non-string item.
 Each string item, located at `extension.reads[<i>]` (0-based TOML index, as every built list), is
-checked in the lock path rule's order (`read_path`, `src/types/lock/entry/written.rs:243-260`):
-a leading `/` → `MustBeRelative`; then `SubPath::new` — `InvalidSubPath::OutsideRepository` →
-`OutsideProject`, `InvalidSubPath::Empty` → `FieldError::Empty`. A valid entry whose `normalized()` equals an
-earlier valid entry's is refused with `ListedTwice` quoting the repeated entry as written, at the
-repeated index (spec §12 row 1 "duplicates refused after normalising"; quoting as `requires.rs`
-does, `src/types/manifest/requires.rs:104`). Every refusal is collected with the other field
-refusals, as today (`parse` reports all at once). The manifest keeps the entries as written; callers
-compare `normalized()` (spec §3.3 "Normalisation").
+checked in the order of the lock path rule's existing checks (`read_path`,
+`src/types/lock/entry/written.rs:243-260`): a leading `/` → `MustBeRelative`; then `SubPath::new` —
+`InvalidSubPath::OutsideRepository` → `OutsideProject`, `InvalidSubPath::Empty` →
+`FieldError::Empty`; then a `\` → `Separator`, the R16 check Task 3 adds to the lock (§16 R28(n)).
+The own-file check of Task 3 does not apply: `agentstacks.toml` and `agentstacks.lock` are allowed in
+`reads` (R28(n)). A valid entry whose `normalized()` equals an earlier valid entry's is refused
+with `ListedTwice` quoting the repeated entry as written, at the repeated index (spec §12 row 1
+"duplicates refused after normalising"; §16 R24 "A repeated `extension.reads` entry is quoted as
+written"). Every refusal is collected with the other field refusals, as today (`parse` reports all
+at once). The manifest keeps the entries as written; callers compare `normalized()` (spec §3.3
+"Normalisation").
 
 **Proof:** written first, seen failing, then passing. In `manifest.rs` (each refusal test asserts
 the full sorted diagnostics, as the existing tests do):
@@ -127,23 +136,27 @@ the full sorted diagnostics, as the existing tests do):
 - `extension_manifest_refuses_a_blank_reads_entry` — `reads = [""]` and `reads = ["  "]`:
   `extension.toml: extension.reads[0]: empty` (the lock rule's blank refusal,
   `agentstacks.lock: file[0].path: empty`, `src/types/lock/entry/written.rs:391`).
+- `extension_manifest_refuses_a_reads_entry_with_a_backslash` — `reads = ['a\b']` (one backslash):
+  `extension.toml: extension.reads[0]: "a\b" must use / as the separator` (§16 R28(n)).
+- `extension_manifest_allows_agentstacks_own_files_in_reads` —
+  `reads = ["agentstacks.toml", "agentstacks.lock"]` parses with both entries kept (§16 R28(n)).
 - `extension_manifest_refuses_a_reads_entry_listed_twice` —
   `reads = [".claude/settings.json", ".claude/settings.json"]`:
   `extension.toml: extension.reads[1]: ".claude/settings.json" listed twice`.
-- `extension_manifest_refuses_one_reads_path_written_two_ways` — for each pair
-  (`.claude/x`, `./.claude/x`), (`./a`, `a`), (`a//b`, `a/b`) as `reads`: exactly one refusal, located
-  at `extension.toml: extension.reads[1]`, ending with `listed twice` (the shape of
-  `lockfile_refuses_one_path_written_two_ways`, `src/types/lock/file.rs:931`).
+- `extension_manifest_refuses_one_reads_path_written_two_ways` — `reads = [".claude/x", "./.claude/x"]`:
+  `extension.toml: extension.reads[1]: "./.claude/x" listed twice`; `reads = ["./a", "a"]`:
+  `extension.toml: extension.reads[1]: "a" listed twice`; `reads = ["a//b", "a/b"]`:
+  `extension.toml: extension.reads[1]: "a/b" listed twice` (§16 R24).
 - `extension_manifest_refuses_unknown_keys` (existing) still passes unchanged: `foo` stays an
   unknown key, and `reads` no longer is.
-- `extension_error_displays_each_message` (existing, `error.rs`) gains the three new variants:
+- `extension_error_displays_each_message` (existing, `error.rs`) gains the four new variants:
   `"/x" must be relative`, `"../x" must stay inside the project`,
-  `".claude/settings.json" listed twice`.
+  `".claude/settings.json" listed twice`, `"a\b" must use / as the separator`.
 
 In `loaded.rs`:
-- `extension_reads_are_the_manifests` — an extension loaded from a `FakeFileTree` whose manifest
-  has `reads = [".claude/settings.json"]` returns the same slice from `Extension::reads()` and
-  `manifest().reads()`.
+- `extension_reads_are_the_manifests` (unit test) — an extension loaded from a `FakeFileTree` whose
+  manifest has `reads = [".claude/settings.json"]` returns the same slice from `Extension::reads()`
+  and `manifest().reads()`.
 
 In `tests/extension.rs`:
 - `extension_fixture_with_reads_loads` — `valid/reads` loads; `reads()` normalised is
@@ -215,9 +228,9 @@ In `write.rs`:
   the `merges` arguments are removed (the `lock` helper loses its `merges` parameter and the `merge`
   helper is removed).
 - `write_lock_escapes_strings` — the escaped string moves from a merge key to a file path: a
-  `[[file]]` whose path is `a"b\c<TAB>d<LF>e<U+0001>` is written as
-  `path = "a\"b\\c\td\ne\u0001"`, reads back to the same path, and the reread lock equals the
-  written one.
+  `[[file]]` whose path is `a"b` + tab + `d` + newline + `e` + U+0001 is written as
+  `path = "a\"bd\ne\u0001"` with the tab escaped as `\t` (the path holds no `\`, which Task 3
+  refuses on read), reads back to the same path, and the reread lock equals the written one.
 
 In `key.rs` and `error.rs`: the existing tests pass without their merge case.
 
@@ -225,7 +238,39 @@ In `key.rs` and `error.rs`: the existing tests pass without their merge case.
 finds only the new test's `[[merge]]` text and its name, and the Definition of Done is green.
 Commit `feat(agentstacks): remove the lock's [[merge]]`.
 
-### Task 3 — Refuse the `pure` hook policy in api 0
+### Task 3 — Refuse a `\` and agentstacks' own files in a lock file path
+
+**Files:**
+- Modify `crates/agentstacks/src/types/lock/error.rs` — `LockError::Separator { text }` displaying
+  `"<text>" must use / as the separator` and `LockError::Managed { text }` displaying
+  `"<text>" is managed by agentstacks`; one case each in `lock_error_displays_each_refusal_text`.
+- Modify `crates/agentstacks/src/types/lock/entry/written.rs` — `read_path` refuses, after its
+  existing checks pass, a path containing `\` with `Separator`, and a path whose `normalized()` is
+  `agentstacks.lock` or `agentstacks.toml` with `Managed`, quoting the path as written; module doc;
+  tests.
+
+**Change:** §16 R16 and R28(e): when a lock is read
+(`Lockfile::parse`), a `[[file]].path` containing `\` is refused with
+`agentstacks.lock: file[0].path: "a\b" must use / as the separator`, and one naming agentstacks'
+own files is refused with `agentstacks.lock: file[0].path: "agentstacks.lock" is managed by
+agentstacks` (same shape for `agentstacks.toml`). `Lockfile::new` takes typed `FileEntry` values and
+is unchanged: §16 R16 scopes the rule to reading, and the op path rule (§3.3) already refuses both
+before a path can reach the lock.
+
+**Proof:** written first, seen failing, then passing. In `written.rs`, `file_entry_refuses_each_rule`
+gains three cases (the shape of its existing `"/x" must be relative` case):
+- path `a\b` (one backslash): `agentstacks.lock: file[0].path: "a\b" must use / as the separator`.
+- path `agentstacks.lock`: `agentstacks.lock: file[0].path: "agentstacks.lock" is managed by agentstacks`.
+- path `agentstacks.toml`: `agentstacks.lock: file[0].path: "agentstacks.toml" is managed by agentstacks`.
+
+In `error.rs`, `lock_error_displays_each_refusal_text` gains `Separator { text: "a\b" }` →
+`"a\b" must use / as the separator` and `Managed { text: "agentstacks.lock" }` →
+`"agentstacks.lock" is managed by agentstacks`.
+
+**Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
+Commit `feat(agentstacks): refuse backslashes and own files in lock paths`.
+
+### Task 4 — Refuse the `pure` hook policy in api 0
 
 **Files:**
 - Modify `crates/agentstacks/src/types/hooks/policy.rs` — `Policy` has one variant, `Confined`
@@ -270,31 +315,42 @@ policy reads `"<text>" (expected confined)`. The `trusted` refusal is unchanged 
 **Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
 Commit `feat(agentstacks): refuse the pure hook policy in api 0`.
 
-### Task 4 — Require every `run` segment to be require-able
+### Task 5 — Require every `run` segment to be require-able
 
 **Files:**
 - Modify `crates/agentstacks/src/types/manifest/error.rs` — `ManifestError::RunSegment { run, segment }`
   displaying `"<run>" segment "<segment>" may use only letters, digits, _ and -`; a case in
   `hook_cases`.
-- Modify `crates/agentstacks/src/types/hooks/run.rs` — after the `run` form is split and the file
-  is a `.lua` file, each `/` segment of the pack-relative path (the `PackPath` that follows the
-  form), with `.lua` removed from the last one, must match `^[A-Za-z0-9_-]+$`; a segment that does
-  not is refused at `run` with `RunSegment`, and no `HookRun` is returned. Module doc lists the rule
-  and why (the segment becomes a dotted module name under the hook runtime, spec §11.1). Tests.
+- Modify `crates/agentstacks/src/types/hooks/run.rs` — the segment rule in `HookRun::read`; module
+  doc lists the rule and why (the segment becomes a dotted module name under the hook runtime, spec
+  §11.1); tests.
 - Modify `crates/agentstacks/src/types/hooks/native/hook.rs` — a case in
   `native_hook_keeps_the_neutral_rules`.
 
-**Change:** Spec §12 row 4 and D14: `hooks/my.hook.lua` is refused, because `my.hook` cannot be one
-segment of a `require` name (spec §4.5 name rule, §11.1: `{{root core}}/hooks/enforce.lua` becomes
-the module `core.hooks.enforce`). `PackPath` already refuses `.`, `..`, empty segments and `\`
+**Change:** Spec §12 row 4, D14 and §16 R24. When the `run` form splits and `run` ends in `.lua`
+(other values are already refused by the `.lua` row and get no segment refusal), each `/` segment of
+the pack-relative path that follows the form, with `.lua` removed from the last one, must match
+`^[A-Za-z0-9_-]+$`. The first segment that does not is refused at `run` with `RunSegment`, quoting
+`run` as written; later bad segments are not reported, and no `HookRun` is returned. Example:
+`{{root core}}/hooks/enforce.lua` becomes the module `core.hooks.enforce` (§11.1), so `my.hook`
+cannot be one segment. `PackPath` already refuses `.`, `..`, empty segments and `\`
 (`src/types/manifest/pack/path.rs`), so the segments this rule sees are non-empty and plain. The
 rule applies to `native/<tool>/hooks.toml` through the same `HookRun::read`.
 
 **Proof:** written first, seen failing, then passing.
 - `hook_run_refuses_a_segment_that_cannot_be_required` (`run.rs`) — `run = 'hooks/my.hook.lua'`:
   the only refusal is
-  `packs/core/pack.toml: hooks[1].run: "hooks/my.hook.lua" segment "my.hook" may use only letters, digits, _ and -`,
-  and no `HookRun` is returned.
+  `packs/core/pack.toml: hooks[1].run: "hooks/my.hook.lua" segment "my.hook" may use only letters, digits, _ and -`
+  (§12 row 4), and no `HookRun` is returned.
+- `hook_run_quotes_a_token_form_as_written` (`run.rs`) — `run = '{{root core}}/hooks/my.hook.lua'`:
+  the only refusal is
+  `packs/core/pack.toml: hooks[1].run: "{{root core}}/hooks/my.hook.lua" segment "my.hook" may use only letters, digits, _ and -`
+  (§16 R24).
+- `hook_run_reports_only_the_first_bad_segment` (`run.rs`) — `run = 'a.b/c.d.lua'`: the only
+  refusal is `packs/core/pack.toml: hooks[1].run: "a.b/c.d.lua" segment "a.b" may use only letters, digits, _ and -`
+  (§16 R24).
+- `hook_run_checks_segments_of_lua_runs_only` (`run.rs`) — `run = 'hooks/my.hook.sh'`: the only
+  refusal is `packs/core/pack.toml: hooks[1].run: "hooks/my.hook.sh" is not a .lua file` (§16 R24).
 - `hook_run_accepts_letters_digits_underscore_and_hyphen` (`run.rs`) — `hooks/handoff-check_2.lua`,
   `Hooks/A9.lua` and `{{root core}}/hooks/enforce.lua` are accepted with no refusal.
 - `hook_run_accepts_the_three_forms` (existing) — unchanged and passing.
@@ -318,17 +374,20 @@ Definition of Done is green. Commit `feat(agentstacks): require-able hook run se
   none of them.
 - Task 2 edits `src/types/mod.rs`, which the skeleton plan owns; this plan depends on it and changes
   only the three `Merge*` re-export lines.
-- Task 1 copies the lock's six-line path decision rather than sharing one function, because the two
-  enums that carry the refusal differ (`LockError`, `ExtensionError`); the wording cannot drift,
-  since both use the shared phrase types. The final cross-check may fold the two into one helper on
-  `SubPath`.
-- Task 4 does not decide the quoted `<run>` text for a `{{root}}` form or the number of refusals
-  for a path with several bad segments; see the open questions sent with this plan set. Its tests
-  cover the pack-relative form with one bad segment, which the spec fixes.
+- Task 1 copies the lock's path decision rather than sharing one function, because the two enums
+  that carry the refusal differ (`LockError`, `ExtensionError`); the wording cannot drift, since
+  both use the shared phrase types. `extension.reads` takes Task 3's `\` check but not its own-file
+  check (§16 R28(n)).
+- `LockError::Separator` and `LockError::Managed` repeat wording that the errors plan's `OpError`
+  and the built `InvalidPackPath::Backslash` also print; the final cross-check may fold them into
+  one shared phrase type in `report/phrase.rs`.
+- `extension_reads_are_the_manifests` uses `crate::port::FakeFileTree` in a `#[cfg(test)]` unit test
+  under `src/types`, which §16 R28(k) allows and the skeleton plan's isolation guard accepts.
 
 ## Proof
 
-- `cargo make dod` is green at the end of Task 4.
-- Spec rows covered: §12 row 1 (Task 1: every listed refusal, normalised duplicates, optional list,
-  `reads` exposed), §12 row 2 (Task 2), §12 row 3 and D14 first sentence (Task 3), §12 row 4 and
-  D14 second sentence, incl. `native/<tool>/hooks.toml` (Task 4).
+- `cargo make dod` is green at the end of Task 5.
+- Spec rows covered: §12 row 1 and §16 R24 (reads quoting) (Task 1: every listed refusal, normalised
+  duplicates, optional list, `reads` exposed, R28(n) separator and own files), §12 row 2 (Task 2),
+  §16 R16 and R28(e) (Task 3), §12 row 3 and D14 first sentence (Task 4), §12 row 4, D14 second sentence and
+  §16 R24 (run segment), incl. `native/<tool>/hooks.toml` (Task 5).

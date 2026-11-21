@@ -1,8 +1,8 @@
 ---
-status: draft
+status: approved
 created: 2026-11-22
 depends-on: [04, 06, 07]
-built-on: ea104af7451e
+built-on: f39b2a814319
 ---
 
 # Ports Implementation Plan
@@ -28,10 +28,10 @@ airsl (spec §14 app row).
 Answer types are the canonical ones other plans build, never copies (`modularity.md` Rule 2):
 `Resolution`, `DiskState`, `DiskFile`, `Link`, `Reads`, `ReadOutcome`, `AirslAnswer` (plan 06);
 `OpPath`, `Proposal`, `Proposals`, `ValuesInput`, `ValuesResult`, `PlanInput` (plan 04);
-`FetchError` (plan 02); `GitUrl`, `GitTag`, `CommitId`, `Pin`, `SubPath`, `LocalPath`,
+`FetchError` (plan 02); `RemoteTag` (plan 07); `GitUrl`, `GitTag`, `CommitId`, `Pin`, `SubPath`, `LocalPath`,
 `BinaryName`, `Extension`, `Diagnostics`, `ContentHash` (built). I/O failures are the platform's
 `std::io::Error`, as `FileTree` already does, so a flow reports `<path>: <io::Error Display>`
-(spec §7 failure table, §13).
+(spec §7 failure table, §13, R1).
 
 Rust guideline rules applied (claudestacks-guideline-rust 0.1.6): `static-dispatch.md` (generic
 bounds and associated types; no `dyn`); `mod-rs-export-only.md` (every `mod.rs` below holds only
@@ -48,7 +48,7 @@ call logs and recorded effects; no new dependency.
 
 **Content authority:** spec §2 (port row, dependency rule, static-dispatch row), §6.1 (what each
 flow step asks of a port), §6.3, §7, §8, §9.2, §9.3, §9.4, §10, §4.3-§4.4 (the adapter calls),
-§14 (app row: fakes only).
+§14 (app row: fakes only), §16 R1, R2, R10, R21.
 
 ---
 
@@ -97,22 +97,32 @@ paths are project-relative `OpPath`s (normalised, spec §3.3 "Normalisation"):
   §6.3, §8 rows 3-5). The answer is plan 06's `Resolution`: `Outside`, or `Inside { link, state }`
   where `link` says whether the path itself is a symlink (§6.2 second table, symlink row) and
   `state` is `Absent`, `File(DiskFile)` (bytes, hash, mode) or `NotRegular` (a dangling symlink
-  included, §6.3 step 1). Apply's race check (§7 step 3) calls the same method.
+  included, §6.3 step 1). Apply's race check (§7 step 3) calls the same method; the mode in a
+  `DiskFile` is for keeping it on swap, and a mode-only change is not "changed" (R28(i): content
+  hash only).
 - `source_tree(dir: &LocalPath)` → `io::Result<Option<Self::Tree>>`: a `path` source directory put
   through the same §6.3 rule (spec §6.3 last paragraph); `None` when it resolves outside the
   project, else the tree to load the pack or extension from.
 - `stage(path, bytes)` → `io::Result<()>`: write the bytes to the step's temp
-  `<dir>/.<name>.agentstacks-tmp`, creating parents, overwriting a leftover temp (spec §7 step 2).
+  `.<name>.agentstacks-tmp` beside the canonical target (R21), creating parents, overwriting a
+  leftover temp (spec §7 step 2).
 - `discard(path)` → `io::Result<()>`: remove that temp; a temp already gone is not an error
   (spec §7 failure rows "2 or 3" and "4": "the temps … are removed").
-- `swap(path)` → `io::Result<()>`: rename the temp onto the (canonical) target, an updated file
+- `swap(path)` → `io::Result<()>`: rename the temp onto the canonical target, an updated file
   keeping its old mode (spec §7 step 4, "Modes").
 - `delete(path)` → `io::Result<()>`: remove a locked file (spec §7 step 4); directories it leaves
-  empty stay (§7, §17).
-- `write_lock(text)` → `io::Result<()>`: write `agentstacks.lock` via temp + rename (spec §7 step 5).
+  empty stay (§7, §18).
+- `write_lock(text)` → `io::Result<()>`: write `agentstacks.lock` via the temp
+  `.agentstacks.lock.agentstacks-tmp` and a rename, keeping the lock's mode (spec §7 step 5, R21).
+
+`stage`, `swap` and `delete` re-resolve the path. A path that resolves outside the project at
+apply time is refused (R21) with an `io::Error` whose Display is `resolves outside the project`, so
+apply's `<path>: <io::Error Display>` (§7 failure table) reads exactly the R21 message
+`<path>: resolves outside the project`, and nothing is written outside the project. Every other
+failure is the platform's error, which the flows report as `<path>: <io::Error Display>` (R1).
 
 The trait doc states the contract each adapter keeps (plan 10 proves it for the real disk): paths
-compare by bytes (§17), the lock records the proposed path and never the canonical one (§6.3), and
+compare by bytes (§18), the lock records the proposed path and never the canonical one (§6.3), and
 nothing outside these methods writes.
 
 `FakeWorkspace` is an in-memory project, rooted at a display path, keyed by the normalised path text:
@@ -134,7 +144,9 @@ nothing outside these methods writes.
 - `stage` keeps the bytes as a temp; `discard` drops it; `swap` moves the temp's bytes onto the
   target, through a symlink to its target (the link stays, §6.3 "written through"), keeping an
   existing file's mode and giving a new one `NEW_MODE`; `delete` removes the entry; `write_lock`
-  replaces the lock text. Each runs only when its call is not set to fail.
+  replaces the lock text. Each runs only when its call is not set to fail. `stage`, `swap` and
+  `delete` of a path set with `outside(path)` fail with the R21 error (Display `resolves outside the
+  project`) and change nothing.
 - Mid-test edits for the apply race (spec §14 "the apply race"): `set_file(&self, path, bytes)` and
   `remove(&self, path)` change the disk between `plan` and `apply`.
 - Observers: `calls()` → the ordered `Vec<WorkspaceCall>` (`ProjectText`, `LockText`,
@@ -158,6 +170,8 @@ nothing outside these methods writes.
   `discard` succeeds.
 - `delete_removes_the_file` — the path resolves `Absent` afterwards.
 - `write_lock_records_the_text` — `lock_written` and `lock_text` both return it.
+- `writing_an_outside_path_is_refused` — `stage` of an `outside` path fails with Display
+  `resolves outside the project` (R21) and leaves no temp.
 - `a_failing_call_returns_denied_and_changes_nothing` — `fail(Swap(".claude/b"))`: swapping
   `.claude/a` succeeds, `.claude/b` fails with `denied()`'s kind and Display, `.claude/b`'s temp
   stays, and its old bytes stay.
@@ -182,7 +196,8 @@ Commit `feat(agentstacks): workspace port and its fake`.
 
 - `type Tree: FileTree` — a rev's files, read into memory once (spec §9.2 "The source's tree is read
   into memory once and served through the `FileTree` port").
-- `list_tags(url, prefix: &str)` → `Result<Vec<GitTag>, FetchError>`: the tags under
+- `list_tags(url, prefix: &str)` → `Result<Vec<RemoteTag>, FetchError>`: plan 07's parsed
+  `ls-remote` lines (rev and tag) for the tags under
   `refs/tags/<prefix>*`, in the order git lists them (lexical, `probes/git-results.md` G1); empty
   when nothing matches (§9.2 "list tags", §9.4 step 1). Choosing among them is plan 07's.
 - `fetch_tag(url, tag)` → `Result<CommitId, FetchError>`: fetch the tag into the cache and return
@@ -194,18 +209,35 @@ Commit `feat(agentstacks): workspace port and its fake`.
   without network"). `at` is the pin the source names, used as `<tag or rev>` in the §9.2 `subdir`
   refusals. A symlink is `EntryKind::Symlink` and a gitlink `EntryKind::Other` in the tree (§9.2).
 
-The trait doc states two contracts the flows rely on: "git not on `PATH`" comes back as its own
-`FetchError` outcome on every call (§9.2 row 1, so the flow can report it once for all keys), and a
-non-zero exit carries git's trimmed stderr (§9.2 row 2, D11).
+The trait doc states the outcomes the flows rely on, all plan 02 `FetchError` values:
+
+- git not on `PATH`: a per-source git-not-found outcome on every call, with no keys. Plans 13 and
+  16 assemble the single `agentstacks.toml: git not found on PATH (needed by packs.core,
+  tools.claude)` refusal from every source that got it (§9.2 row 1 "once"; plan 02's variant
+  carries the key list).
+- git exits non-zero: the subcommand and git's stderr, lossy UTF-8, trimmed (§9.2 row 2, D11, R2).
+- spawning git fails any other way: the io error, shown as `agentstacks.toml: packs.core: git:
+  <io::Error Display>` (R1).
+- git output that does not parse (an `ls-remote` line, an `ls-tree` record, `rev-parse` output that
+  is not a commit id, a `cat-file` frame or `<oid> missing`): the subcommand and the first line of
+  the output, lossy UTF-8, trimmed, shown as `agentstacks.toml: packs.core: git <subcommand>
+  printed output agentstacks cannot read: "<first line>"` (R2).
+- a cache I/O failure: the path involved and the io error, shown as `<path>: <io::Error Display>`
+  (R1).
+- the §9.2 `subdir` rows and the §9.3 HOME refusal (`HOME` unset or empty, R10).
 
 `FakeGit` answers from configuration and logs every call:
 
-- Builders: `tags(url, tags)` (`list_tags` returns those whose text starts with `prefix`, sorted
+- Builders: `tags(url, remote_tags)` (`list_tags` returns the `RemoteTag`s whose tag starts with `prefix`, sorted
   by bytes, as git does), `tag(url, tag, rev)` (`fetch_tag`), `tree(url, rev, subdir, FakeFileTree)`
   (`tree`; the `FakeFileTree` is returned as a clone, so the same rev can be served twice),
-  `fail(url, FetchError)` (queued: the next call on that URL returns it, once per queued error) and
-  `git_missing()` (every call returns the §9.2 row 1 outcome).
-- A call with no configured answer returns the §9.2 row 1 outcome too, so a test that forgot to
+  `fail(url, FetchError)` (queued: the next call on that URL returns it, once per queued error),
+  `git_missing()` and `git_missing_for(url)` (every call, or every call on that URL, returns the
+  per-source git-not-found outcome: `FetchError::GitNotFound` with an empty `needed_by`, which plans
+  13 and 16 merge into one refusal), and `home_unset()` and `home_unset_for(url)` (every call, or
+  every call on that URL, returns `FetchError::HomeUnset`, R10). These answers are built fresh on
+  each call, so no `Clone` is needed on `FetchError`.
+- A call with no configured answer returns the git-not-found outcome too, so a test that forgot to
   configure a source sees a refusal it did not expect rather than a silent success.
 - `calls()` → the ordered `Vec<GitCall>`: `ListTags { url, prefix }`, `FetchTag { url, tag }`,
   `Tree { url, rev, subdir }`. This is how plan 13 proves a moved tag uses no tag call (§9.1 last
@@ -213,14 +245,18 @@ non-zero exit carries git's trimmed stderr (§9.2 row 2, D11).
   asked for.
 
 **Proof:**
-- `list_tags_filters_by_prefix_in_byte_order` — configured `packs-v0.2.0`, `other-v9.9.9`,
-  `packs-v0.10.0`, `packs-v0.1.0`; prefix `packs-v` gives `packs-v0.1.0`, `packs-v0.10.0`,
-  `packs-v0.2.0` (the G1 order); prefix `packs-v9` gives an empty list.
+- `list_tags_filters_by_prefix_in_byte_order` — configured `RemoteTag`s for `packs-v0.2.0`,
+  `other-v9.9.9`, `packs-v0.10.0`, `packs-v0.1.0`; prefix `packs-v` gives `packs-v0.1.0`,
+  `packs-v0.10.0`, `packs-v0.2.0` with their revs (the G1 order); prefix `packs-v9` gives an empty
+  list.
 - `fetch_tag_returns_the_configured_rev` — and logs `FetchTag`.
 - `tree_returns_the_configured_files_twice` — two `tree` calls for one rev both serve the files.
 - `queued_failure_is_returned_once` — the first call on the URL fails with the queued error, the
   second gets the configured answer.
-- `git_missing_answers_every_call` — all three methods return the §9.2 row 1 outcome.
+- `git_missing_answers_every_call` — all three methods return `GitNotFound` with an empty
+  `needed_by`; `git_missing_for(url)` affects only that URL.
+- `home_unset_answers_every_call` — all three methods return `HomeUnset`; `home_unset_for(url)`
+  affects only that URL.
 - `unconfigured_call_reports_git_missing` — a `tree` for an unknown rev returns that outcome.
 - `calls_are_logged_in_order` — list, fetch, tree come back in call order with their arguments.
 - `fake_is_usable_through_a_generic_bound` — a helper generic over `G: Git` reads a file from
@@ -240,22 +276,40 @@ Commit `feat(agentstacks): git port and its fake`.
 **Change:** `Binary` answers the two questions of spec §10 and §8 rows 6-8:
 
 - `on_path(name: &BinaryName)` → `bool`: whether `name` is found on `PATH` (§10 rows 1-2: a pack's
-  `requires.binaries`, an extension's `require_binary`).
-- `airsl_version()` → `AirslAnswer` (plan 06): `NotFound` when `airsl` is not on `PATH`, else
-  `Printed(text)`, what `airsl --version` printed (§10 row 3, §8 rows 6-8). Parsing `airsl <semver>`
-  and comparing versions are plan 06's and plan 04's rules, never the port's.
+  `requires.binaries`, an extension's `require_binary`). "On PATH" is R10: a regular file with an
+  execute bit; empty `PATH` entries are skipped; an unset `PATH` finds nothing; a symlink counts
+  when it resolves to an executable regular file (R28(c)).
+- `airsl_version()` → `AirslAnswer` (plan 06's answer type), what `airsl --version` gave (§10 row
+  3, §8 rows 6-8):
+  - `airsl` not on `PATH` (R10) → `NotFound`;
+  - it ran and exited 0 → `Printed(text)`, `text` its stdout as lossy UTF-8, trimmed (R2);
+  - it ran and exited non-zero → the `AirslAnswer` that plan 06's rule counts as unparseable, so the
+    refusal is `agentstacks.toml: airsl --version printed "<text>", expected "airsl <version>"`
+    (R2: "airsl exiting non-zero counts as unparseable");
+  - a found `airsl` that will not run (any spawn error other than `NotFound`) → plan 06's
+    spawn-failure variant carrying the `io::Error`, reported as `agentstacks.toml: airsl:
+    <io::Error Display>` (R1).
 
-`FakeBinary`: builders `with(name)` (on `PATH`) and `airsl(text)` (`airsl` on `PATH`, printing
-`text`); without `airsl(…)` the answer is `NotFound`. `asked()` → the ordered `Vec<BinaryCall>`
-(`OnPath(name)`, `AirslVersion`), so plan 13 proves a repeated name is looked up once (§3.3
-"checked once") and plans 13 and 15 prove airsl is never asked when no pack declares
-`requires.airsl` or the lock has no `[airsl]`.
+  Parsing `airsl <semver>` and comparing versions are plan 06's and plan 04's rules, never the port's.
+
+`FakeBinary`: builders `with(name)` (on `PATH`), `airsl(text)` (`airsl` on `PATH`, printing `text`,
+exit 0), `airsl_exit_failure(text)` (printing `text`, exit non-zero) and `airsl_spawn_failure()`
+(found, but running it fails: the spawn-failure variant with a `PermissionDenied` io error built
+fresh on each call, `FakeBinary::denied()`); without one of the `airsl…` builders the answer is
+`NotFound`. `asked()` → the ordered `Vec<BinaryCall>` (`OnPath(name)`,
+`AirslVersion`), so plan 13 proves a repeated name is looked up once (§3.3 "checked once") and plans
+13 and 15 prove airsl is never asked when no pack declares `requires.airsl` or the lock has no
+`[airsl]`.
 
 **Proof:**
 - `on_path_answers_configured_names` — `rg` configured → true; `node` not → false.
 - `airsl_version_is_not_found_by_default` — `NotFound`.
 - `airsl_version_prints_the_configured_text` — `airsl("airsl 0.1.4")` → `Printed("airsl 0.1.4")`,
   and `on_path` of `airsl` is true.
+- `airsl_exit_failure_is_the_unparseable_answer` — `airsl_exit_failure("airsl 0.1.4")` gives the
+  non-zero-exit answer carrying `airsl 0.1.4`, which plan 06's parse refuses.
+- `airsl_spawn_failure_carries_the_io_error` — the spawn-failure variant whose io error has kind
+  `PermissionDenied` and the Display of `FakeBinary::denied()`.
 - `questions_are_logged` — two lookups and one version query come back in order.
 
 **Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
@@ -334,18 +388,22 @@ Commit `feat(agentstacks): adapter port and its fake`.
 
 - **Seams with the plans that build the answer types.** `Resolution`, `DiskFile::new(bytes, mode)`,
   `Reads`, `ReadOutcome`, `AirslAnswer` (plan 06), `Proposals`' insertion and the payload types
-  (plan 04) and `FetchError` (plan 02) are used by name. The fakes need: `ValuesInput` and
-  `PlanInput` to be `Clone` (the call log keeps copies), and a `FetchError` value for "git not on
-  `PATH`" that carries no "needed by" list, because a port call sees one source and plan 13 merges
-  the keys (§9.2 row 1 "once"). If plan 02 shapes that variant differently, plan 02's shape wins and
-  the fake builds it the way plan 02 allows.
+  (plan 04) and `FetchError` (plan 02) are used by name. These signatures are the source of truth
+  for plans 12-16. The other plans must provide:
+  - `ValuesInput` and `PlanInput` are `Clone`, because the call log keeps copies;
+  - plan 02's git-not-found `FetchError` (`GitNotFound { needed_by }`) can be built per source with an
+    empty key list, which plans 13 and 16 fill;
+  - plan 02 has `FetchError` variants for the R1 spawn and cache failures and the R2 unreadable
+    output;
+  - plan 06's `AirslAnswer` has the spawn-failure variant carrying the `io::Error` (R1), and a way
+    to carry a non-zero exit with its printed text that its parse counts as unparseable (R2).
 - **The adapter signature is wider than plan 13's wording.** Plan 13 calls `values` and `plan`
   directly; the port adds `open` and a `Session`, which plan 12 needs (one engine across both
   dispatches, the extension's `FileTree` for its `.lua` files). Plan 13's coder follows the names
   here.
-- **The fakes are `#[cfg(test)]`.** A doc-comment example in `app/` cannot use them (doctests do not
-  compile `cfg(test)` items); plans 13 and 14 promise such examples and need a non-fake example or a
-  `no_run` text instead. Flagged for the orchestrator.
+- **The fakes are `#[cfg(test)]`.** No doc-comment example may use a fake, because doctests do not
+  compile `cfg(test)` items. The port traits' doc examples name only built, non-test types; the
+  fakes are shown in their own unit tests.
 - **Riskiest task: Task 1.** `FakeWorkspace` must model write-through, mode keeping and failure
   injection faithfully enough that plan 14's tests mean the same as plan 10's contract tests. Each
   behaviour has a fake test here and a disk test there with the same name stem.
@@ -367,6 +425,7 @@ Commit `feat(agentstacks): adapter port and its fake`.
   §8 rows 1, 3-5 (lock text, resolution, Task 1) and 6-8 (airsl answer, Task 3); §9.2 list tags,
   fetch tag, fetch rev, list files, read blobs, git-missing outcome, symlink and gitlink kinds as
   the port contract (Task 2); §9.3 cache-hit contract (Task 2); §9.4 step 1 listing (Task 2); §10
-  `PATH` lookup and airsl answer (Task 3); §4.3 `read` record and §4.4 values/plan dispatch with
+  `PATH` lookup and airsl answer incl. symlinks to executables (Task 3, R28(c)); mode-only change
+  not "changed" (Task 1 contract, R28(i)); §4.3 `read` record and §4.4 values/plan dispatch with
   cross-tool duplicates (Task 4); §14 app row (fakes for every flow). The real adapters' behaviour
-  is proven by plans 10, 11 and 12.
+  is proven by plans 10, 11 and 12. §16 rows: R1 (io and spawn outcomes, Tasks 1-3), R2 (unreadable git output, non-zero airsl exit, Tasks 2-3), R10 (HOME, "on PATH", Tasks 2-3), R21 (temps beside the canonical target, lock temp and mode, outside at apply, Task 1).

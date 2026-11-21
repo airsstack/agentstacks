@@ -1,8 +1,8 @@
 ---
-status: draft
+status: approved
 created: 2026-11-22
 depends-on: [09]
-built-on: ea104af7451e
+built-on: f39b2a814319
 ---
 
 # Workspace Implementation Plan
@@ -19,8 +19,9 @@ beside the built `StdFileTree` (`fs/disk.rs`, unchanged):
 - `Cache` is the git cache directory of §9.3: its home from `$HOME`, the per-URL directory, a
   temporary repository directory, and the rename into `<rev>.git` that settles a race with
   `DirectoryNotEmpty`. `process/git` (plan 11) drives `git` and calls `Cache` for every disk step,
-  so `std::fs` stays in `fs` and `std::process` stays in `process`. The process id in a temp name
-  is therefore passed in by the caller, never read here.
+  so `std::fs` stays in `fs` and `std::process` stays in `process`. This is the one allowed edge from
+  one adapter to another (spec §2, X3: `process` may use `fs::cache` and nothing else from `fs`). The
+  process id in a temp name is therefore passed in by the caller, never read here.
 
 It is translation only (`docs/architecture.md` "Where logic lives"): every decision about a step is
 plan 06's, taken on the `Resolution` this adapter returns. The workspace is a folder, one job per
@@ -55,7 +56,8 @@ PermissionsExt}` under `cfg(unix)`; `tempfile` (dev-dependency, unchanged, spec 
 
 **Content authority:** spec §6.3 (all), §6.2 "Disk states" and the symlink row of the second table,
 §7 (steps 2, 4, 5, "Modes", failure rows as I/O errors handed back), §9.3 (all), §14 fs row, §15
-(`tempfile` stays a dev-dependency).
+(`tempfile` stays a dev-dependency), §16 R1, R10, R17 (what apply locks after a failure, not
+done here), R21, X3.
 
 ---
 
@@ -99,7 +101,7 @@ canonical target plus `Link` (`Direct` / `Symlink`, plan 06), in the order of §
 3. The result must `starts_with` the canonical root, else "outside" (§6.3 step 3; the
    `canonicalize` + `starts_with` check of `probes/round2-results.md`).
 
-Paths compare by bytes; nothing is case-folded (§17).
+Paths compare by bytes; nothing is case-folded (§18).
 
 **Proof:** written first, seen failing, then passing (all on `tempfile` dirs, symlink cases under
 `cfg(unix)`).
@@ -129,7 +131,9 @@ Commit `feat(agentstacks): resolve project paths inside the project`.
 **Change:** `disk_state(target)` (crate-private) reads what a canonical target holds (§6.2 "Disk
 states"): nothing there → `DiskState::Absent`; a regular file (following links) →
 `DiskState::File(DiskFile::new(bytes, mode))`, the mode being the Unix permission bits (§7 "Modes");
-anything else (directory, socket, device) → `DiskState::NotRegular`. `StdWorkspace::resolve(path)`
+anything else (directory, socket, device) → `DiskState::NotRegular`. The mode is kept so `swap`
+can restore it; a mode-only change is not "changed" (R28(i): content hash only), which is the
+comparing flow's rule, not this adapter's. `StdWorkspace::resolve(path)`
 combines Task 1 and this: outside → `Resolution::Outside`; dangling → `Inside { Symlink,
 NotRegular }`; else `Inside { link, state }`. A read error other than `NotFound` is returned.
 
@@ -169,12 +173,13 @@ Commit `feat(agentstacks): project disk state through the workspace`.
 - Modify `crates/agentstacks/src/fs/workspace/mod.rs`.
 
 **Change:** `temp_of(target)` (crate-private, pure) names the temp `.<name>.agentstacks-tmp` in the
-target's directory (§7 step 2). The target is the canonical one (Task 1), so the later rename stays
-inside one directory and a link inside the project is written through (§6.3 "the write goes to its
-canonical target"); this placement is gap GW2 below. `stage(path, bytes)` re-resolves the path; an
-outside answer is refused as an `io::Error` whose Display is `resolves outside the project`, so
-apply reports `<path>: resolves outside the project` (§6.3 step 3 text; gap GW3) and no temp is
-written outside the project. Otherwise it creates the parents (`create_dir_all`, §7 step 2 "parents
+target's directory (§7 step 2). The target is the canonical one (Task 1; R21 "Apply temps: beside
+the canonical target"), so the later rename stays inside one directory and a link inside the
+project is written through (§6.3 "the write goes to its canonical target"). `stage(path, bytes)`
+re-resolves the path. A path that resolves outside the project at apply time is refused (R21): the
+`io::Error` it returns displays `resolves outside the project`, so apply reports exactly
+`<path>: resolves outside the project`, and no temp is written outside the project. Otherwise it
+creates the parents (`create_dir_all`, §7 step 2 "parents
 created") and writes the bytes with `std::fs::write`, which truncates a leftover temp of the same
 name (§7 step 2 "a leftover temp of the same name is overwritten") and gives a new temp the mode
 `std::fs::write` creates (§7 "Modes", `probes/round3-results.md` S2). `discard(path)` removes that
@@ -210,11 +215,12 @@ restored file keeps the temp's `std::fs::write` mode (§7 "Modes" first bullet).
 canonical target keeps an inside link in place (`S4 rename onto canonical target: link2
 is_symlink=true real content="B"`). `delete(path)` re-resolves (outside → the same refusal) and
 removes the file; the directories it leaves empty stay (§7 "Directories a delete leaves empty are
-left in place", §17). `write_lock(text)` writes `<root>/.agentstacks.lock.agentstacks-tmp` and
+left in place", §18). `write_lock(text)` writes `<root>/.agentstacks.lock.agentstacks-tmp` and
 renames it onto `<root>/agentstacks.lock`, copying an existing lock's permissions first (§7 step 5
-"via temp + rename"; the name and the mode rule are gap GW4). Every failure is the platform's
-`io::Error`, handed back unchanged; deciding what to remove and what to lock after a failure is
-apply's (plan 14, §7 failure table).
+"via temp + rename"; R21: "The lock temp is `.agentstacks.lock.agentstacks-tmp`, and the lock keeps
+its mode"). Every other failure is the platform's `io::Error`, handed back unchanged; the flows show
+it as `<path>: <io::Error Display>` (§7 failure table, R1). Deciding what to remove and what to lock
+after a failure is apply's (plan 14, §7 failure table, R17).
 
 **Proof:**
 - `swap_keeps_the_old_mode` — §14 "mode kept": a 755 file updated through stage + swap holds the new
@@ -244,31 +250,41 @@ Commit `feat(agentstacks): swap staged files and write the lock`.
 
 **Change:** `Cache` is the directory of §9.3:
 
-- `Cache::from_home(home: Option<&OsStr>)` → `Result<Cache, FetchError>`: the root is
-  `<home>/.airsstack/cache` (D10). No home is plan 02's §9.3 variant, which displays (after its
-  `agentstacks.toml` location) `HOME is not set, so the cache (~/.airsstack/cache) has no home`.
-  `Cache::from_env()` passes `std::env::var_os("HOME")`. Whether an empty `HOME` counts as not set is
-  gap GW5.
-- `repo(url, rev)` → `io::Result<Option<PathBuf>>`: `<root>/git/<hex sha256 of url>/<rev>.git` when
-  that directory exists, so a locked rev resolves without network (§9.3 "Layout"). The two names
-  come from plan 07's cache path rule.
-- `temp(url, name)` → `io::Result<PathBuf>`: creates the URL directory and returns
-  `<url dir>/<name>`, where `name` is plan 07's `tmp-<pid>-<n>` built by the caller from its process
-  id and counter (§9.3 "Filling it" step 1). A leftover entry of that name is removed first (a
-  killed process with the same pid; gap GW6).
-- `install(temp, url, rev)` → `io::Result<PathBuf>`: renames the temp to `<rev>.git` (§9.3 step 2).
-  `ErrorKind::DirectoryNotEmpty` means another run cached it first (`S1 rename dir onto non-empty
-  dir: ERR kind=DirectoryNotEmpty`): the temp is removed and the existing directory is returned.
-  Any other error is handed back.
-- `discard(temp)` → `io::Result<()>`: removes a temp after a failed fetch; `NotFound` is success.
-  Temps of a killed process are never cleaned (§9.3 last bullet, §17).
+- `Cache::from_home(home: Option<&OsStr>)` → `Result<Cache, FetchError>`: calls plan 07's
+  `cache_home(home)` and keeps its answer; the root is `<home>/.airsstack/cache` (D10). `cache_home`
+  owns the rule: a `HOME` that is unset or empty is "not set" (R10) and gives the unlocated
+  `FetchError::HomeUnset`, which displays (after its `agentstacks.toml` location)
+  `HOME is not set, so the cache (~/.airsstack/cache) has no home`. Reporting it once per run is the
+  flows' (R10 "reported once"). `Cache::from_env()` passes `std::env::var_os("HOME")`.
+- `repo(url, rev)` → `Result<Option<PathBuf>, FetchError>`: `<rev>.git` under the URL directory when
+  that directory exists, so a locked rev resolves without network (§9.3 "Layout"). The paths come
+  from plan 07's `url_dir` and `rev_dir`; `Cache` re-implements none of plan 07's rules.
+- `temp(url, name)` → `Result<PathBuf, FetchError>`: creates the URL directory and returns
+  `<url dir>/<name>`, where `name` is plan 07's `temp_name(pid, n)` (`tmp-<pid>-<n>`) built by the
+  caller from its process id and counter (§9.3 "Filling it" step 1). A leftover entry of that name
+  is removed and the name reused (R21 "A leftover cache temp of the same name is removed and
+  reused").
+- `install(temp, url, rev)` → `Result<PathBuf, FetchError>`: renames the temp to `<rev>.git` (§9.3
+  step 2). `ErrorKind::DirectoryNotEmpty` means another run cached it first (`S1 rename dir onto
+  non-empty dir: ERR kind=DirectoryNotEmpty`): the temp is removed and the existing directory is
+  returned.
+- `discard(temp)` → `Result<(), FetchError>`: removes a temp after a failed fetch; `NotFound` is
+  success. Temps of a killed process are never cleaned (§9.3 last bullet, §18).
 
-How an I/O failure here reaches the user is gap GW1 (no message in the spec); `Cache` returns the
-platform's error and plan 11 passes it on.
+Every other I/O failure here is R1: plan 02's cache I/O `FetchError` carrying the path involved and
+the `io::Error`, shown as `<path>: <io::Error Display>` at that path. The path is the directory being
+created for `temp`, the temp being removed for `temp`, `install` and `discard`, and the
+`<rev>.git` target for a failed rename (R28(b)). `process/git` (plan 11) passes it on unchanged (X3:
+`process` may use `fs::cache` and nothing else from `fs`).
 
 **Proof:**
-- `no_home_is_refused` — `from_home(None)` gives the §9.3 variant; its Display is exactly
-  `HOME is not set, so the cache (~/.airsstack/cache) has no home`.
+- `no_home_is_refused` — `from_home(None)` and `from_home(Some(""))` both give `HomeUnset`; its
+  Display is exactly `HOME is not set, so the cache (~/.airsstack/cache) has no home` (R10).
+- `a_cache_io_failure_names_its_path` — on a `tempfile` home whose `.airsstack` is a regular file,
+  `temp` fails with the R1 cache variant whose path is the URL directory and whose Display is
+  `<that path>: <io::Error Display>`.
+- `a_leftover_temp_is_removed_and_reused` — an existing `tmp-<pid>-<n>` directory holding a file is
+  gone after `temp` returns the same path (R21).
 - `layout_follows_the_url_hash_and_rev` — on a `tempfile` home, `repo` of an installed rev is
   `<home>/.airsstack/cache/git/<hex sha256 of url>/<rev>.git`; an uninstalled rev is `None`.
 - `temp_creates_the_url_directory` — and returns `<url dir>/tmp-<pid>-<n>` for the given name.
@@ -286,22 +302,9 @@ Commit `feat(agentstacks): git cache directory with race-safe install`.
 
 ## Risks
 
-- **Gaps held for the author (no answer invented above; each task names its gap):**
-  - GW1: no message for a cache I/O failure (creating the URL directory, a rename failing with
-    anything but `DirectoryNotEmpty`, removing a temp).
-  - GW2: §7 step 2 says `<dir>/.<name>.agentstacks-tmp` and step 4 says the rename goes "onto its
-    (canonical) target"; for a path behind an inside link, the plan puts the temp beside the
-    canonical target so the rename stays in one directory.
-  - GW3: a path whose resolution turned outside between plan and apply. The plan refuses staging,
-    swapping and deleting it with an `io::Error` displayed `resolves outside the project`, reusing
-    the §6.3 text, so nothing is written outside the project before the §7 step 3 check runs.
-  - GW4: the lock's temp name and mode. §7 step 5 says only "via temp + rename"; the plan applies
-    the step 2 name rule and keeps an existing lock's mode like an updated file.
-  - GW5: `HOME` set to an empty string (§9.3 covers "not set").
-  - GW6: a cache temp name that already exists (pid reuse after a killed process).
-- **`DirectoryNotEmpty` only.** POSIX also allows `EEXIST` for a rename onto a non-empty directory;
+- **`DirectoryNotEmpty` only.** POSIX also allows `EEXIST` for a rename onto a non-empty directory.
   Linux and macOS give `ENOTEMPTY` (S1 is macOS). The spec names `DirectoryNotEmpty`, and the plan
-  follows it; another errno would surface as an I/O failure (GW1).
+  follows it; another errno would surface as an R1 I/O failure.
 - **Time of check versus time of use.** Resolution, staging and renaming are separate system calls;
   a link swapped in between is caught by apply's state check (§7 step 3) except in the instant
   between that check and the rename. The spec accepts this (§7 order); the module docs say so, as
@@ -329,4 +332,9 @@ Commit `feat(agentstacks): git cache directory with race-safe install`.
   (`swap_writes_through_an_inside_symlink`), symlink delete forgotten
   (`resolve_marks_a_file_replaced_by_a_symlink`), escape refused (`resolve_refuses_an_escape`,
   Task 1 escapes), dangling link (`resolve_reports_a_dangling_link_as_not_regular`), cache rename
-  race (`install_race_uses_the_existing_directory`).
+  race (`install_race_uses_the_existing_directory`). §16: R1 (`a_cache_io_failure_names_its_path`,
+  I/O errors handed back in Tasks 2-4), R10 (`no_home_is_refused`), R21 (temps beside the canonical
+  target, Task 3; lock temp name and mode, `write_lock_replaces_the_lock_and_leaves_no_temp`;
+  outside at apply, `stage_refuses_a_path_that_now_resolves_outside` and
+  `delete_refuses_a_path_that_now_resolves_outside`; leftover cache temp,
+  `a_leftover_temp_is_removed_and_reused`), X3 (only `fs::cache` is used by `process`).

@@ -1,8 +1,8 @@
 ---
-status: draft
+status: approved
 created: 2026-11-22
 depends-on: [02]
-built-on: ea104af7451e
+built-on: f39b2a814319
 ---
 
 # JSON edit Implementation Plan
@@ -11,9 +11,14 @@ built-on: ea104af7451e
 
 **Architecture:** `types/json` is a pure rule module (spec §2, `docs/architecture.md` "Where logic
 lives"). It takes text in and gives text or one refusal out. It never touches disk and never sees a
-Lua value. The host (plan 12) reads the Lua arguments, converts the Lua value to a
-`serde_json::Value` (spec §5 second table) and calls `edit`. The module has three sibling files,
-each with one job (modularity Rule 1):
+Lua value. Spec §16 R14 says the first failing row of the §5 table wins, so `edit` owns the row
+order:
+- the host (plan 12) checks row 1, the argument types, and hands over raw parts: the text, each
+  path element as a key or as the bad element's type word, and a deferred value conversion;
+- `edit` checks rows 2–7 in order, and only then runs the conversion (spec §5 second table, plan
+  12's code).
+
+The module has four sibling files, each with one job (modularity Rule 1):
 
 ```text
 crates/agentstacks/src/types/json/
@@ -21,20 +26,26 @@ crates/agentstacks/src/types/json/
 ├─ error.rs   JsonEditError                         (plan 02, not touched here)
 ├─ indent.rs  Indent: the indent detected from the input text (§5 "indent" row)
 ├─ print.rs   Ending + print: pretty-printing with an indent, LF, trailing newline (§5 rows 9–11)
+├─ elem.rs    PathElem: one raw path element, a string key or the bad element's type word
 └─ edit.rs    edit: parse, walk the key path, set or remove, then print (§5 rows 2–8, 12–13)
 ```
 
-Public API (fixed by the plan-set map):
-`edit(text: &str, path: &[String], value: Option<serde_json::Value>) -> Result<String, JsonEditError>`.
-`None` removes the key (Lua `nil`). `Indent`, `Ending` and `print` stay
-`pub(in crate::types::json)`. They are building blocks of `edit` and are not exported.
+Public API: `edit<F>(text: &str, path: &[PathElem], value: F) -> Result<String, JsonEditError>`,
+where `F: FnOnce() -> Result<Option<serde_json::Value>, JsonEditError>`. The arguments:
+- `PathElem` is `Key(String) | NotString(LuaType)`, with `LuaType` from plan 02;
+- `value` is called at most once, after every first-table row has passed;
+- `Ok(None)` from `value` removes the key (Lua `nil`), and its `Err` (a §5 second-table refusal)
+  is returned as is.
+
+`Indent`, `Ending` and `print` stay `pub(in crate::types::json)`. They are building blocks of
+`edit` and are not exported.
 
 Rust guideline rules applied (claudestacks-guideline-rust 0.1.6):
-- `mod-rs-export-only.md`: `json/mod.rs` holds only the four-question `//!` block, `mod` lines and
-  `pub use edit::edit;`.
+- `mod-rs-export-only.md`: `json/mod.rs` holds only the four-question `//!` block, `mod` lines,
+  `pub use edit::edit;` and `pub use elem::PathElem;`.
 - `modularity.md` Rule 1: one job per file (above). Rule 2: no second JSON value or error type.
   `serde_json::Value` is the value, and plan 02's `JsonEditError` is the only refusal type.
-- `unit-test-mandate.md`: `indent.rs`, `print.rs` and `edit.rs` each carry a colocated
+- `unit-test-mandate.md`: `indent.rs`, `print.rs`, `elem.rs` and `edit.rs` each carry a colocated
   `#[cfg(test)] mod tests`.
 - `strong-types.md`: no `bool` parameter. The trailing-newline decision is the two-variant enum
   `Ending`, and the indent is the `Indent` newtype.
@@ -59,7 +70,8 @@ second table (Lua value → JSON) and the argument row are plan 12's.
 crates/agentstacks/src/types/json/mod.rs     — modify: module docs; `mod edit; mod indent; mod print;` and `pub use edit::edit;`
 crates/agentstacks/src/types/json/indent.rs  — create: Indent and its detection from the input text
 crates/agentstacks/src/types/json/print.rs   — create: Ending and print (pretty-printing with an indent, LF, trailing newline)
-crates/agentstacks/src/types/json/edit.rs    — create: edit (parse, key-path walk, set/remove, print)
+crates/agentstacks/src/types/json/elem.rs    — create: PathElem
+crates/agentstacks/src/types/json/edit.rs    — create: edit (row order, parse, key-path walk, set/remove, print)
 ```
 
 No other file changes. `json/error.rs` and the `mod error; pub use …` lines in `json/mod.rs`
@@ -78,7 +90,7 @@ belong to plan 02, which lands first.
 **Change:** `Indent` is a `pub(in crate::types::json)` newtype over the indent text, so `print`
 never takes a bare string. `Indent::detect(text: &str) -> Indent` applies spec §5 "indent":
 - Find the first line after the first one that starts with a space or a tab. That is "the first
-  indented line", read as the probe's `edit` reads it (`probes/examples-main.rs`, `edit`: skip one
+  indented line", as the probe's `edit` finds it (`probes/examples-main.rs`, `edit`: skip one
   line, then the first line starting with `' '` or `'\t'`).
 - Take its leading run of spaces and tabs.
 - If that run is all spaces, or exactly one tab, it is the indent.
@@ -142,47 +154,81 @@ detects the same indent as LF text. `Indent::as_bytes` hands the bytes to
 ### Task 3 — Edit the text at a key path
 
 **Files:**
+- Create `crates/agentstacks/src/types/json/elem.rs` — `PathElem`.
 - Create `crates/agentstacks/src/types/json/edit.rs` — `edit`.
-- Modify `crates/agentstacks/src/types/json/mod.rs` — `mod edit;`, `pub use edit::edit;`,
-  entry-point line in the docs.
+- Modify `crates/agentstacks/src/types/json/mod.rs` — `pub mod elem; mod edit;`,
+  `pub use elem::PathElem; pub use edit::edit;`, entry-point line in the docs.
 
-**Change:** `edit(text, path, value)` applies the spec §5 first table, in the order of its rows
-(see GAP J2 under Risks for the precedence reading):
-1. **Empty text** (§5 row 2): when `text` is empty or whitespace-only (`str::trim` is empty), the
-   document parsed is `{}`.
-2. **Parse** (§5 row 3): otherwise `serde_json::from_str::<serde_json::Value>(text)`. A failure is
-   the `JsonEditError` variant carrying the serde_json error's Display
-   (`json.edit: <serde_json message>`, e.g. `trailing comma at line 1 column 8`,
-   `probes/json-results.md` J2).
-3. **Top level** (§5 row 4): a parsed value that is not an object gives `json.edit: top level must
-   be an object`.
-4. **Path** (§5 row 5): an empty `path` gives `json.edit: path: empty`. Element types are checked
-   by the host before the call (`path[2]: expected string, got number` is plan 12's), since a
-   `&[String]` holds only strings.
-5. **Set** (`Some(value)`, §5 row 6): walk every key before the last. A missing key is inserted as
-   `{}`, and the walk descends into it. An existing key whose value is not an object gives
-   `json.edit: "<key>" is not an object` with that key (e.g. `"hooks"`). The last key is then
-   inserted. An existing key keeps its position and gets the new value; a new key goes last
-   (§5 row 8; `preserve_order`, `probes/round3-results.md` J3).
-6. **Remove** (`None`, §5 row 7): walk the keys before the last without creating anything. If a
-   parent or the last key is missing, return `text` exactly as it came in (no re-print). Otherwise
-   remove the last key so that every other key keeps its relative order (§5 row 8 "existing keys
-   keep their position"; the probe's `edit` uses `shift_remove`, `probes/examples-main.rs`). The
-   rest of the document stays as it is: no parent is pruned. A parent that exists but is not an
-   object is GAP J1 (see Risks).
-7. **Print** (§5 rows 9–11): `print(&document, &Indent::detect(text), Ending::of(text))`, where both
-   read the original `text` (see GAP J3 for whitespace-only text).
+**Change:**
+- **`PathElem`** is `Key(String) | NotString(LuaType)`. The host builds one per Lua path element:
+  a string element becomes its key, and any other element becomes its type word. `edit` then owns
+  the element-type refusal, so it is ordered after the parse rows.
+- **`edit(text, path, value)`** applies the spec §5 first table in the order of its rows, and the
+  first failing row is the one refusal (§16 R14). Row 1 (`text: expected string, got <type>`,
+  `path: expected table, got <type>`, and the §16 R3 argument shapes `text: not valid UTF-8` and
+  `path: expected a list`) is the host's, checked before the call because `edit` takes a `&str`
+  and a slice. The order inside `edit`:
+  1. **Empty text** (§5 row 2): when `text` is empty or whitespace-only (`str::trim` is empty), the
+     document parsed is `{}`.
+  2. **Parse** (§5 row 3): otherwise `serde_json::from_str::<serde_json::Value>(text)`. A failure
+     is the `JsonEditError::Parse` variant carrying the serde_json error's Display
+     (`json.edit: <serde_json message>`, e.g. `trailing comma at line 1 column 8`,
+     `probes/json-results.md` J2).
+  3. **Top level** (§5 row 4): a parsed value that is not an object gives `json.edit: top level
+     must be an object`.
+  4. **Path** (§5 row 5): an empty `path` gives `json.edit: path: empty`. Otherwise the first
+     `NotString(word)` at Lua position `i` (1-based) gives `json.edit: path[<i>]: expected string,
+     got <word>`, e.g. `path[2]: expected string, got number`.
+  5. **Keys** (§5 row 6, §16 R14): walk the keys before the last, read-only. The walk stops at the
+     first missing key. An existing key whose value is not an object gives `json.edit: "<key>" is
+     not an object` with that key (e.g. `"hooks"`). This holds for setting and for removing alike
+     (§16 R14).
+  6. **Value**: only now is `value()` called. Its `Err` is returned unchanged.
+  7. **Set** (`Some(v)`, §5 row 6): every missing parent is inserted as `{}` and descended into,
+     then the last key is inserted. An existing key keeps its position and gets the new value, and
+     a new key goes last (§5 row 8; `preserve_order`, `probes/round3-results.md` J3).
+  8. **Remove** (`None`, §5 row 7): if a parent or the last key is missing, return `text` exactly
+     as it came in, with no re-print. Otherwise remove the last key so that every other key keeps
+     its relative order (§5 row 8 "existing keys keep their position"; the probe's `edit` uses
+     `shift_remove`, `probes/examples-main.rs`). The rest of the document stays as it is: no
+     parent is pruned.
+  9. **Print** (§5 rows 9–11): `print(&document, &Indent::detect(text), Ending::of(text))`. Both
+     read the original `text`, whitespace-only text included (spec §16 R14: "Whitespace-only text
+     takes its indent and trailing newline from the original text").
 
 **Duplicate keys** (§5 row 13) need no code: `serde_json::Value` keeps the last one (`probes/round2-results.md`
 R7: `plain Value={"a":2}`). **Numbers** (§5 row 12) need no code: Task 2 prints them in normal
 form.
 
 **Proof:** written first, seen failing, then passing. Each refusal test asserts the returned error
-is the plan 02 `JsonEditError` variant for that row; plan 02's own tests pin the Display text.
+is the plan 02 `JsonEditError` variant for that row, and plan 02's own tests pin the Display text.
+Notation in the test lines:
+- a path written `["a", "b"]` is `[PathElem::Key("a"), PathElem::Key("b")]`;
+- a value written `Some(v)` is a closure returning `Ok(Some(v))`;
+- a value written `None` is a closure returning `Ok(None)`.
+- `path_elem_keeps_a_key_or_a_type_word` (in `elem.rs`) — `Key("a")` holds `a`, and
+  `NotString(number)` holds the word `number`.
 - `edit_treats_empty_text_as_an_empty_object` — `edit("", ["a"], Some(1))` is exactly
   `"{\n  \"a\": 1\n}"` (§5 row 2).
 - `edit_treats_whitespace_only_text_as_an_empty_object` — `edit("  ", ["a"], Some(1))` is exactly
   `"{\n  \"a\": 1\n}"` (§5 row 2).
+- `edit_takes_whitespace_only_formatting_from_the_original_text` — `edit("\n", ["a"], Some(1))` is
+  exactly `"{\n  \"a\": 1\n}\n"` (trailing newline kept from the original), and
+  `edit("\n\t\n", ["a"], Some(1))` is exactly `"{\n\t\"a\": 1\n}\n"` (tab indent from the original)
+  (§16 R14).
+- `edit_first_failing_row_wins` — the Lua call `json.edit("{,", {}, 1)` reaches `edit` as
+  `edit("{,", [], Some(1))` and gives the parse refusal, not `path: empty`. `edit("[1]", [],
+  Some(1))` gives the top-level refusal, and `edit("{,", [NotString(number)], Some(1))` gives the
+  parse refusal, not the element refusal (§16 R14).
+- `edit_refuses_a_path_element_that_is_not_a_string` — `edit("{}", [Key("a"), NotString(number)],
+  Some(1))` gives the refusal whose Display is `json.edit: path[2]: expected string, got number`
+  (§5 row 5).
+- `edit_calls_value_last` — the closure records each call. For each refusal of rows 2–6 above
+  (parse, top level, empty path, element type, a parent that is not an object), the closure is
+  never called. On a success it is called exactly once.
+- `edit_returns_the_value_refusal_unchanged` — a closure returning the plan 02
+  `JsonEditError::MixedTable` makes `edit("{}", ["a"], …)` return that same error (§5 second table,
+  converted by the host).
 - `edit_refuses_text_that_is_not_json` — `edit("{\"a\":1,}", ["b"], Some(1))` is the parse
   refusal whose serde_json message is `trailing comma at line 1 column 8` (§5 row 3, J2).
 - `edit_refuses_a_top_level_that_is_not_an_object` — `"[1]"`, `"\"x\""`, `"null"` and `"1"`
@@ -200,6 +246,9 @@ is the plan 02 `JsonEditError` variant for that row; plan 02's own tests pin the
   None)` returns `"{\"a\": 0.10}"` byte for byte, with no re-print of `0.10` (§5 row 7).
 - `edit_returns_the_text_unchanged_when_removing_under_a_missing_parent` — `edit("{\"a\": 0.10}",
   ["x", "y"], None)` returns the input byte for byte (§5 row 7).
+- `edit_refuses_removing_through_a_parent_that_is_not_an_object` — `edit("{\"hooks\": []}",
+  ["hooks", "x"], None)` gives the not-an-object refusal naming `hooks`, whose Display is
+  `json.edit: "hooks" is not an object` (§16 R14).
 - `edit_removes_an_existing_key_and_keeps_the_others_in_order` — removing `["b"]` from
   `{"a":1,"b":2,"c":3,"d":4}` is exactly `"{\n  \"a\": 1,\n  \"c\": 3,\n  \"d\": 4\n}"`, so the
   removal does not swap `d` into `b`'s place (§5 rows 7–8).
@@ -245,38 +294,34 @@ is the plan 02 `JsonEditError` variant for that row; plan 02's own tests pin the
   The test decides.
 - **Byte-for-byte expectations.** Every exact string in Task 2 and Task 3 is either copied from a
   probe output (`probes/round3-results.md` J1, `probes/examples-results.txt`, the spec §5 block) or
-  follows the serde_json pretty format those outputs show (`": "` separator, empty `{}`/`[]`
-  compact, `probes/json-results.md` J4). If a hand-derived expectation (for example in
-  `edit_creates_missing_parents_as_objects`) disagrees with the real output, execute records the
-  real bytes as a deviation. The rule stays, not the literal.
-- **GAP J1 — removal through a parent that is not an object.** The spec gives "a missing key or
-  parent → no change" for removal and `"<key>" is not an object` only for setting. For
-  `edit("{\"hooks\": []}", ["hooks", "x"], None)` the spec does not say whether the text comes
-  back unchanged or is refused. Unsettled; no test is written for it until the spec decides.
-- **GAP J2 — precedence when several rows fail.** One call can fail more than one row, for
-  example unparseable text and an empty path. The plan reads the §5 table top to bottom, so the
-  parse refusal wins. The spec does not state an order. Every test uses inputs that fail one row
-  only.
-- **GAP J3 — whitespace-only text and the formatting rows.** "Treated as `{}`" could also govern
-  indent and trailing newline. Task 3 reads both from the original text, as the probe's `edit`
-  does (`probes/examples-main.rs`). So `edit("\n", ["a"], Some(1))` would end in `\n`. The spec
-  does not say which. The tests avoid a whitespace-only input that contains `\n` or an indented
-  line.
-- **Not done here:** argument reading (`text: expected string, got nil`, `path: expected table`,
-  `path[2]: expected string, got number`) and the Lua value conversion table, including its
-  refusals. Both are plan 12's.
+  derived from the layout those proven outputs show for `PrettyFormatter::with_indent`:
+  - one key per line, with `": "` between key and value;
+  - `,` at the end of every member but the last;
+  - each nested object and array opens on its key's line and closes on its own line, one indent
+    level out;
+  - each array element on its own line (J1 `"allow"`, the §5 checked example);
+  - empty `{}`/`[]` compact (J1 `"hooks": {}`, `probes/json-results.md` J4);
+  - normal-form numbers (J1).
+
+  The literals are part of the test. A mismatch is a failing test to fix in the code, never a
+  deviation.
+- **Not done here:** row 1 argument reading (`text: expected string, got nil`, `path: expected
+  table`, and the §16 R3 shapes `text: not valid UTF-8` and `path: expected a list`), building the
+  `PathElem`s, and the Lua value conversion behind the `value` closure (§5 second table, with its
+  refusals). All of them are plan 12's.
 
 ## Proof
 
 - `cargo make dod` green at the end of Task 3.
 - Spec §5 rows covered (first table):
-  - row 1 "arguments": plan 12 (host reads them; not reachable through `&str` / `&[String]`);
+  - row 1 "arguments": plan 12 (the host reads them before the call);
   - row 2 empty/whitespace text: Task 3 (`edit_treats_empty_text_as_an_empty_object`,
-    `edit_treats_whitespace_only_text_as_an_empty_object`);
+    `edit_treats_whitespace_only_text_as_an_empty_object`,
+    `edit_takes_whitespace_only_formatting_from_the_original_text`);
   - row 3 parse: Task 3 (`edit_refuses_text_that_is_not_json`);
   - row 4 top level: Task 3 (`edit_refuses_a_top_level_that_is_not_an_object`);
-  - row 5 path non-empty: Task 3 (`edit_refuses_an_empty_path`); the `path[2]` element type is
-    plan 12's;
+  - row 5 path non-empty and element types: Task 3 (`edit_refuses_an_empty_path`,
+    `edit_refuses_a_path_element_that_is_not_a_string`);
   - row 6 set and parents: Task 3 (`edit_creates_missing_parents_as_objects`,
     `edit_refuses_a_parent_that_is_not_an_object`, `edit_replaces_the_value_at_the_last_key`);
   - row 7 remove missing: Task 3 (`edit_returns_the_text_unchanged_when_removing_a_missing_key`,
@@ -297,3 +342,11 @@ is the plan 02 `JsonEditError` variant for that row; plan 02's own tests pin the
 - Spec §5 "Dependency": no change here. Plan 01 adds `serde_json` with `preserve_order`, and
   nothing in this plan enables `arbitrary_precision`.
 - Spec §5 second table: plan 12.
+- Spec §16 R14: removal through a non-object parent → Task 3
+  (`edit_refuses_removing_through_a_parent_that_is_not_an_object`); whitespace-only formatting →
+  Task 3 (`edit_takes_whitespace_only_formatting_from_the_original_text`); first failing row wins →
+  Task 3 (`edit_first_failing_row_wins`, `edit_calls_value_last`,
+  `edit_returns_the_value_refusal_unchanged`).
+- Spec §16 R3 (`json.edit: text: not valid UTF-8`, `json.edit: path: expected a list`, the value
+  refusals) and R5 (one refusal per call, located at the nearest Lua frame): plan 12. `edit` returns
+  at most one refusal by its signature.
