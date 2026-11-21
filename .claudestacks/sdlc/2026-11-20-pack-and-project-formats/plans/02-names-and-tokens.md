@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01]
 built-on: 3162a314af79
@@ -411,3 +411,31 @@ Commit `feat(agentstacks): render tokens with supplied values`.
     them): §3.2 `{{var arguments}}` outside a `SKILL.md` → plan 06; §3.2
     `{{skill_dir core/coder}}` → plan 06 (own pack) and plan 10 (other pack, §9 item 2); §3.2
     `{{option archive_kep}}` → plan 10 (§9 item 3).
+
+## Review findings
+
+Reviewer (one round): blocking none; code 0🔴 3🟡 7🔵, plan 2🔵. Fixer applied all; `cargo test -p agentstacks model::` → `test result: ok. 162 passed; 0 failed`.
+
+- 🟡 render.rs:28 broken span precondition silently drops values — fixed: `debug_assert!`s for order, bounds and char boundaries.
+- 🟡 scan.rs:52 no multi-line span test — fixed: `scan_gives_a_token_on_a_later_line_its_text_span_and_line` (span 6..14, `reaches_native`, `n.md:2`, rendered output).
+- 🟡 scan.rs:232 workflow vocabulary in test name — fixed (renamed, see Deviations).
+- 🔵 test names containing "spec" — fixed (renamed, see Deviations).
+- 🔵 render.rs:21 untested no-value copy — fixed: `render_copies_a_token_with_no_value_as_written`.
+- 🔵 hard-coded counts in token_kind/var/token_error docs — fixed.
+- 🔵 token_target.rs:51 `[]` assumed root — fixed (matches on kind).
+- 🔵 token_values.rs:66 test pattern — fixed (slice pattern).
+- 🔵 item_ref.rs:37 Vec allocation — fixed (`split_once`); option_name.rs:30 duplicated rule — fixed (`is_name_with_separator` in kebab_name.rs, test `separator_rule_takes_the_separator_as_a_parameter`).
+- 🔵 plan additions `InvalidName::value()`, `InvalidOptionName::value()`, `TokenKind::as_str`, `Var::as_str` — accepted.
+
+## Deviations
+
+- 2026-11-20 — Run shape: one coder ran Tasks 1–4 in order, in parallel with plan 03 in the same tree (shared file `model/mod.rs`, append-only lines).
+- 2026-11-20 — `kebab_name` is a private module with `pub(super)` functions (clippy `redundant_pub_crate` rejects `pub(crate)` inside it).
+- 2026-11-20 — `Token::span()` returns an owned `Range<usize>`; `TokenValues` keys by `(start, end)`.
+- 2026-11-20 — `InvalidName` / `InvalidOptionName` gained public `value()`; `TokenKind::as_str`, `Var::as_str` added.
+- 2026-11-20 — `TokenError` variants carry their message fields (`UnknownKind{word}`, `NeedsTarget{kind}`, `TakesOneTarget{kind}`, `InvalidTarget{target}`, `RootTakesPackName{target}`, `UnknownVar{name}`); derives `Clone, PartialEq, Eq`.
+- 2026-11-20 — mod.rs doc links written `scan()` / `render()` (rustdoc: module and function share the name).
+- 2026-11-20 — Test renames after review (the guideline forbids workflow vocabulary in source): `kebab_rule_accepts_spec_examples` → `kebab_rule_accepts_lowercase_digits_and_hyphens_up_to_64_bytes`; `kebab_rule_refuses_spec_examples` → `kebab_rule_refuses_bad_start_bad_character_overlong_and_empty`; `pack_name_parses_spec_examples` → `pack_name_parses_through_new_from_str_and_try_from`; `option_name_refuses_spec_examples` → `option_name_refuses_bad_start_bad_character_overlong_and_empty`; `token_error_messages_match_spec` → `token_error_displays_each_refusal_message`; `scan_accepts_the_spec_examples` → `scan_accepts_skill_root_and_skill_dir_tokens`; `scan_refuses_each_spec_example` → `scan_refuses_each_malformed_token`; `scan_leaves_pack_rules_to_later_plans` → `scan_accepts_tokens_whose_validity_depends_on_the_pack`.
+
+- 2026-11-20 — Final gate after fixes: `cargo make dod` → `test result: ok. 191 passed; 0 failed`, `[cargo-make] INFO - Build Done in 8.89 seconds.`
+- 2026-11-21 — **Redesign after build:** the code was moved into `crates/agentstacks/src/types/<group>/` with the `types::port::FileTree` port and `fs::StdFileTree`, files renamed so no name repeats its folder word, and refined by crate-wide reviews. Paths and names above are superseded by the built tree; behaviour follows the redesigned `spec.md`.

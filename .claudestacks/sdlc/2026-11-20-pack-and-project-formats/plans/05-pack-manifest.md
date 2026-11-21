@@ -1,8 +1,9 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01, 02, 04]
 built-on: 3162a314af79
+disproves: 3162a314af79
 ---
 
 # Pack Manifest Implementation Plan
@@ -650,3 +651,35 @@ Commit `feat(agentstacks): parse native hook declarations`.
   - §3.4/§3.5 token errors located by key → `grants_report_token_errors_by_indexed_key`,
     `hook_run_reports_a_token_error_without_a_form_error`.
 - 80 colocated unit tests across 23 logic-bearing files; `mod.rs` is export-only and has none.
+
+## Review findings
+
+Reviewer (one round; mutation probes in a scratch copy): blocking none; code 0🔴 7🟡 9🔵 2❓, plan 2🟡 3🔵. Fixer applied 1–9 below; final `cargo make dod` → `test result: ok. 292 passed; 0 failed`, `[cargo-make] INFO - Build Done in 7.28 seconds.`; `cargo make deny` → `advisories ok, bans ok, licenses ok, sources ok`.
+
+- 🟡 grants.rs:125 unguarded (`span().start == 0` → `true` survived) — fixed: row `read = ["x/{{root}}"]` in `grants_refuse_each_rule`; fails under the mutation.
+- 🟡 hook_run.rs:104 unguarded (`rest.contains("{{")` → false survived) — fixed: row `{{root}}/{{var tmpdir}}/x.lua` in `hook_run_refuses_other_forms`; fails under the mutation.
+- 🟡 hook.rs:102 false refusal: `match = [1]` also gave `empty list never fires` — fixed (emptiness on the raw array; same in `read_agents`): `hook_refuses_only_the_item_error_for_a_non_empty_match_of_wrong_types`.
+- 🟡 pack_manifest.rs:71 `RequiresItself` withheld when another identity field was invalid — fixed (`read_identity` returns the valid name separately): `pack_manifest_refuses_requiring_itself_beside_another_bad_field`.
+- 🟡 workflow vocabulary in test names/consts — fixed (renamed, see Deviations).
+- 🔵 requires.rs:40 own name listed twice emitted `a pack cannot require itself` twice — fixed (one RequiresItself + one ListedTwice): `requires_refuses_its_own_name_once_and_a_repeat_as_listed_twice`.
+- 🔵 dropped `fail_open = false` row on a lua hook — fixed: row in `hook_refuses_unknown_keys_but_knows_every_action_key`.
+- 🔵 docs (pack_manifest.rs:9, :54, native_hooks.rs:38, requires.rs:9) — fixed.
+- 🔵 unused public `TomlFields::file` / `TomlFields::record` — removed.
+- 🟡 public API exposes `semver`/`toml` types (`AirslReq::as_version_req`, `parse_toml_document`, `TomlFields`, `OptionDecl::default`, `PackManifest::version`) — open: the plan prescribes all but `PackManifest::version`; left for the author.
+- 🟡 pack_path.rs:34 only `/` is a separator: `""`, `"."`, `"..\\x"`, `"a//b"`, `"dir/"` accepted — open: refusing them needs new refusal wording the spec does not give; flagged for the author.
+- ❓ grants.rs:136 duplicate `env`/`exec` entries accepted while `requires` lists refuse repeats — open (plan silent).
+- ❓ hook.rs:130 `agents = []` accepted (a hook that can never fire) — open (plan silent).
+- 🔵 grants.rs:29 `Vec<String>` grant paths (no newtype); grants.rs:149 cascade on an invalid binary name; hook_run.rs:50 case-sensitive `.lua`/`.sh`; toml_fields.rs:215 clones per read — open (nits).
+- 🟡/🔵 plan text: `*_spec_*` test names mandated, `']'` quoted instead of the real `` `]` ``, the §4 example's `render`/`exclude` placement, deviations 3–4 not amended — recorded under Deviations; `disproves:` set.
+
+## Deviations
+
+- 2026-11-20 — Run shape: one coder ran Tasks 1–7 in order, concurrent with plan 04's review/fix (shared files append-only).
+- 2026-11-20 — **Spec claim disproven (spec §1.1, line 66):** the toml 1.2.0 syntax message is quoted as `unclosed array, expected ']'`. Real output (scratchpad `probe-toml-results.md:19-20`, and the red run of `parse_document_locates_a_syntax_error_by_line`): ``unclosed array, expected `]` `` (backticks). Built and tested with the real text (`parse_document_locates_a_syntax_error_by_line`, `pack_manifest_stops_at_a_syntax_error`, `native_hooks_report_a_syntax_error_by_line`). `disproves: 3162a314af79` set; `design` clears it.
+- 2026-11-20 — **Spec claim disproven (spec §4 example, lines 239–245):** `render` / `exclude` are written after `[requires]`; TOML assigns them to that table, so the parser reports `requires.render: unknown key` / `requires.exclude: unknown key` (first test run). The fixture for `pack_manifest_parses_the_metadata_example` writes them before the first `[table]`. The spec example is wrong as TOML; `design` clears it.
+- 2026-11-20 — `TomlFields::table_or_empty` / `optional_table` return `Option<TomlFields>`: `None` after recording `expected table, got <type>` so a wrong-typed `[pack]` does not cascade into `required` refusals; absent key → `Some(empty)` / `None`.
+- 2026-11-20 — Where the plan was silent: `Requires::read(fields, Option<&PackName>)`; `OptionDecl::read` / `Hook::read` / `NativeHook::read` return `Some` when valid even if an unknown key was refused (`PackManifest::parse` still errs); options come out in key order (`toml::Table` is sorted); `.lua`/`.sh` compared exactly (clippy case-sensitive-extension lint); `PackPath::new("")` accepted; grant paths kept as written `Vec<String>`; a `run` both non-`.lua` and malformed gets both refusals.
+- 2026-11-20 — Extra public API: `TomlFields::{key_path, item_path, refuse_path, scan_field, refusal_count}`, `PackPath::has_extension`, `ExcludeGlob::{pattern, matches}`, `HookAction::KEYS`.
+- 2026-11-20 — Metadata-example fixture description reads "a chain of steps" (no workflow vocabulary in source).
+- 2026-11-20 — Test renames: `exclude_glob_compiles_the_spec_example` → `exclude_glob_compiles_a_typical_pattern`; `grants_parse_the_spec_example` → `grants_parse_a_typical_example`; `lua_hook_parses_the_spec_example` → `lua_hook_parses_a_typical_example` (const `SPEC_EXAMPLE` → `TYPICAL_EXAMPLE`); `manifest_error_messages_match_the_spec` → `manifest_error_messages_match_their_wording`; `message_hook_parses_the_spec_example` → `message_hook_parses_a_typical_example`; `pack_manifest_reads_the_spec_options` → `pack_manifest_reads_typical_options`; `pack_manifest_parses_the_spec_hooks` → `pack_manifest_parses_typical_hooks` (const `SPEC_HOOKS` → `TYPICAL_HOOKS`); `requires_parses_the_spec_example` → `requires_parses_a_typical_example`.
+- 2026-11-21 — **Redesign after build:** the code was moved into `crates/agentstacks/src/types/<group>/` with the `types::port::FileTree` port and `fs::StdFileTree`, files renamed so no name repeats its folder word, and refined by crate-wide reviews. Paths and names above are superseded by the built tree; behaviour follows the redesigned `spec.md`.

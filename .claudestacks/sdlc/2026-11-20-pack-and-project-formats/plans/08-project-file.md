@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01, 02, 05]
-built-on: 3162a314af79
+built-on: 95010069150c
 ---
 
 # Project File Implementation Plan
@@ -324,3 +324,12 @@ Entries iterate in name order because a raw `toml::Table` is sorted by key (spec
   (`project_file_refuses_a_syntax_error_with_its_line`).
 - The remaining §7 rows (key = fetched name, `requires.packs` listed, cycles, option typing) are
   covered by plan 10.
+
+## Review findings
+
+Built after the 2026-11-21 redesign. Crate-wide review rounds: review #1 (~70 findings) fixed in two waves; final review (0🔴 13🟡 17🔵 3❓). The 13🟡 and Q1–Q3 are fixed in the final fix wave (see the PR); the 17🔵 are listed in the PR as follow-ups.
+
+## Deviations
+
+- 2026-11-21 — **Redesign:** the spec was redesigned (`spec-superseded-2026-11-21.md` → `spec.md`) after plans 01–05 were built. This plan was built against the new spec, not the text above: code lives under `crates/agentstacks/src/types/<group>/` (domain types and logic, no I/O) with the read-only `types::port::FileTree` port and `fs::StdFileTree` as the only `std::fs` caller; loaders take `&impl FileTree`; file names never repeat their folder word. File paths and type names in the tasks above are superseded by the built tree.
+- 2026-11-21 — Built in parallel with sibling plans by separate coders; consistency fixed afterwards by crate-wide reviews (one error collection type `Diagnostics`, `[i]` on element refusals, own error type per validating newtype, one api constant).

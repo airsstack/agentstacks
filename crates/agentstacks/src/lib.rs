@@ -7,15 +7,15 @@
 //!
 //! # Responsibilities
 //!
-//! - [`model`] is the home of the vocabulary: packs, tool extensions, operations and the lock.
+//! - [`types`] is the home of the domain types and the logic over them, reaching the disk only
+//!   through the ports it declares.
 //! - [`validation`] is the home of the checks on every operation an extension proposes.
+//! - [`fs`](mod@fs) is the home of the adapter that reads the real disk for the ports `types`
+//!   declares, and the only place that calls `std::fs`.
 //! - [`plan`] is the home of the view that shows every operation before anything is applied.
 //! - [`executor`] is the home of the only writer to disk.
-//! - [`lock`] is the home of the pinned versions and file hashes in `agentstacks.lock`.
-//! - [`extension_host`] is the home of the runner for Lua tool extensions under airsl with zero
+//! - [`host`] is the home of the runner for Lua tool extensions under airsl with zero
 //!   grants.
-//!
-//! Every module currently holds no items.
 //!
 //! # Non-responsibilities
 //!
@@ -24,8 +24,8 @@
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
 pub mod executor;
-pub mod extension_host;
-pub mod lock;
-pub mod model;
+pub mod fs;
+pub mod host;
 pub mod plan;
+pub mod types;
 pub mod validation;

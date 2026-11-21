@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01, 02, 03, 05]
-built-on: 3162a314af79
+built-on: 95010069150c
 ---
 
 # Extension Manifest Implementation Plan
@@ -386,3 +386,12 @@ Definition of Done is green. Commit `test(agentstacks): extension fixtures`.
 | §10 I/O failure | `<path>: <the std::io::Error Display>` | `extension_load_reports_an_unreadable_manifest_as_io` |
 | §10 all errors per run | — | `extension_manifest_reports_all_errors_at_once`, `extension_load_reports_every_refusal_together`, `parse_with_entry_keeps_a_valid_entry_when_another_field_fails` |
 | §8.1 tree hash for extensions | — | `extension_load_records_the_tree_hash`, `minimal_extension_fixture_loads` |
+
+## Review findings
+
+Built after the 2026-11-21 redesign. Crate-wide review rounds: review #1 (~70 findings) fixed in two waves; final review (0🔴 13🟡 17🔵 3❓). The 13🟡 and Q1–Q3 are fixed in the final fix wave (see the PR); the 17🔵 are listed in the PR as follow-ups.
+
+## Deviations
+
+- 2026-11-21 — **Redesign:** the spec was redesigned (`spec-superseded-2026-11-21.md` → `spec.md`) after plans 01–05 were built. This plan was built against the new spec, not the text above: code lives under `crates/agentstacks/src/types/<group>/` (domain types and logic, no I/O) with the read-only `types::port::FileTree` port and `fs::StdFileTree` as the only `std::fs` caller; loaders take `&impl FileTree`; file names never repeat their folder word. File paths and type names in the tasks above are superseded by the built tree.
+- 2026-11-21 — Built in parallel with sibling plans by separate coders; consistency fixed afterwards by crate-wide reviews (one error collection type `Diagnostics`, `[i]` on element refusals, own error type per validating newtype, one api constant).

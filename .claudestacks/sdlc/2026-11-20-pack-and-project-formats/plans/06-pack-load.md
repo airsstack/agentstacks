@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [02, 03, 04, 05]
-built-on: 3162a314af79
+built-on: 95010069150c
 ---
 
 # Pack Loading Implementation Plan
@@ -521,3 +521,12 @@ with an existing `run`), `valid-native-hooks`, `valid-options`, `valid-native-fi
 | §6.2 own-pack `run` exists | `own_runs_resolve_in_all_three_forms`, `missing_own_run_is_refused`, `run_naming_a_skill_file_does_not_exist_under_root`, `run_naming_a_native_file_does_not_exist_under_root`, `native_hook_runs_are_checked_as_own_pack_runs`, fixtures `hook-run-missing`, `native-hook-run-missing` |
 | §6.2 `agents` name own agents | `hook_agents_must_name_own_agents`, fixture `hook-agents-unknown` |
 | §10 all errors per run, sorted | `load_continues_past_a_refused_pack_toml`, `load_reports_errors_from_every_file_in_one_run` |
+
+## Review findings
+
+Built after the 2026-11-21 redesign. Crate-wide review rounds: review #1 (~70 findings) fixed in two waves; final review (0🔴 13🟡 17🔵 3❓). The 13🟡 and Q1–Q3 are fixed in the final fix wave (see the PR); the 17🔵 are listed in the PR as follow-ups.
+
+## Deviations
+
+- 2026-11-21 — **Redesign:** the spec was redesigned (`spec-superseded-2026-11-21.md` → `spec.md`) after plans 01–05 were built. This plan was built against the new spec, not the text above: code lives under `crates/agentstacks/src/types/<group>/` (domain types and logic, no I/O) with the read-only `types::port::FileTree` port and `fs::StdFileTree` as the only `std::fs` caller; loaders take `&impl FileTree`; file names never repeat their folder word. File paths and type names in the tasks above are superseded by the built tree.
+- 2026-11-21 — Built in parallel with sibling plans by separate coders; consistency fixed afterwards by crate-wide reviews (one error collection type `Diagnostics`, `[i]` on element refusals, own error type per validating newtype, one api constant).

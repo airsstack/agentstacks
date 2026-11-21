@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01]
 built-on: 3162a314af79
@@ -338,3 +338,31 @@ line-ending normalisation; file modes are never read; directories contribute not
 | §8.1 tree hash | — | `combine_sorts_entries_by_path_bytes`, `tree_hash_matches_the_spec_example`, `tree_hash_ignores_creation_order`, `tree_hash_ignores_file_modes`, `tree_hash_keeps_line_endings`, `tree_hash_covers_the_path` |
 | §10 I/O form | `<path>: <the std::io::Error Display>` | `walk_reports_a_missing_directory_as_io`, `tree_hash_reports_a_missing_directory_as_io` |
 | §10 all errors per run, sorted | — | `walk_reports_every_symlink` |
+
+## Review findings
+
+Reviewer (one round; 18 mutants, 16 killed): blocking none; code 0🔴 3🟡 12🔵 1❓, plan 1🟡 1❓. Fixer: 33 walk/tree_hash/content_hash tests green.
+
+- 🟡 tree_hash.rs:34 read-failure branch unguarded (mutant survived) — fixed: `tree_hash_reports_an_unreadable_file_as_io` (cfg unix, chmod 000); with the branch mutated to `Err(_) => {}` it fails: left `[]` vs right `["…b/c.lua: Permission denied (os error 13)"]`.
+- 🟡 lock/mod.rs:5, :16 future-tense narration — fixed.
+- 🟡 plan Task 4 Proof names no read-failure test — covered by the test above.
+- 🔵 lib.rs:10/:19 stale/temporal docs — fixed.
+- 🔵 tree_hash_keeps_line_endings / tree_hash_covers_the_path asserted only `!= SPEC_HASH` — fixed (LF vs CRLF; A.md vs a.md in-test).
+- 🔵 tree_hash.rs:216 could pass vacuously — fixed (len == 1).
+- 🔵 walk.rs:98 refused non-UTF-8 directory not entered, unguarded (mutant survived) — fixed: `walk_does_not_enter_a_refused_non_utf8_directory` (cfg linux; its first run is CI ubuntu, not run on this macOS host).
+- 🔵 tree_path.rs:10 doc overstated — fixed (caller invariant).
+- 🔵 content_hash.rs:60 discarded `write!` Result — fixed (nibble table); tree_hash.rs:45 `mut entries` param — fixed; walk.rs:17 long doc line — fixed.
+- 🔵 lock/mod.rs:18 exemption line placement — open (matches repo convention).
+- 🔵 model/mod.rs:1 Responsibilities omit walk types — open (shared file under concurrent edit).
+- 🔵 tree_hash.rs:32 TOCTOU: `fs::read` follows a symlink swapped in after the walk — open (needs a racing local writer; not changed).
+- ❓ walk.rs:49 a root `dir` that is itself a symlink is followed — open (plan silent; behaviour kept).
+- ❓ per-task commits absent — by design (execute does not commit).
+
+## Deviations
+
+- 2026-11-20 — Run shape: one coder ran Tasks 1–4 in order, in parallel with plan 02 in the same tree (shared file `model/mod.rs`, append-only lines).
+- 2026-11-20 — `Walked::ignored()` sorts by encoded path bytes (`PathBuf::cmp` would put `a/b` before `a.md`); `walk` uses an explicit stack.
+
+- 2026-11-20 — Final gate after fixes: `cargo make dod` → `test result: ok. 191 passed; 0 failed`, `[cargo-make] INFO - Build Done in 8.89 seconds.`
+- 2026-11-20 — Test renames (workflow vocabulary out of source, applied at the end of the 01–05 run): `content_hash_error_displays_the_spec_message` → `content_hash_error_displays_its_message`; `content_hash_of_bytes_matches_the_spec_digests` → `content_hash_of_bytes_matches_known_sha256_digests`; `tree_hash_matches_the_spec_example` → `tree_hash_matches_the_known_example_hash` (const `SPEC_HASH` → `EXAMPLE_HASH`, helper `spec_example` → `example_tree`); `walk_error_special_file_displays_the_spec_message` → `walk_error_special_file_displays_its_message`; `walk_error_not_utf8_displays_the_spec_message` → `walk_error_not_utf8_displays_its_message`. `cargo make dod` → 292 passed, Build Done.
+- 2026-11-21 — **Redesign after build:** the code was moved into `crates/agentstacks/src/types/<group>/` with the `types::port::FileTree` port and `fs::StdFileTree`, files renamed so no name repeats its folder word, and refined by crate-wide reviews. Paths and names above are superseded by the built tree; behaviour follows the redesigned `spec.md`.

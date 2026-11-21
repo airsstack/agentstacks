@@ -1,0 +1,4 @@
+[[hooks]]
+kind = "lua"
+event = "PreToolUse"
+run = "{{root core}}/hooks/enforce.lua"

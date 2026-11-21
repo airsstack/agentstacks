@@ -1,0 +1,24 @@
+render = ["enforcement.json"]
+[pack]
+name = "core"
+version = "0.1.0"
+api = 0
+description = "d"
+[requires]
+airsl = ">=0.1.4"
+[options.archive_keep]
+type = "integer"
+default = 20
+description = "Discussions kept"
+[options.style_reinject]
+type = "boolean"
+default = true
+description = "Re-inject the style rules"
+[[hooks]]
+kind = "message"
+event = "session.start"
+text = "Read {{root}}/enforcement.json"
+[[hooks]]
+kind = "lua"
+event = "session.end"
+run = "hooks/enforce.lua"

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: []
 built-on: 3162a314af79
@@ -332,3 +332,32 @@ diagnostics`.
   `cargo make dod` green after Task 5.
 - 37 colocated unit tests: `location.rs` 7, `type_word.rs` 1, `field_error.rs` 8,
   `format_error.rs` 2, `diagnostic.rs` 9, `diagnostics.rs` 10.
+
+## Review findings
+
+Reviewer (one round): blocking none; code 2🟡 9🔵, plan 1🟡 1🔵 1❓.
+
+- 🟡 diagnostics.rs:56 stable sort unguarded — fixed: `into_sorted_keeps_push_order_for_many_equal_keys` (32 equal-key items; fails with `sort_unstable_by_key`, passes restored). `cargo make dod-crate agentstacks` → exit 0, 125 unit tests passed.
+- 🟡 location.rs:102 `/`-join unguarded on Unix — fixed: `redundant_separators_and_current_dir_components_are_normalised` (`a//b/pack.toml`, `a/./b/pack.toml` → `a/b/pack.toml`). Same run, exit 0.
+- 🔵 IntoIterator doc does not say it sorts — fixed (doc line added).
+- 🔵 field_error.rs:10 / format_error.rs:17 docs describe non-existent parsers / misplaced PartialEq note — fixed (docs describe what exists; note moved to `# Usage`).
+- 🔵 `#[must_use]` missing on `Diagnostic::new`, `Location::{file,at_line,at_key}` — fixed.
+- 🔵 test helpers hid bad line literals via `unwrap_or(NonZeroUsize::MIN)` — fixed (`ok_or(..)?`, tests return `Result`).
+- 🔵 lib.rs:19 "every module except model holds no items" — fixed by plan 03 (lib.rs docs now name `lock`).
+- 🔵 location.rs:112 `display().to_string()` allocates per component — open (micro-perf, not changed).
+- 🔵 mod.rs:1 module doc names packs/extensions/lock not yet in `model` — open (shared file under concurrent edit by plans 02–05; grows true as they land).
+- 🔵 mod.rs:30 no `#[doc(inline)]` on flattening re-exports — open (same reason).
+- 🟡/🔵 plan text still says accessor `file()` and 37 tests — recorded under Deviations below (plan text is not rewritten by execute).
+- ❓ per-task commits absent — by design: execute does not commit unless told to.
+
+## Deviations
+
+- 2026-11-20 — Board row on start: `plan 01 … plan 10 approved — execute 01` (clean).
+- 2026-11-20 — Run shape: one coder ran Tasks 1–5 in order (test-first per task) instead of one coder per task; one reviewer and one fixer for the plan. Plans 02 and 03 then ran in parallel in the same tree, sharing only `model/mod.rs` (append-only lines).
+- 2026-11-20 — `Location::file(path)` constructor and a `file()` accessor cannot share a name (E0592 "duplicate definitions with name `file`"); accessor built as `Location::file_path() -> &Path`.
+- 2026-11-20 — `Location::set_level` takes `Option<String>` (`Option<impl Into<String>>` does not compile for `set_level(None)`).
+- 2026-11-20 — `Location::at_line` takes `NonZeroUsize`; constructors take `impl Into<PathBuf>` / `impl Into<String>`.
+- 2026-11-20 — Absolute paths render with one leading `/`; extra test `absolute_file_has_a_single_leading_slash` (38 tests, plan said 37), plus two reversion-guard tests from review (40).
+- 2026-11-20 — Tests use no `expect`/`panic!` (workspace lints `panic = deny`, `expect_used = warn` under `-D warnings`).
+- 2026-11-20 — Test rename at the end of the 01–05 run: `each_type_word_displays_its_spec_word` → `each_type_word_displays_its_word`. `cargo make dod` → 292 passed, Build Done.
+- 2026-11-21 — **Redesign after build:** the code was moved into `crates/agentstacks/src/types/<group>/` with the `types::port::FileTree` port and `fs::StdFileTree`, files renamed so no name repeats its folder word, and refined by crate-wide reviews. Paths and names above are superseded by the built tree; behaviour follows the redesigned `spec.md`.

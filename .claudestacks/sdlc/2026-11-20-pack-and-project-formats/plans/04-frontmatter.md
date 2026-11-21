@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-20
 depends-on: [01, 02]
 built-on: 3162a314af79
@@ -514,3 +514,36 @@ name `coder`; each refusal asserts the full `Display`):
 - 59 colocated unit tests: `yaml_value.rs` 7, `frontmatter_error.rs` 2, `body_start.rs` 1,
   `frontmatter.rs` 13, `yaml_syntax.rs` 4, `frontmatter_fields.rs` 10, `invocation.rs` 3,
   `skill_meta.rs` 7, `model_tier.rs` 2, `effort.rs` 2, `agent_tool.rs` 2, `agent_meta.rs` 6.
+
+## Review findings
+
+Reviewer (one round; 23 mutants, 18 killed): blocking none; code 0🔴 9🟡 11🔵 2❓, plan 2🟡 2🔵. Fixer: clippy and rustdoc `-D warnings` green, `cargo test --all-targets` → 248 passed, 0 failed (fmt red only in plan-05 files mid-edit at that time).
+
+- 🟡 "spec order" in rustdoc (agent_tool, effort, invocation, model_tier) — fixed ("declaration order").
+- 🟡 test names with "spec" — fixed (renamed, see Deviations).
+- 🟡 frontmatter.rs:33 CRLF delimiter unguarded (mutant survived) — fixed: `split_accepts_crlf_delimiters`; fails with `strip_suffix('\r')` mutated, passes restored.
+- 🟡 skill_meta.rs:87 `argument_hint` token scan unguarded (mutant survived) — fixed: `skill_meta_scans_argument_hint_for_tokens`, `skill_meta_refuses_malformed_token_in_argument_hint` (`argument_hint: unknown token kind "skil"`); both fail with the scan call deleted.
+- 🔵 case sensitivity unguarded (mutants survived) — fixed: `effort_matching_is_case_sensitive`, `model_tier_matching_is_case_sensitive`.
+- ❓ `tools: []` → `Some([])` unpinned — pinned: `agent_meta_keeps_an_empty_tools_list_distinct_from_absent`.
+- ❓ YAML 1.1 names (`on`, `y`, `no`, …) read as booleans — pinned: `skill_meta_refuses_a_name_yaml_reads_as_boolean` (`name: expected string, got boolean`); follows the YAML 1.1 rule the plan states. Authors must quote such names.
+- 🔵 skill_meta.rs:103 / agent_meta.rs:91 could return `Err(vec![])` — fixed (`let … else` with `debug_assert!(!refusals.is_empty())`).
+- 🔵 frontmatter.rs:9 stray `//!`, frontmatter.rs:69 unreachable fallback, frontmatter_error.rs:36 doc, frontmatter_fields.rs:46 visibility, string_wording.rs exemption line — fixed.
+- 🔵 frontmatter_fields.rs:76 `value()` clones per lookup — open (returning a reference needs a split-borrow restructure; not a contained change).
+- 🔵 skill_meta/agent_meta and the four vocabulary enums repeat structure — open (modularity nit).
+- 🟡 frontmatter.rs:101 serde-saphyr messages passed through carry Rust API advice (`cannot deserialize null into string; use Option<String>`, `multiple YAML documents detected; use from_str_multiple …`) — open: the plan requires the parser message unchanged; flagged for the author.
+- 🟡 yaml_value.rs:86 `native` integer beyond i64 but within f64 (`99999999999999999999`) is stored as `Float(1e20)`; `18446744073709551615` refuses the file (as the plan requires) — open, flagged for the author.
+- 🟡/🔵 plan text not amended for deviations — recorded under Deviations below; ❓ per-task commits absent — by design.
+
+## Deviations
+
+- 2026-11-20 — Run shape: one coder ran Tasks 1–5 in order after plans 01/02 were built, concurrent with plan 03's review/fix; review and fix concurrent with plan 05's coder.
+- 2026-11-20 — `Cargo.toml` declares `serde-saphyr = "2"` (as the plan); the resolver picked 2.2.0, so `Cargo.lock` was pinned with `cargo update -p serde-saphyr --precise 2.1.1` (the probed version; tests assert its wording). Reviewer: all model tests also pass on 2.2.0.
+- 2026-11-20 — `FieldError::WrongType` takes a closed `TypeWord`, so `expected a mapping` / `expected a string` are `FrontmatterError::NotAMapping{got}` / `NotAString{got}`; displayed messages identical to the plan's.
+- 2026-11-20 — `optional_string` takes `StringWording::{Generic, WithArticle}` instead of an `expected` word; `FrontmatterError::not_one_of` helper added.
+- 2026-11-20 — Helper modules (`frontmatter_fields`, `string_wording`, `yaml_syntax`) are private `mod` with `pub(super)` items (clippy `redundant_pub_crate`).
+- 2026-11-20 — `SkillMeta::parse` / `AgentMeta::parse` take `&Path` and `&ItemName`.
+- 2026-11-20 — Red-first not observed for frontmatter_fields, skill_meta, agent_meta and the vocabulary enums (tests written with the code); reviewer mutation run covered them, survivors fixed above.
+- 2026-11-20 — Test renames: `agent_meta_parses_spec_example` → `agent_meta_reads_every_key`; `skill_meta_parses_spec_example` → `skill_meta_reads_every_key`; `frontmatter_error_messages_match_spec` → `frontmatter_error_displays_each_message`.
+
+- 2026-11-20 — Final gate after fixes: `cargo make dod` → `test result: ok. 289 passed; 0 failed`, `[cargo-make] INFO - Build Done in 9.86 seconds.`
+- 2026-11-21 — **Redesign after build:** the code was moved into `crates/agentstacks/src/types/<group>/` with the `types::port::FileTree` port and `fs::StdFileTree`, files renamed so no name repeats its folder word, and refined by crate-wide reviews. Paths and names above are superseded by the built tree; behaviour follows the redesigned `spec.md`.
