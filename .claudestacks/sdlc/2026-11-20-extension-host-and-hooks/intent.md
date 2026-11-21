@@ -1,10 +1,12 @@
 ---
-status: draft
+status: dropped
 created: 2026-11-20
 milestone: foundation/01
 ---
 
 # Intent: Extension host and hook runtime
+
+> Dropped 2026-11-21: merged into `2026-11-20-core-plan-and-apply`, which now carries this scope.
 
 ## Problem
 
@@ -21,8 +23,7 @@ pinned and declared.
 
 ## Affected systems
 
-- `crates/agentstacks` `extension_host` seam; a new `airsl` dependency from crates.io (claudestacks
-  uses `airsl = "0.1.3"`).
+- `crates/agentstacks` `host` seam; a new `airsl` library dependency from crates.io.
 - The hook entry points that packs ship, and the shim a tool invokes to reach airsl.
 - The operation model from `core-plan-and-apply`.
 
@@ -31,6 +32,9 @@ pinned and declared.
 - `crates/agentstacks` runs an extension's adapter under airsl with zero grants and gets back
   proposed operations, or a refusal naming what the extension tried to use.
 - A documented `api = 0` surface that both official and community extensions use; no private hooks.
+- An extension may read only the project files its `extension.toml` declares (`reads`), and gets
+  a pure JSON text-edit helper that keeps key order and indent, so it can rewrite a config file it
+  shares with the user (settled 2026-11-21).
 - Pack hooks run on an airsl binary whose version the lock pins and whose presence is a declared
   requirement, never an ambient one.
 - When a tool demands another language for hooks, only a thin generated shim forwards to airsl.
@@ -42,6 +46,9 @@ pinned and declared.
 
 - Depends on `pack-and-project-formats` and `core-plan-and-apply`.
 - Lua is the only scripting language; `airsl` only from crates.io.
+- `airsl` is embedded as a library at its latest published version and extended only through its
+  public API (settled 2026-11-21). Gaps in airsl are filed upstream (airsstack/airsl#11–#15) and
+  worked around here, not fixed in airsl by this chain.
 - `api` stays `0` until both Claude and OpenCode run on it (`api = 1` is `foundation/03`).
 
 ## Non-goals

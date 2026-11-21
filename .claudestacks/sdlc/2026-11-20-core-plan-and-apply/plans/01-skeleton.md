@@ -1,0 +1,293 @@
+---
+status: draft
+created: 2026-11-22
+depends-on: []
+built-on: ea104af7451e
+---
+
+# Skeleton Implementation Plan
+
+**Goal:** Lay out the ports-and-adapters module skeleton of `crates/agentstacks`.
+
+**Architecture:** The crate root gets the six spec §2 modules: `types` (rules), `port` (traits and
+fakes), `app` (flows), and the adapters `fs`, `process` and `host`. `FileTree`, `EntryKind` and
+`FakeFileTree` move unchanged from `src/types/port/` to `src/port/` (spec §12 last row). The four
+empty seams `executor.rs`, `host.rs`, `plan.rs` and `validation.rs` (`src/lib.rs:26-31`) are removed
+(spec §2 "removed:"). Every new module is a docs-only stub, so later plans only add files and
+`mod` / `pub use` lines. `tests/isolation.rs` is extended to guard `src/port` and `src/app` the way
+it guards `src/types`, and to refuse a path into an adapter module (`crate::fs`, `crate::process`,
+`crate::host`) inside `types`, `port` and `app` (spec §2 paragraph after the dependency rule).
+The dependency and license changes of spec §15 rows 1-3 land here, so that no later plan edits
+`Cargo.toml` or `deny.toml`.
+
+Guideline rules applied (claudestacks-guideline-rust 0.1.6): `mod-rs-export-only.md` (every
+`mod.rs` and `lib.rs` holds only `//!` docs, `mod` and `pub use`; every new module file opens with
+the four-question block); `unit-test-mandate.md` exemption #1 (the docs-only stubs carry the
+export-only line instead of a test block, as the removed seams do today); `modularity.md` Rule 1
+(one job per module, the spec §2 table); naming (one-word folder and file names, no `_`, the folder
+word never repeated: `port/tree.rs`, not `port/port_tree.rs`); `doc-comment-discipline.md` (no plan,
+spec or chain names in any doc comment; module docs describe the code).
+
+**Tech Stack:** Rust 2024 (MSRV 1.94), crate `agentstacks`; cargo-make gate; cargo-deny;
+`airsl 0.1.4` and `serde_json 1.0.154` from crates.io (declared only, not yet used).
+
+**Content authority:** spec §2 (module tree, dependency rule, isolation paragraph, module table),
+§12 last row (the `FileTree` move), §15 rows 1-3 (dependencies and `Zlib`).
+
+---
+
+## Files that change
+
+```
+crates/agentstacks/src/port/mod.rs              — create (moved from src/types/port/mod.rs): port docs, `mod`/`pub use` lines
+crates/agentstacks/src/port/tree.rs             — create (moved from src/types/port/tree.rs): FileTree, utf8_text, unchanged
+crates/agentstacks/src/port/kind.rs             — create (moved from src/types/port/kind.rs): EntryKind, unchanged
+crates/agentstacks/src/port/fake.rs             — create (moved from src/types/port/fake.rs): FakeFileTree, unchanged
+crates/agentstacks/src/types/port/              — delete (all four files, moved above)
+crates/agentstacks/src/types/mod.rs             — modify: drop `pub mod port` and its two re-exports; add the five new rule modules; docs
+crates/agentstacks/src/types/op/mod.rs          — create: docs-only stub
+crates/agentstacks/src/types/json/mod.rs        — create: docs-only stub
+crates/agentstacks/src/types/plan/mod.rs        — create: docs-only stub
+crates/agentstacks/src/types/resolve/mod.rs     — create: docs-only stub
+crates/agentstacks/src/types/protocol/mod.rs    — create: docs-only stub
+crates/agentstacks/src/app/mod.rs               — create: docs, `pub mod plan; apply; doctor; update;`
+crates/agentstacks/src/app/plan.rs              — create: docs-only stub
+crates/agentstacks/src/app/apply.rs             — create: docs-only stub
+crates/agentstacks/src/app/doctor.rs            — create: docs-only stub
+crates/agentstacks/src/app/update.rs            — create: docs-only stub
+crates/agentstacks/src/process/mod.rs           — create: docs-only stub
+crates/agentstacks/src/host/mod.rs              — create: docs-only stub (replaces src/host.rs)
+crates/agentstacks/src/executor.rs              — delete
+crates/agentstacks/src/host.rs                  — delete
+crates/agentstacks/src/plan.rs                  — delete
+crates/agentstacks/src/validation.rs            — delete
+crates/agentstacks/src/lib.rs                   — modify: `pub mod app; fs; host; port; process; types;`, crate docs
+crates/agentstacks/src/fs/disk.rs               — modify: use path and doctest import of FileTree/EntryKind
+crates/agentstacks/src/fs/mod.rs                — modify: one doc sentence (the ports now live in `port`)
+crates/agentstacks/src/types/extension/loaded.rs — modify: use paths of FileTree, utf8_text, FakeFileTree
+crates/agentstacks/src/types/extension/mod.rs   — modify: intra-doc link target of FileTree
+crates/agentstacks/src/types/pack/error.rs      — modify: intra-doc link target of FileTree::read_text
+crates/agentstacks/src/types/pack/load.rs       — modify: use paths of FileTree, FakeFileTree
+crates/agentstacks/src/types/pack/mod.rs        — modify: intra-doc link target of FileTree
+crates/agentstacks/src/types/set/testing.rs     — modify: use path of FakeFileTree
+crates/agentstacks/src/types/tree/hash/tree.rs  — modify: use paths of FileTree, FakeFileTree
+crates/agentstacks/src/types/tree/walk/run.rs   — modify: use paths of EntryKind, FileTree, FakeFileTree
+crates/agentstacks/tests/isolation.rs           — modify: scan port and app too; refuse adapter paths; header docs
+Cargo.toml                                      — modify: workspace deps airsl, serde_json
+crates/agentstacks/Cargo.toml                   — modify: add airsl, serde_json (workspace = true)
+deny.toml                                       — modify: add "Zlib" to [licenses] allow
+```
+
+### The 22 users of `FileTree` / `EntryKind`
+
+`grep -rlE "FileTree|EntryKind" src tests` in `crates/agentstacks`, outside `src/types/port`, lists
+22 files (spec §12 last row). Each one, and what this plan does to it:
+
+| # | File | What matches | Edit |
+|---|---|---|---|
+| 1 | `src/fs/disk.rs` | `use crate::types::port::{EntryKind, FileTree}` (line 26); doctest `use agentstacks::types::{EntryKind, FileTree}` (line 39) | both paths to `port` |
+| 2 | `src/fs/mod.rs` | doc text "the ports the `types` module declares", `StdFileTree` | the doc sentence only |
+| 3 | `src/types/extension/loaded.rs` | `use crate::types::port::FileTree` / `utf8_text` (lines 33-34); test `use crate::types::port::FakeFileTree` (line 205) | three paths to `crate::port` |
+| 4 | `src/types/extension/mod.rs` | intra-doc link `crate::types::FileTree` (line 8) | link to `crate::port::FileTree` |
+| 5 | `src/types/manifest/exclude.rs` | `StdFileTree` in a doctest only | none |
+| 6 | `src/types/mod.rs` | `pub mod port`; `pub use port::EntryKind` / `FileTree` (lines 40, 192, 194) | removed (Task 1) |
+| 7 | `src/types/pack/error.rs` | intra-doc link `crate::types::FileTree::read_text` (line 101) | link to `crate::port::FileTree::read_text` |
+| 8 | `src/types/pack/item/loaded.rs` | `StdFileTree` in doctests only | none |
+| 9 | `src/types/pack/load.rs` | `use crate::types::port::FileTree` (line 68); test `FakeFileTree` (line 502) | two paths to `crate::port` |
+| 10 | `src/types/pack/mod.rs` | intra-doc link `crate::types::FileTree` (line 8) | link to `crate::port::FileTree` |
+| 11 | `src/types/pack/native.rs` | `StdFileTree` in a doctest only | none |
+| 12 | `src/types/set/check.rs` | `StdFileTree` in a doctest only | none |
+| 13 | `src/types/set/testing.rs` | `use crate::types::port::FakeFileTree` (line 22) | path to `crate::port` |
+| 14 | `src/types/set/valid.rs` | `StdFileTree` in a doctest only | none |
+| 15 | `src/types/tree/hash/tree.rs` | `use crate::types::port::FileTree` (line 25); test `FakeFileTree` (line 113) | two paths to `crate::port` |
+| 16 | `src/types/tree/path.rs` | `StdFileTree` in doctests only | none |
+| 17 | `src/types/tree/walk/outcome.rs` | `StdFileTree` in doctests only | none |
+| 18 | `src/types/tree/walk/run.rs` | `use crate::types::port::EntryKind` / `FileTree` (lines 32-33); test `FakeFileTree` (line 145) | three paths to `crate::port` |
+| 19 | `tests/extension.rs` | `agentstacks::fs::StdFileTree` only | none |
+| 20 | `tests/isolation.rs` | `FileTree` in the header doc | rewritten in Task 3 |
+| 21 | `tests/pack.rs` | `agentstacks::fs::StdFileTree` only | none |
+| 22 | `tests/set.rs` | `agentstacks::fs::StdFileTree` only | none |
+
+Ten of the 22 match only through the word `StdFileTree` (the `fs` adapter type, whose path does not
+change) and need no edit. The moved files' own doctests (`port/tree.rs`, `port/kind.rs`) import
+`agentstacks::types::FileTree` / `EntryKind` today and switch to `agentstacks::port::…`.
+
+## Order of work
+
+### Task 1 — Move `FileTree` and `EntryKind` into `port`
+
+**Files:**
+- Create `crates/agentstacks/src/port/{mod,tree,kind,fake}.rs` — moved with `git mv` from
+  `src/types/port/`, bodies unchanged except the internal `use crate::types::port::…` lines (now
+  `crate::port::…`) and the doctest imports (now `agentstacks::port::{EntryKind, FileTree}`).
+  `port/mod.rs` keeps `pub mod kind; pub mod tree; #[cfg(test)] pub mod fake;`, the three
+  `pub use` lines and `pub(crate) use tree::utf8_text;`. Its `//!` block is rewritten for the
+  module's new place: the home of the traits the flows and rules read the outside through, each
+  with a fake for tests; `FileTree` is the one it holds today; non-responsibilities: no logic, no
+  adapter (spec §2 `port/` row, §2 module table `port/*` row).
+- Modify `crates/agentstacks/src/types/mod.rs` — remove `pub mod port;`, the `pub use port::EntryKind`
+  and `pub use port::FileTree` lines, and the `[`port`]` responsibility bullet.
+- Modify `crates/agentstacks/src/lib.rs` — add `pub mod port;` (the rest of `lib.rs` changes in
+  Task 2).
+- Modify the 12 files marked with an edit in the table above (rows 1-4, 7, 9, 10, 13, 15, 18):
+  use paths, doctest imports and intra-doc link targets only.
+
+**Change:** `agentstacks::port::{FileTree, EntryKind}` (and `FakeFileTree` under `#[cfg(test)]`)
+replace `agentstacks::types::{FileTree, EntryKind}`. Behaviour is unchanged: the trait, the enum,
+the fake and `utf8_text` move byte for byte apart from paths. `agentstacks::types::FileTree` no
+longer exists (no compatibility re-export: spec §2 puts `FileTree` in `port`, and modularity Rule 2
+allows one home per concept).
+
+**Proof:** written first, seen failing, then passing.
+- The doctests of `port::tree::FileTree` and `port::kind::EntryKind` are first edited to import
+  from `agentstacks::port`; they fail to compile before the move and pass after it.
+- `read_text_returns_utf8_text`, `read_text_refuses_bytes_that_are_not_utf8`,
+  `read_text_passes_a_read_failure_through`, `utf8_text_words_bad_bytes_as_read_text_does`
+  (`port/tree.rs`), `the_kinds_are_distinct` (`port/kind.rs`) and every test of `port/fake.rs`
+  run at their new path with unchanged assertions.
+- Every existing test of the rows 3, 9, 13, 15 and 18 files passes unchanged; they reach the fake
+  through the new path.
+
+**Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
+Commit `refactor(agentstacks): move FileTree and EntryKind to port`.
+
+### Task 2 — Lay out the empty modules of the skeleton
+
+**Files:**
+- Delete `crates/agentstacks/src/{executor,host,plan,validation}.rs`.
+- Create `crates/agentstacks/src/app/mod.rs` — `//!` block (the use cases, generic over ports, each
+  calling ports in order and handing results to `types` rules; non-responsibilities: no rule, no
+  adapter, no `std::fs` / `std::process` / `std::net`) and `pub mod apply; pub mod doctor;
+  pub mod plan; pub mod update;`.
+- Create `crates/agentstacks/src/app/{plan,apply,doctor,update}.rs` — one `//!` block each naming
+  the flow it will hold (build a reviewable plan; apply a shown plan as the only writer; report
+  drift against the lock; find newer tags for git sources) and the export-only exemption line.
+- Create `crates/agentstacks/src/process/mod.rs` — `//!` block: the adapter that drives the `git`
+  CLI and looks up binaries on `PATH`, the only `std::process` caller; translation only.
+- Create `crates/agentstacks/src/host/mod.rs` — `//!` block: the adapter that runs an extension's
+  Lua adapter in the airsl sandbox, the only place Lua runs; translation only.
+- Create `crates/agentstacks/src/types/{op,json,plan,resolve,protocol}/mod.rs` — `//!` block each,
+  the one job from the spec §2 module table (`types/op`: an operation and its validation;
+  `types/json`: editing a JSON document's text at one key path; `types/plan`: the step for each
+  path from op, lock and disk state; `types/resolve`: reconciling the lock with
+  `agentstacks.toml` and choosing tags; `types/protocol`: the hook command line and the text of
+  the hook runtime). No items yet.
+- Modify `crates/agentstacks/src/types/mod.rs` — add `pub mod json; pub mod op; pub mod plan;
+  pub mod protocol; pub mod resolve;` and one responsibility bullet each. These modules get no flat
+  `pub use` lines in `types/mod.rs`; callers use `types::op::…` (plan-set convention).
+- Modify `crates/agentstacks/src/lib.rs` — modules become `pub mod app; pub mod fs; pub mod host;
+  pub mod port; pub mod process; pub mod types;`. The `//!` responsibilities list the six modules
+  with their spec §2 jobs and the dependency rule (`types` → nothing; `port` → `types`;
+  `app` → `port`, `types`; `fs`, `process`, `host` → `port`, `types`); every intra-doc link to a
+  removed module (`validation`, `plan`, `executor`) is gone.
+- Modify `crates/agentstacks/src/fs/mod.rs` — the first two doc sentences say the adapter answers
+  the ports `port` declares (today: "the ports the `types` module declares"). Nothing else in that
+  file changes.
+
+**Change:** The crate exposes `app`, `fs`, `host`, `port`, `process` and `types`, matching the spec
+§2 tree. Each stub file carries the unit-test-mandate exemption #1 line (export-only, no executable
+logic), worded as the removed seams word it today.
+
+**Proof:** written first, seen failing, then passing.
+- No unit test: every file this task creates or edits is export-only (unit-test-mandate
+  exemption #1). The proof is the gate's doc step: the new `lib.rs` intra-doc links to
+  `[`app`]`, `[`port`]`, `[`process`]`, `[`host`]` and `types::{op, json, plan, resolve, protocol}`
+  are written first and fail `RUSTDOCFLAGS="-D warnings" cargo doc` until the modules exist.
+
+**Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
+Commit `refactor(agentstacks): lay out the ports-and-adapters skeleton`.
+
+### Task 3 — Guard `port` and `app`, and refuse adapter paths inside
+
+**Files:**
+- Modify `crates/agentstacks/tests/isolation.rs` — header `//!` rewritten (the inside, `types`,
+  `port` and `app`, reaches the disk, processes, the network and the adapters only through ports);
+  the scan runs over `src/types`, `src/port` and `src/app`; a second forbidden list holds the three
+  adapter paths.
+
+**Change:**
+- The existing `std::fs` / `std::process` / `std::net` / `File::open` scan (including grouped
+  `use std::{..}`) runs over all three inside directories, not only `src/types` (spec §2: "extended
+  to cover `src/port` and `src/app`").
+- A new scan refuses, in code (comments ignored by the existing `without_comments`), the paths
+  `crate::fs`, `crate::process` and `crate::host`, whole or as a direct member of a grouped
+  `use crate::{..}`, inside the same three directories (spec §2: "refuse any `use crate::fs`,
+  `crate::process` or `crate::host` inside those three"). A match must end at a word boundary, so
+  `crate::fsx` or `crate::types::fs` are not flagged. The grouped form reuses the member walk of
+  `grouped_imports`, parameterised by the root word (`std` or `crate`) and its forbidden members.
+- The offence line names the file, the line and the forbidden path, as today.
+
+**Proof:** written first, seen failing, then passing.
+- `port_never_names_the_disk_a_process_or_the_network` — every `.rs` file under `src/port` (at least
+  one is found) has no forbidden `std` path.
+- `app_never_names_the_disk_a_process_or_the_network` — the same over `src/app` (at least one file
+  is found).
+- `inside_never_names_an_adapter_module` — no `.rs` file under `src/types`, `src/port` or `src/app`
+  names `crate::fs`, `crate::process` or `crate::host` in code.
+- `the_scan_flags_a_path_into_an_adapter_module` — `use crate::fs::StdFileTree;` is flagged as
+  `crate::fs` on line 1; `crate::process::GitCli::new()` on line 2 of a two-line source is flagged
+  as `crate::process` on line 2; `use crate::host::AirslAdapter;` is flagged as `crate::host`.
+- `the_scan_flags_grouped_imports_of_an_adapter_module` — `use crate::{fs, types::Location};` is
+  flagged as `crate::fs`; `use crate::{\n    types,\n    host::AirslAdapter,\n};` is flagged as
+  `crate::host` on line 3.
+- `the_scan_does_not_flag_other_crate_paths` — `use crate::types::fs_like;`, `crate::fsx::a()`,
+  `crate::hosts::b()`, `use crate::{types, port};` and `// use crate::fs` produce no offence.
+
+"Seen failing" for the directory scan: a temporary `use crate::fs::StdFileTree;` in
+`src/app/plan.rs` makes `inside_never_names_an_adapter_module` fail; the line is removed before the
+commit.
+
+**Done when:** `cargo make dod-crate agentstacks` passes and the Definition of Done is green.
+Commit `test(agentstacks): guard port and app against the outside and the adapters`.
+
+### Task 4 — Declare airsl and serde_json and allow Zlib
+
+**Files:**
+- Modify `Cargo.toml` — under `[workspace.dependencies]`: `airsl = "0.1.4"` and
+  `serde_json = { version = "1.0.154", features = ["preserve_order"] }` (spec §15 rows 1-2; no
+  `arbitrary_precision`, spec §5 "Dependency").
+- Modify `crates/agentstacks/Cargo.toml` — under `[dependencies]`: `airsl = { workspace = true }`
+  and `serde_json = { workspace = true }`. `tempfile` stays under `[dev-dependencies]` (spec §15
+  row 4).
+- Modify `deny.toml` — add `"Zlib"` to `[licenses] allow`, in alphabetical place after
+  `"Unlicense"` (spec §15 row 3: `preserve_order` pulls `foldhash 0.2.0`, `license = "Zlib"`,
+  `probes/round3-results.md` D1, D2).
+- `Cargo.lock` — updated by cargo to the newest `airsl 0.1.x` (spec D4).
+
+**Change:** The two crates later plans need are in the graph. Nothing uses them yet, and no lint
+the workspace enables refuses an unused dependency (`Cargo.toml` `[workspace.lints]`).
+
+**Proof:** written first, seen failing, then passing.
+- `cargo make deny` run once after the dependency lines and before the `Zlib` line fails with
+  `rejected: license is not explicitly allowed` for `foldhash` (spec §15 row 3, probe D1), and
+  passes after it.
+- `cargo tree -p agentstacks -i foldhash -e features` shows `foldhash` reached through
+  `serde_json feature "preserve_order"` (probe D2).
+
+**Done when:** `cargo make dod` and `cargo make deny` pass and the Definition of Done is green.
+Commit `build(repo): add airsl and serde_json, allow the Zlib license`.
+
+---
+
+## Risks
+
+- **Riskiest step: Task 1.** Removing the `types::FileTree` re-export breaks every path that named
+  it. The 22-file table is the complete list from the spec's grep, and rows 1-4, 7, 9, 10, 13, 15
+  and 18 are the only ones that name the moved items; a missed intra-doc link fails the doc step
+  (`-D warnings`), not silently.
+- `git mv` keeps history for the four `port` files; a copy-and-delete would lose it.
+- The `crate::` scan is lexical, like the existing `std` scan. A relative path such as
+  `super::super::fs` is not caught; the crate writes `crate::` paths throughout, and the final
+  cross-check reads the inside for that form.
+- Not done here: `docs/architecture.md`'s "State" column (owned by the docs plan) and any port
+  beyond `FileTree` (the ports plan).
+
+## Proof
+
+- `cargo make dod` is green at the end of Task 4, and `cargo make deny` passes.
+- `grep -rnE "types::port|types::FileTree|types::EntryKind|types::\{[^}]*(FileTree|EntryKind)" crates/agentstacks`
+  prints nothing.
+- `ls crates/agentstacks/src` shows exactly `app fs host lib.rs port process types`.
+- Spec rows covered: §2 module tree and "removed:" line (Tasks 1-2), §2 dependency rule as crate
+  docs (Task 2), §2 isolation paragraph (Task 3), §2 module table jobs as module docs (Task 2), §12
+  last row (Task 1), §15 rows 1-3 (Task 4), §15 row 4 (Task 4, unchanged by design).

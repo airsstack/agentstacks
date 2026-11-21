@@ -1,0 +1,36 @@
+airsl 0.1.4
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined --allow-read .tool/agentstacks/core .tool/agentstacks/runtime.lua core.hooks.ctx 0 neutral --manifest x.json
+{"context":"event=tool.before session=s1 args=--manifest,x.json read=true:hello\n fs=append atomic_write canonicalize copy create_exclusive exists is_dir is_file list mkdir read read_lines remove remove_dir rename same_content stat tempdir tempfile walk write"}
+exit=0
+stderr: 
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.ctx 0 neutral
+{"context":"event=tool.before session=s1 args= read=false:fs.read denied: `/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/11b11407-be42-4105-93b0-46ffa5b55ffb/scratchpad/probe-runtime/proj/.tool/agentstacks/core/data.txt` is outside the granted read roots: none are granted\nstack traceback:\n\t[C]: in ?\n\t[C]: in function 'pcall'\n\t.../probe-runtime/proj/.tool/agentstacks/core/hooks/ctx.lua:5: in function <.../probe-runtime/proj/.tool/agentstacks/core/hooks/ctx.lua:4>\n\t.tool/agentstacks/runtime.lua:20: in main chunk\n fs=append atomic_write canonicalize copy create_exclusive exists is_dir is_file list mkdir read read_lines remove remove_dir rename same_content stat tempdir tempfile walk write"}
+exit=0
+stderr: 
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.blk 0 neutral
+exit=0
+stderr: agentstacks: hook core.hooks.blk tried to block but is not declared may_block; reason: edits to tool.before are not allowed
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.blk 1 neutral
+{"decision":"block","reason":"edits to tool.before are not allowed"}
+exit=0
+stderr: 
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.raw 0 native
+{"context":"native payload tool_name=Edit event=nil"}
+exit=0
+stderr: 
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.missing 0 neutral
+exit=0
+stderr: 
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --policy confined .tool/agentstacks/runtime.lua core.hooks.missing 0 neutral
+exit=1
+stderr: airsl: lua error in .tool/agentstacks/runtime.lua: module `core.hooks.missing` not found under `/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/11b11407-be42-4105-93b0-46ffa5b55ffb/scratchpad/probe-runtime/proj/.tool/agentstacks`
+stack traceback:
+	[C]: in function 'require'
+	.tool/agentstacks/runtime.lua:20: in main chunk
+$ echo '{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/p","tool_name":"Edit"}' | airsl run --fail-open --policy confined .tool/agentstacks/runtime.lua core.hooks.both 0 neutral
+{"context":"keep this context"}
+exit=0
+stderr: agentstacks: hook core.hooks.both tried to block but is not declared may_block; reason: and drop this block
+$ echo '{"hook_event_name":"Notification","session_id":"s1","cwd":"/p"}' | airsl run --policy confined .tool/agentstacks/runtime.lua core.hooks.ctx 0 neutral
+exit=0
+stderr: 
