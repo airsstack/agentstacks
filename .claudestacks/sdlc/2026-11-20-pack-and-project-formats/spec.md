@@ -304,7 +304,9 @@ The core intersects every pack's `requires.airsl` (Cargo-flavour ranges, `semver
 comparator becomes a version interval; the 8 operators of §1.1 are supported, and `*` (no
 comparators) is unbounded. `Op` is `#[non_exhaustive]` (§1.1), so an operator added by a later
 `semver` release is refused at `pack.toml` parse, naming the range:
-`requires.airsl: ">=0.1" uses an operator this agentstacks does not support`. No
+`requires.airsl: "<range>" uses an operator this agentstacks does not support`, where `<range>`
+is the range as written. With `semver` 1.0.28 no input produces it: every operator it parses is
+one of the 8. No
 common version → `airsl: core needs >=0.2, sdlc needs <0.2`. Installed airsl outside it →
 `airsl 0.1.3 installed, packs need >=0.1.4`. Probing the binary and pinning it belong to
 `core-plan-and-apply` and `extension-host-and-hooks`.
@@ -715,7 +717,10 @@ needs <0.2`); the installed-version refusal joins the ranges with `, ` in the sa
   include duplicate keys, duplicate tables and integers beyond i64, §1.1) take their line from the
   error span. Empty TOML is an empty table, so it is refused field by field (`api: required`). A
   value of a TOML type no field accepts (datetime, float) gets the generic wrong-type message.
-- One `thiserror` enum per module, no string errors, so `cli-commands` can map them to exit codes.
+- One `thiserror` enum per concern (a group may hold more than one: `project/` has `ProjectError`
+  and `SourceError`, `tree/` has `WalkError` and `ContentHashError`), and no string errors: a
+  parser's own text is carried in one `ParserMessage` type. So `cli-commands` can map them to
+  exit codes.
   A validation run returns a list of `Diagnostic { location, error }`.
 
 ## 11. Architecture
@@ -735,7 +740,9 @@ crates/agentstacks/src/
 ├─ types/                types + logic + ports; no std::fs, no network, no process
 │  ├─ api.rs             API: the one supported api number                                    (§4, §4.5, §7, §8)
 │  ├─ report/            Location, TypeWord (word), FieldError (field), FormatError (format),
-│  │                     Diagnostic, Diagnostics                                               (§10)
+│  │                     Diagnostic, Diagnostics, ParserMessage (parser); phrase: the shared
+│  │                     refusals ListedTwice, MustBeRelative, OutsideProject, NotLuaFile,
+│  │                     DoesNotExist, UnsupportedApi, wrapped by every module enum            (§10)
 │  ├─ name/              PackName, ToolName, ItemName, OptionName, BinaryName, EnvName, the
 │  │                     kebab rule; invalid.rs: InvalidName, InvalidOptionName, InvalidEnvName (§4.1)
 │  ├─ tokens/            Token, TokenKind, Var, ItemRef (reference), TokenTarget, TokenError,
@@ -762,11 +769,12 @@ crates/agentstacks/src/
 │  ├─ pack/              Pack (load), PackLayout (layout), install/{checks,set}: InstallSet and the
 │  │                     install checks; HookTargets (targets), item/{loaded,kind}: PackSkill,
 │  │                     PackAgent, ItemKind; NativeDir (native), PackError, the body scan (scan)
-│  │                     and pack-local token rules (local)                                    (§2, §3)
+│  │                     and pack-local token rules (local), KeyPath (key); only Pack, its items
+│  │                     and PackError are public, the loader's building blocks are crate-private (§2, §3)
 │  ├─ extension/         Extension (loaded), ExtensionManifest (manifest), EntryPath (entry),
 │  │                     ExtensionError                                                        (§4.5)
 │  ├─ lock/              Lockfile (file), LockContents, entry/{locked,written}: LockedEntry,
-│  │                     LockedSource, FileEntry, MergeEntry; Owner, MergeFile/MergeKey (merge),
+│  │                     LockedSource, FileEntry, MergeEntry, EntryKey (key); Owner, MergeFile/MergeKey (merge),
 │  │                     LockError, write_lock (write), check_airsl_presence (airsl)            (§8)
 │  └─ set/               check_pack_set (check) → ValidSet (valid); the cross-pack checks: graph,
 │                        targets, runs, clash, options, airsl, interval, fetched; SetError      (§9)

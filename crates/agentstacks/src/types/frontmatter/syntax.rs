@@ -21,6 +21,7 @@ use std::path::Path;
 use crate::types::frontmatter::error::FrontmatterError;
 use crate::types::report::Diagnostic;
 use crate::types::report::Location;
+use crate::types::report::ParserMessage;
 
 /// The characters after which an unquoted `{{` starts a YAML value.
 const VALUE_STARTS: [u8; 4] = [b':', b'-', b'[', b','];
@@ -51,7 +52,7 @@ pub(super) fn syntax_diagnostic(
     Diagnostic::new(
         location,
         FrontmatterError::Syntax {
-            message: message.to_owned(),
+            message: ParserMessage::new(message),
             quoting_hint,
         },
     )

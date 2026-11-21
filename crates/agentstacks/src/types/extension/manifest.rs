@@ -29,6 +29,7 @@ use crate::types::format::parse_toml_document;
 use crate::types::manifest::PackVersion;
 use crate::types::name::ToolName;
 use crate::types::report::Diagnostics;
+use crate::types::report::UnsupportedApi;
 
 /// A parsed `extension.toml`.
 ///
@@ -180,7 +181,7 @@ fn read_section(section: &mut TomlFields) -> Section {
             .ok()
     });
     if let Some(api) = section.required_integer("api").filter(|api| *api != API) {
-        section.refuse("api", ExtensionError::ApiUnsupported { api });
+        section.refuse("api", ExtensionError::from(UnsupportedApi::new(api)));
     }
     let description = section.required_text("description");
     let entry = section.required_text("entry").and_then(|text| {

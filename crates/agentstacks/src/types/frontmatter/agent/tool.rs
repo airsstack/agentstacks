@@ -60,6 +60,30 @@ impl AgentTool {
         Self::Skill,
     ];
 
+    /// Parses `value` as written in frontmatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FrontmatterError::UnknownTool`] when `value` is not one of [`AgentTool::ALL`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::AgentTool;
+    ///
+    /// assert_eq!(AgentTool::new("shell")?.as_str(), "shell");
+    /// assert!(AgentTool::new("bash").is_err());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(value: &str) -> Result<Self, FrontmatterError> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_str() == value)
+            .ok_or_else(|| FrontmatterError::UnknownTool {
+                text: value.to_owned(),
+            })
+    }
+
     /// The value as written in frontmatter.
     ///
     /// # Examples
@@ -93,12 +117,15 @@ impl FromStr for AgentTool {
     type Err = FrontmatterError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|candidate| candidate.as_str() == value)
-            .ok_or_else(|| FrontmatterError::UnknownTool {
-                value: value.to_owned(),
-            })
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for AgentTool {
+    type Error = FrontmatterError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -121,5 +148,21 @@ mod tests {
             let refused = text.parse::<AgentTool>().err().map(|e| e.to_string());
             assert_eq!(refused.as_deref(), Some(shown));
         }
+    }
+
+    #[test]
+    fn agent_tool_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<AgentTool, FrontmatterError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["shell", "bash"] {
+            let expected = shown(AgentTool::new(text));
+            assert_eq!(shown(text.parse::<AgentTool>()), expected);
+            assert_eq!(shown(AgentTool::try_from(text)), expected);
+        }
+        assert!(AgentTool::new("shell").is_ok());
+        assert!(AgentTool::new("bash").is_err());
     }
 }

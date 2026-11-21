@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
 
 use crate::types::name::PackName;
+use crate::types::pack::KeyPath;
 use crate::types::pack::Pack;
 use crate::types::project::ProjectFile;
 use crate::types::report::Diagnostic;
@@ -33,7 +34,7 @@ type Edges<'a> = BTreeMap<&'a PackName, Vec<&'a PackName>>;
 
 /// Refuses requirements the project file at `project_file` does not list, and requirement cycles,
 /// among the loaded `packs` of `project`.
-pub(crate) fn check_requires(
+pub(super) fn check_requires(
     project_file: &Path,
     project: &ProjectFile,
     packs: &BTreeMap<PackName, Pack>,
@@ -45,7 +46,10 @@ pub(crate) fn check_requires(
         for required in pack.manifest().requires().packs() {
             if !project.packs().contains_key(required) {
                 refusals.push(Diagnostic::new(
-                    Location::set_level(project_file, Some(format!("packs.{key}"))),
+                    Location::set_level(
+                        project_file,
+                        Some(KeyPath::new("packs").key(key.as_str()).into()),
+                    ),
                     SetError::RequiresUnlisted {
                         pack: key.clone(),
                         required: required.clone(),

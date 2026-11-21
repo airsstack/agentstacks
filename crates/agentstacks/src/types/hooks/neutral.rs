@@ -29,6 +29,7 @@ use crate::types::hooks::event::HookEvent;
 use crate::types::manifest::ManifestError;
 use crate::types::name::BinaryName;
 use crate::types::name::ItemName;
+use crate::types::report::ListedTwice;
 use crate::types::tokens::LocatedToken;
 
 /// A neutral hook of a pack.
@@ -117,13 +118,13 @@ impl Hook {
     /// Reads the `[[hooks]]` item behind `fields`, refusing what is wrong in it.
     ///
     /// `binaries` are the pack's `requires.binaries`; every token found is appended to `tokens`.
-    pub(crate) fn read(
+    pub(in crate::types) fn read(
         fields: &mut TomlFields,
         binaries: &[BinaryName],
         tokens: &mut Vec<LocatedToken>,
     ) -> Option<Self> {
         let event = fields.required_string("event").and_then(|text| {
-            HookEvent::parse(&text)
+            HookEvent::new(&text)
                 .map_err(|error| fields.refuse("event", ManifestError::from(error)))
                 .ok()
         });
@@ -188,18 +189,15 @@ fn read_matches(fields: &mut TomlFields, event: HookEvent) -> Option<Vec<MatchVa
     let mut values: Vec<MatchValue> = Vec::new();
     for (index, text) in listed {
         let item_path = fields.item_path("match", index);
-        match MatchValue::parse(&text) {
-            Some(value) if allowed.contains(&value) => {
+        match MatchValue::new(&text) {
+            Ok(value) if allowed.contains(&value) => {
                 if values.contains(&value) {
-                    fields.refuse_path(&item_path, ManifestError::ListedTwice { text });
+                    fields.refuse_path(&item_path, ManifestError::from(ListedTwice::text(text)));
                 } else {
                     values.push(value);
                 }
             }
-            _ => fields.refuse_path(
-                &item_path,
-                ManifestError::MatchNotValid { value: text, event },
-            ),
+            _ => fields.refuse_path(&item_path, ManifestError::MatchNotValid { text, event }),
         }
     }
     (fields.refusal_count() == before).then_some(values)
@@ -240,7 +238,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::parse_toml_document;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

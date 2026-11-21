@@ -40,6 +40,7 @@ use toml::Value;
 use crate::types::api::API;
 use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
+use crate::types::lock::entry::key::EntryKey;
 use crate::types::lock::entry::locked::LockedEntry;
 use crate::types::lock::entry::written::{FileEntry, MergeEntry};
 use crate::types::lock::error::LockError;
@@ -52,8 +53,10 @@ use crate::types::project::SubPath;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::report::FieldError;
+use crate::types::report::ListedTwice;
 use crate::types::report::Location;
 use crate::types::report::TypeWord;
+use crate::types::report::UnsupportedApi;
 
 /// The keys `agentstacks.lock` may hold at its top level.
 const TOP_LEVEL_KEYS: [&str; 6] = ["api", "airsl", "tool", "pack", "file", "merge"];
@@ -159,7 +162,7 @@ impl Lockfile {
         let mut root = TomlFields::new(file, "", table);
         root.refuse_unknown_keys(&TOP_LEVEL_KEYS);
         if let Some(api) = root.required_integer("api").filter(|api| *api != API) {
-            root.refuse_at_file(LockError::ApiUnsupported { api });
+            root.refuse_at_file(LockError::from(UnsupportedApi::new(api)));
         }
         let airsl = read_airsl(&mut root);
         let tools = read_array(&mut root, file, "tool", |entry, path| {
@@ -251,7 +254,7 @@ impl Lockfile {
     ///     Owner, PackName, PackVersion, SubPath,
     /// };
     ///
-    /// let tree = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+    /// let tree = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
     /// let core = LockedEntry::new(
     ///     PackName::new("core")?,
     ///     PackVersion::new("0.3.0")?,
@@ -261,7 +264,7 @@ impl Lockfile {
     /// let file = FileEntry::new(
     ///     SubPath::new(".claude/skills/discuss/SKILL.md")?,
     ///     tree,
-    ///     Owner::parse("core")?,
+    ///     Owner::new("core")?,
     /// );
     /// let contents = LockContents {
     ///     packs: vec![core],
@@ -377,32 +380,25 @@ impl Identities<'_> {
     /// Records in `diagnostics` every entry that repeats an earlier one, located at the repeated
     /// entry, and every `by` that names nothing locked.
     fn check(&self, file: &Path, diagnostics: &mut Diagnostics) {
-        let at_entry =
-            |path: &str, error: LockError| Diagnostic::new(Location::at_key(file, path), error);
+        let at_entry = |path: &str, key: EntryKey| {
+            Diagnostic::new(
+                Location::at_key(file, path),
+                LockError::from(ListedTwice::new(key)),
+            )
+        };
         for (path, name) in repeated(&self.tools, |name| name) {
-            diagnostics.push(at_entry(
-                path,
-                LockError::DuplicateTool { name: name.clone() },
-            ));
+            diagnostics.push(at_entry(path, EntryKey::Tool(name.clone())));
         }
         for (path, name) in repeated(&self.packs, |name| name) {
-            diagnostics.push(at_entry(
-                path,
-                LockError::DuplicatePack { name: name.clone() },
-            ));
+            diagnostics.push(at_entry(path, EntryKey::Pack(name.clone())));
         }
         for (path, written) in repeated(&self.files, SubPath::normalized) {
-            diagnostics.push(at_entry(
-                path,
-                LockError::DuplicateFile {
-                    path: written.clone(),
-                },
-            ));
+            diagnostics.push(at_entry(path, EntryKey::File(written.clone())));
         }
         for (path, (merge_file, key)) in repeated(&self.merges, |target| target) {
             diagnostics.push(at_entry(
                 path,
-                LockError::DuplicateMerge {
+                EntryKey::Merge {
                     file: merge_file.clone(),
                     key: key.clone(),
                 },
@@ -420,7 +416,7 @@ impl Identities<'_> {
                 diagnostics.push(Diagnostic::new(
                     Location::at_key(file, path.as_str()),
                     LockError::UnknownOwner {
-                        name: owner.to_string(),
+                        text: owner.to_string(),
                     },
                 ));
             }
@@ -459,7 +455,7 @@ fn read_airsl(root: &mut TomlFields) -> Option<PackVersion> {
     let mut airsl = root.optional_table("airsl")?;
     let version = airsl.required_string("version").and_then(|text| {
         PackVersion::new(&text)
-            .map_err(|_| airsl.refuse("version", LockError::NotAVersion { value: text }))
+            .map_err(|_| airsl.refuse("version", LockError::NotAVersion { text }))
             .ok()
     });
     airsl.refuse_unknown_keys(&["version"]);
@@ -840,8 +836,8 @@ mod tests {
     fn owned_file(path: &str, by: &str) -> Result<FileEntry, Box<dyn std::error::Error>> {
         Ok(FileEntry::new(
             SubPath::new(path)?,
-            ContentHash::parse(&format!("sha256:{HEX64}"))?,
-            Owner::parse(by)?,
+            ContentHash::new(&format!("sha256:{HEX64}"))?,
+            Owner::new(by)?,
         ))
     }
 

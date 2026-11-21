@@ -39,10 +39,10 @@ use crate::types::tokens::var::Var;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TokenError {
     /// The first word is not a known token kind.
-    #[error("unknown token kind \"{word}\"")]
+    #[error("unknown token kind \"{text}\"")]
     UnknownKind {
         /// The word that is not a kind.
-        word: String,
+        text: String,
     },
     /// An opening `{{` has no closing `}}` on its line.
     #[error("unterminated token")]
@@ -63,25 +63,25 @@ pub enum TokenError {
         kind: TokenKind,
     },
     /// A target is not `[pack/]name`.
-    #[error("\"{target}\" is not a valid target (expected [pack/]name)")]
+    #[error("\"{text}\" is not a valid target (expected [pack/]name)")]
     InvalidTarget {
         /// The target as written.
-        target: String,
+        text: String,
     },
     /// A pack or item name is not valid.
     #[error(transparent)]
     Name(#[from] InvalidName),
     /// A `root` token names something other than a pack.
-    #[error("token \"root\" takes a pack name, not \"{target}\"")]
+    #[error("token \"root\" takes a pack name, not \"{text}\"")]
     RootTakesPackName {
         /// The target as written.
-        target: String,
+        text: String,
     },
     /// A `var` token names a var that does not exist.
-    #[error("unknown var \"{name}\" (known: {})", Var::known_names())]
+    #[error("unknown var \"{text}\" (known: {})", Var::known_names())]
     UnknownVar {
         /// The name as written.
-        name: String,
+        text: String,
     },
     /// An option name is not valid.
     #[error(transparent)]
@@ -100,7 +100,7 @@ mod tests {
         let cases: [(TokenError, &str); 11] = [
             (
                 TokenError::UnknownKind {
-                    word: "skil".to_owned(),
+                    text: "skil".to_owned(),
                 },
                 "unknown token kind \"skil\"",
             ),
@@ -120,7 +120,7 @@ mod tests {
             ),
             (
                 TokenError::InvalidTarget {
-                    target: "a/b/c".to_owned(),
+                    text: "a/b/c".to_owned(),
                 },
                 "\"a/b/c\" is not a valid target (expected [pack/]name)",
             ),
@@ -130,13 +130,13 @@ mod tests {
             ),
             (
                 TokenError::RootTakesPackName {
-                    target: "core/x".to_owned(),
+                    text: "core/x".to_owned(),
                 },
                 "token \"root\" takes a pack name, not \"core/x\"",
             ),
             (
                 TokenError::UnknownVar {
-                    name: "session".to_owned(),
+                    text: "session".to_owned(),
                 },
                 "unknown var \"session\" (known: session_id, arguments, tmpdir, home, airsstack_home, project_dir)",
             ),

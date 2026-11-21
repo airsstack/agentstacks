@@ -30,7 +30,7 @@ type Shippers<'a> = BTreeMap<&'a ItemName, Vec<&'a PackName>>;
 
 /// Refuses each skill and each agent name that two or more of the loaded `packs` ship, in the
 /// project file at `project_file`. `packs` are keyed by their `[packs.*]` name.
-pub(crate) fn check_name_clashes(
+pub(super) fn check_name_clashes(
     project_file: &Path,
     packs: &BTreeMap<PackName, Pack>,
 ) -> Vec<Diagnostic> {

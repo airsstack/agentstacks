@@ -123,9 +123,9 @@ fn read_token(text: &str, inside: &str, span: Range<usize>) -> Result<Token, Tok
     let Some(first) = words.next() else {
         return Err(TokenError::Empty);
     };
-    let kind = TokenKind::parse(first)?;
+    let kind = TokenKind::new(first)?;
     let target_words: Vec<&str> = words.collect();
-    let target = TokenTarget::parse(kind, &target_words)?;
+    let target = TokenTarget::new(kind, &target_words)?;
     let reaches_native =
         kind == TokenKind::Root && text.get(span.end..).is_some_and(reaches_native);
     Ok(Token::new(target, span, reaches_native))
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(shown_tokens(&tokens), ["{{skill sdlc/status}}"]);
         assert_eq!(
             tokens.first().map(|t| t.token().target().clone()),
-            TokenTarget::parse(TokenKind::Skill, &["sdlc/status"]).ok()
+            TokenTarget::new(TokenKind::Skill, &["sdlc/status"]).ok()
         );
         assert!(diagnostics.is_empty());
 

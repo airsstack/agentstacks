@@ -56,8 +56,6 @@ pub use extension::ExtensionError;
 pub use extension::ExtensionManifest;
 #[doc(inline)]
 pub use format::YamlValue;
-#[cfg(test)]
-pub(crate) use format::parse_toml_document;
 #[doc(inline)]
 pub use frontmatter::AgentMeta;
 #[doc(inline)]
@@ -89,6 +87,8 @@ pub use hooks::HookRun;
 #[doc(inline)]
 pub use hooks::InvalidHookEvent;
 #[doc(inline)]
+pub use hooks::InvalidMatchValue;
+#[doc(inline)]
 pub use hooks::InvalidPolicy;
 #[doc(inline)]
 pub use hooks::LuaHook;
@@ -102,6 +102,8 @@ pub use hooks::NativeHook;
 pub use hooks::NativeHooks;
 #[doc(inline)]
 pub use hooks::Policy;
+#[doc(inline)]
+pub use lock::EntryKey;
 #[doc(inline)]
 pub use lock::FileEntry;
 #[doc(inline)]
@@ -175,15 +177,9 @@ pub use name::PackName;
 #[doc(inline)]
 pub use name::ToolName;
 #[doc(inline)]
-pub use pack::HookTargets;
-#[doc(inline)]
-pub use pack::InstallSet;
-#[doc(inline)]
 pub use pack::ItemKind;
 #[doc(inline)]
 pub use pack::NativeDir;
-#[doc(inline)]
-pub use pack::NativeLayout;
 #[doc(inline)]
 pub use pack::Pack;
 #[doc(inline)]
@@ -191,21 +187,7 @@ pub use pack::PackAgent;
 #[doc(inline)]
 pub use pack::PackError;
 #[doc(inline)]
-pub use pack::PackLayout;
-#[doc(inline)]
 pub use pack::PackSkill;
-#[doc(inline)]
-pub use pack::check_airsl_declared;
-#[doc(inline)]
-pub use pack::check_local_tokens;
-#[doc(inline)]
-pub use pack::check_native_references;
-#[doc(inline)]
-pub use pack::check_something_to_install;
-#[doc(inline)]
-pub use pack::rendered_text;
-#[doc(inline)]
-pub use pack::scan_body;
 #[doc(inline)]
 pub use port::EntryKind;
 #[doc(inline)]
@@ -233,8 +215,6 @@ pub use project::PackEntry;
 #[doc(inline)]
 pub use project::Pin;
 #[doc(inline)]
-pub use project::PinRule;
-#[doc(inline)]
 pub use project::ProjectError;
 #[doc(inline)]
 pub use project::ProjectFile;
@@ -243,21 +223,35 @@ pub use project::Source;
 #[doc(inline)]
 pub use project::SourceError;
 #[doc(inline)]
-pub use project::SourceFields;
-#[doc(inline)]
 pub use project::SubPath;
 #[doc(inline)]
 pub use report::Diagnostic;
 #[doc(inline)]
 pub use report::Diagnostics;
 #[doc(inline)]
+pub use report::DoesNotExist;
+#[doc(inline)]
 pub use report::FieldError;
 #[doc(inline)]
 pub use report::FormatError;
 #[doc(inline)]
+pub use report::ListedTwice;
+#[doc(inline)]
 pub use report::Location;
 #[doc(inline)]
+pub use report::MustBeRelative;
+#[doc(inline)]
+pub use report::NotLuaFile;
+#[doc(inline)]
+pub use report::OutsideProject;
+#[doc(inline)]
+pub use report::ParserMessage;
+#[doc(inline)]
+pub use report::Quoted;
+#[doc(inline)]
 pub use report::TypeWord;
+#[doc(inline)]
+pub use report::UnsupportedApi;
 #[doc(inline)]
 pub use set::AirslRange;
 #[doc(inline)]
@@ -265,7 +259,7 @@ pub use set::SetError;
 #[doc(inline)]
 pub use set::ValidSet;
 #[doc(inline)]
-pub use set::check::check as check_pack_set;
+pub use set::check as check_pack_set;
 #[doc(inline)]
 pub use tokens::ItemRef;
 #[doc(inline)]

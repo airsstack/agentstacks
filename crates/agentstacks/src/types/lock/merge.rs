@@ -15,6 +15,7 @@
 //! What a key means inside its file belongs to the code that applies merges.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::report::FieldError;
 
@@ -60,6 +61,22 @@ impl MergeFile {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl FromStr for MergeFile {
+    type Err = FieldError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for MergeFile {
+    type Error = FieldError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -111,6 +128,22 @@ impl MergeKey {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl FromStr for MergeKey {
+    type Err = FieldError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for MergeKey {
+    type Error = FieldError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -172,6 +205,17 @@ mod tests {
     fn merge_strings_order_by_text() -> TestResult {
         assert!(MergeKey::new("a")? < MergeKey::new("z")?);
         assert!(MergeFile::new("a")? < MergeFile::new("b")?);
+        Ok(())
+    }
+
+    #[test]
+    fn merge_strings_from_str_and_try_from_match_new() -> TestResult {
+        assert_eq!("hooks".parse::<MergeKey>()?, MergeKey::new("hooks")?);
+        assert_eq!(MergeKey::try_from("hooks")?, MergeKey::new("hooks")?);
+        assert_eq!("a.json".parse::<MergeFile>()?, MergeFile::new("a.json")?);
+        assert_eq!(MergeFile::try_from("a.json")?, MergeFile::new("a.json")?);
+        assert_eq!("".parse::<MergeKey>().err(), MergeKey::new("").err());
+        assert_eq!(MergeFile::try_from(" ").err(), MergeFile::new(" ").err());
         Ok(())
     }
 }

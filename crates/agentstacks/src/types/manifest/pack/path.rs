@@ -15,8 +15,10 @@
 
 use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 
 use crate::types::manifest::InvalidPackPath;
+use crate::types::report::MustBeRelative;
 
 /// A relative path that stays inside its pack.
 ///
@@ -48,7 +50,6 @@ impl PackPath {
     /// [`InvalidPackPath::TrailingSlash`] for a trailing `/`, and
     /// [`InvalidPackPath::EmptySegment`] for an empty segment such as `a//b`.
     pub fn new(text: &str) -> Result<Self, InvalidPackPath> {
-        let path = || text.to_owned();
         if text.is_empty() {
             return Err(InvalidPackPath::Empty);
         }
@@ -56,22 +57,32 @@ impl PackPath {
             return Err(InvalidPackPath::IsDot);
         }
         if text.starts_with('/') {
-            return Err(InvalidPackPath::MustBeRelative { path: path() });
+            return Err(MustBeRelative::new(text).into());
         }
         if text.contains('\\') {
-            return Err(InvalidPackPath::Backslash { path: path() });
+            return Err(InvalidPackPath::Backslash {
+                text: text.to_owned(),
+            });
         }
         if text.split('/').any(|segment| segment == "..") {
-            return Err(InvalidPackPath::MustStayInsidePack { path: path() });
+            return Err(InvalidPackPath::MustStayInsidePack {
+                text: text.to_owned(),
+            });
         }
         if text.split('/').any(|segment| segment == ".") {
-            return Err(InvalidPackPath::DotSegment { path: path() });
+            return Err(InvalidPackPath::DotSegment {
+                text: text.to_owned(),
+            });
         }
         if text.ends_with('/') {
-            return Err(InvalidPackPath::TrailingSlash { path: path() });
+            return Err(InvalidPackPath::TrailingSlash {
+                text: text.to_owned(),
+            });
         }
         if text.split('/').any(str::is_empty) {
-            return Err(InvalidPackPath::EmptySegment { path: path() });
+            return Err(InvalidPackPath::EmptySegment {
+                text: text.to_owned(),
+            });
         }
         Ok(Self(text.to_owned()))
     }
@@ -94,6 +105,22 @@ impl PackPath {
 impl fmt::Display for PackPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+impl FromStr for PackPath {
+    type Err = InvalidPackPath;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for PackPath {
+    type Error = InvalidPackPath;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
     }
 }
 
@@ -146,5 +173,21 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn pack_path_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<PackPath, InvalidPackPath>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["hooks/x.lua", "a/./b"] {
+            let expected = shown(PackPath::new(text));
+            assert_eq!(shown(text.parse::<PackPath>()), expected);
+            assert_eq!(shown(PackPath::try_from(text)), expected);
+        }
+        assert!(PackPath::new("hooks/x.lua").is_ok());
+        assert!(PackPath::new("a/./b").is_err());
     }
 }

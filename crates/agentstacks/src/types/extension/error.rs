@@ -22,9 +22,11 @@
 //! failure and the walker's other refusals are not variants here:
 //! [`FormatError`](crate::types::FormatError) carries them.
 
-use crate::types::api::API;
 use crate::types::manifest::InvalidVersion;
 use crate::types::name::InvalidName;
+use crate::types::report::DoesNotExist;
+use crate::types::report::NotLuaFile;
+use crate::types::report::UnsupportedApi;
 
 /// A refusal of an extension directory or its `extension.toml`.
 ///
@@ -38,8 +40,8 @@ use crate::types::name::InvalidName;
 ///     "not an extension (no extension.toml)"
 /// );
 /// assert_eq!(
-///     ExtensionError::EntryMissing { value: "adapter.lua".to_owned() }.to_string(),
-///     "\"adapter.lua\" does not exist"
+///     ExtensionError::EntryOutside { text: "../adapter.lua".to_owned() }.to_string(),
+///     "\"../adapter.lua\" must stay inside the extension"
 /// );
 /// assert_eq!(
 ///     ExtensionError::Symlink.to_string(),
@@ -58,29 +60,20 @@ pub enum ExtensionError {
     #[error(transparent)]
     Version(#[from] InvalidVersion),
     /// An `api` this agentstacks does not speak.
-    #[error("{api} not supported (this agentstacks speaks {})", API)]
-    ApiUnsupported {
-        /// The refused value.
-        api: i64,
-    },
+    #[error(transparent)]
+    UnsupportedApi(#[from] UnsupportedApi),
     /// An `entry` that is absolute or climbs out of the extension.
-    #[error("\"{value}\" must stay inside the extension")]
+    #[error("\"{text}\" must stay inside the extension")]
     EntryOutside {
-        /// The refused path.
-        value: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// An `entry` that is not a `.lua` file.
-    #[error("\"{value}\" is not a .lua file")]
-    EntryNotLua {
-        /// The refused path.
-        value: String,
-    },
+    #[error(transparent)]
+    NotLuaFile(#[from] NotLuaFile),
     /// An `entry` that names no file of the extension.
-    #[error("\"{value}\" does not exist")]
-    EntryMissing {
-        /// The path that was not found.
-        value: String,
-    },
+    #[error(transparent)]
+    DoesNotExist(#[from] DoesNotExist),
     /// A symlink inside the extension directory.
     #[error("symlinks are not allowed in an extension")]
     Symlink,
@@ -92,7 +85,7 @@ mod tests {
 
     #[test]
     fn extension_error_displays_each_message() {
-        let value = || "adapter.lua".to_owned();
+        let text = || "adapter.lua".to_owned();
         let cases = [
             (
                 ExtensionError::NotAnExtension,
@@ -107,19 +100,19 @@ mod tests {
                 "\"1.2\" is not semver",
             ),
             (
-                ExtensionError::ApiUnsupported { api: 1 },
+                ExtensionError::from(UnsupportedApi::new(1)),
                 "1 not supported (this agentstacks speaks 0)",
             ),
             (
-                ExtensionError::EntryOutside { value: value() },
+                ExtensionError::EntryOutside { text: text() },
                 "\"adapter.lua\" must stay inside the extension",
             ),
             (
-                ExtensionError::EntryNotLua { value: value() },
+                ExtensionError::from(NotLuaFile::new(text())),
                 "\"adapter.lua\" is not a .lua file",
             ),
             (
-                ExtensionError::EntryMissing { value: value() },
+                ExtensionError::from(DoesNotExist::new(text())),
                 "\"adapter.lua\" does not exist",
             ),
             (

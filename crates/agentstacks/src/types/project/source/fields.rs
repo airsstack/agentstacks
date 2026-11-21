@@ -31,29 +31,9 @@ use crate::types::report::FieldError;
 
 /// The checked source keys of one entry.
 ///
-/// # Examples
-///
-/// ```
-/// use agentstacks::types::{CommitId, GitTag, GitUrl, LocalPath, Pin, SourceFields};
-///
-/// let url = GitUrl::new("https://example.org/r")?;
-/// let rev = CommitId::new("0123456789abcdef0123456789abcdef01234567")?;
-/// let tag = GitTag::new("v1")?;
-/// // A `rev` wins over a `tag` written beside it, but the tag is kept as written.
-/// let fields = SourceFields::Git {
-///     url,
-///     pin: Pin::Rev(rev),
-///     tag: Some(tag.clone()),
-///     subdir: None,
-/// };
-/// assert_eq!(fields.tag(), Some(&tag));
-///
-/// let path = SourceFields::Path(LocalPath::new("packs/team-lint")?);
-/// assert_eq!(path.tag(), None);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
+/// A `rev` wins over a `tag` written beside it as the pin, but the `tag` is kept as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SourceFields {
+pub(in crate::types) enum SourceFields {
     /// A git repository pinned to a tag or a commit.
     Git {
         /// The repository URL.
@@ -72,7 +52,7 @@ pub enum SourceFields {
 impl SourceFields {
     /// Reads the source keys through `fields`, the reader over the entry at `key_path`, recording
     /// every refusal in it. `None` when anything was refused.
-    pub(crate) fn read_into(
+    pub(in crate::types) fn read_into(
         fields: &mut TomlFields,
         key_path: &str,
         rule: PinRule,
@@ -118,30 +98,6 @@ impl SourceFields {
             }),
             (None, Some(path), ..) => Some(Self::Path(path)),
             _ => None,
-        }
-    }
-
-    /// The `tag` the entry was written with, when it has one.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use agentstacks::types::{CommitId, GitUrl, Pin, SourceFields};
-    ///
-    /// let fields = SourceFields::Git {
-    ///     url: GitUrl::new("https://example.org/r")?,
-    ///     pin: Pin::Rev(CommitId::new("0123456789abcdef0123456789abcdef01234567")?),
-    ///     tag: None,
-    ///     subdir: None,
-    /// };
-    /// assert_eq!(fields.tag(), None);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    #[must_use]
-    pub const fn tag(&self) -> Option<&GitTag> {
-        match self {
-            Self::Git { tag, .. } => tag.as_ref(),
-            Self::Path(_) => None,
         }
     }
 }
@@ -385,11 +341,12 @@ mod tests {
         let git = "git = \"https://example.org/r\"\n";
 
         let rev_only = lock(&format!("{git}rev = \"{HEX40}\"\n"))?.map_err(|s| s.join("; "))?;
-        assert_eq!(rev_only.tag(), None);
+        assert!(matches!(rev_only, SourceFields::Git { tag: None, .. }));
 
         let both =
             lock(&format!("{git}tag = \"v1\"\nrev = \"{HEX40}\"\n"))?.map_err(|s| s.join("; "))?;
-        assert_eq!(both.tag(), Some(&GitTag::new("v1")?));
+        let v1 = GitTag::new("v1")?;
+        assert!(matches!(both, SourceFields::Git { tag: Some(tag), .. } if tag == v1));
 
         for text in [format!("{git}tag = \"v1\"\n"), git.to_owned()] {
             assert_eq!(

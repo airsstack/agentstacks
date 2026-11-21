@@ -8,7 +8,8 @@
 //! - [`FileTree`] is a directory root plus three reads below it: what an entry is, which names a
 //!   directory holds, and a file's bytes. Every path it takes is relative to the root.
 //! - [`FileTree::read_text`] reads a file's bytes as UTF-8 text, so every reader of a text file
-//!   words "not valid UTF-8" the same way.
+//!   words "not valid UTF-8" the same way. `utf8_text` is that conversion on its own, for a
+//!   reader that already holds a file's bytes.
 //!
 //! # Non-responsibilities
 //!
@@ -86,9 +87,19 @@ pub trait FileTree {
     /// The I/O failure when the file cannot be read, or an [`io::ErrorKind::InvalidData`] error
     /// displayed as `not valid UTF-8` when its bytes are not UTF-8.
     fn read_text(&self, rel: &Path) -> io::Result<String> {
-        String::from_utf8(self.read_file(rel)?)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not valid UTF-8"))
+        utf8_text(self.read_file(rel)?)
     }
+}
+
+/// The text of a file's `bytes`, refused the way [`FileTree::read_text`] refuses them.
+///
+/// # Errors
+///
+/// An [`io::ErrorKind::InvalidData`] error displayed as `not valid UTF-8` when `bytes` are not
+/// UTF-8.
+pub(crate) fn utf8_text(bytes: Vec<u8>) -> io::Result<String> {
+    String::from_utf8(bytes)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not valid UTF-8"))
 }
 
 #[cfg(test)]
@@ -124,6 +135,20 @@ mod tests {
         assert_eq!(
             error.map(|e| e.to_string()),
             Some(FakeFileTree::denied().to_string())
+        );
+    }
+
+    #[test]
+    fn utf8_text_words_bad_bytes_as_read_text_does() {
+        assert_eq!(utf8_text(b"a\n".to_vec()).ok().as_deref(), Some("a\n"));
+        let error = utf8_text(vec![0x66, 0xFF]).err();
+        assert_eq!(
+            error.as_ref().map(io::Error::kind),
+            Some(io::ErrorKind::InvalidData)
+        );
+        assert_eq!(
+            error.map(|e| e.to_string()),
+            Some("not valid UTF-8".to_owned())
         );
     }
 }

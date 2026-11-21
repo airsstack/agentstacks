@@ -27,6 +27,8 @@ use crate::types::project::InvalidSubPath;
 use crate::types::project::SourceError;
 use crate::types::project::SubPath;
 use crate::types::report::FieldError;
+use crate::types::report::MustBeRelative;
+use crate::types::report::OutsideProject;
 use crate::types::tree::ContentHash;
 
 /// The keys a `[[file]]` entry may hold.
@@ -41,11 +43,11 @@ const MERGE_KEYS: [&str; 4] = ["file", "key", "hash", "by"];
 /// ```
 /// use agentstacks::types::{ContentHash, FileEntry, Owner, SubPath};
 ///
-/// let hash = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+/// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
 /// let entry = FileEntry::new(
 ///     SubPath::new(".claude/skills/discuss/SKILL.md")?,
 ///     hash.clone(),
-///     Owner::parse("core")?,
+///     Owner::new("core")?,
 /// );
 /// assert_eq!(entry.path().as_str(), ".claude/skills/discuss/SKILL.md");
 /// assert_eq!(entry.hash(), &hash);
@@ -69,8 +71,8 @@ impl FileEntry {
     /// ```
     /// use agentstacks::types::{ContentHash, FileEntry, Owner, SubPath};
     ///
-    /// let hash = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
-    /// let entry = FileEntry::new(SubPath::new("a/b.md")?, hash, Owner::parse("core")?);
+    /// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+    /// let entry = FileEntry::new(SubPath::new("a/b.md")?, hash, Owner::new("core")?);
     /// assert_eq!(entry.path().normalized(), "a/b.md");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -131,12 +133,12 @@ impl FileEntry {
 /// ```
 /// use agentstacks::types::{ContentHash, MergeEntry, MergeFile, MergeKey, Owner};
 ///
-/// let hash = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+/// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
 /// let entry = MergeEntry::new(
 ///     MergeFile::new(".claude/settings.json")?,
 ///     MergeKey::new("hooks")?,
 ///     hash.clone(),
-///     Owner::parse("core")?,
+///     Owner::new("core")?,
 /// );
 /// assert_eq!(entry.file().as_str(), ".claude/settings.json");
 /// assert_eq!(entry.key().as_str(), "hooks");
@@ -160,12 +162,12 @@ impl MergeEntry {
     /// ```
     /// use agentstacks::types::{ContentHash, MergeEntry, MergeFile, MergeKey, Owner};
     ///
-    /// let hash = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+    /// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
     /// let entry = MergeEntry::new(
     ///     MergeFile::new("opencode.json")?,
     ///     MergeKey::new("plugin")?,
     ///     hash,
-    ///     Owner::parse("claude")?,
+    ///     Owner::new("claude")?,
     /// );
     /// assert_eq!(entry.by().to_string(), "claude");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -242,13 +244,13 @@ impl MergeEntry {
 fn read_path(fields: &mut TomlFields) -> Option<SubPath> {
     let text = fields.required_string("path")?;
     if text.starts_with('/') {
-        fields.refuse("path", LockError::NotRelative { value: text });
+        fields.refuse("path", LockError::from(MustBeRelative::new(text)));
         return None;
     }
     match SubPath::new(&text) {
         Ok(path) => Some(path),
         Err(InvalidSubPath::OutsideRepository) => {
-            fields.refuse("path", LockError::OutsideProject { value: text });
+            fields.refuse("path", LockError::from(OutsideProject::new(text)));
             None
         }
         Err(error) => {
@@ -277,8 +279,8 @@ fn read_text<T>(
 /// Reads `by`: a name, refused as an unknown owner when it cannot be one.
 fn read_owner(fields: &mut TomlFields) -> Option<Owner> {
     let text = fields.required_string("by")?;
-    Owner::parse(&text)
-        .map_err(|_| fields.refuse("by", LockError::UnknownOwner { name: text }))
+    Owner::new(&text)
+        .map_err(|_| fields.refuse("by", LockError::UnknownOwner { text }))
         .ok()
 }
 
@@ -352,7 +354,7 @@ mod tests {
         let entry = read_file(&file_text())?.map_err(|shown| shown.join("; "))?;
         assert_eq!(entry.path().as_str(), ".claude/skills/discuss/SKILL.md");
         assert_eq!(entry.hash().hex(), HEX64);
-        assert_eq!(entry.by(), &Owner::parse("core")?);
+        assert_eq!(entry.by(), &Owner::new("core")?);
         Ok(())
     }
 
@@ -416,8 +418,8 @@ mod tests {
     fn file_entry_new_keeps_its_parts() -> TestResult {
         let entry = FileEntry::new(
             SubPath::new(".claude/x")?,
-            ContentHash::parse(&format!("sha256:{HEX64}"))?,
-            Owner::parse("core")?,
+            ContentHash::new(&format!("sha256:{HEX64}"))?,
+            Owner::new("core")?,
         );
         assert_eq!(entry.path().as_str(), ".claude/x");
         assert_eq!(entry.by().as_str(), "core");
@@ -430,7 +432,7 @@ mod tests {
         assert_eq!(entry.file().as_str(), ".claude/settings.json");
         assert_eq!(entry.key().as_str(), "<locator>");
         assert_eq!(entry.hash().hex(), HEX64);
-        assert_eq!(entry.by(), &Owner::parse("core")?);
+        assert_eq!(entry.by(), &Owner::new("core")?);
         Ok(())
     }
 
@@ -486,8 +488,8 @@ mod tests {
         let entry = MergeEntry::new(
             MergeFile::new(".claude/settings.json")?,
             MergeKey::new("hooks")?,
-            ContentHash::parse(&format!("sha256:{HEX64}"))?,
-            Owner::parse("core")?,
+            ContentHash::new(&format!("sha256:{HEX64}"))?,
+            Owner::new("core")?,
         );
         assert_eq!(entry.file().as_str(), ".claude/settings.json");
         assert_eq!(entry.key().as_str(), "hooks");

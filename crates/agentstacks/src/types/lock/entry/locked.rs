@@ -127,7 +127,7 @@ impl LockedSource {
 /// ```
 /// use agentstacks::types::{ContentHash, LocalPath, LockedEntry, LockedSource, PackName, PackVersion};
 ///
-/// let tree = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+/// let tree = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
 /// let entry = LockedEntry::new(
 ///     PackName::new("team-lint")?,
 ///     PackVersion::new("0.1.0")?,
@@ -158,7 +158,7 @@ impl<N> LockedEntry<N> {
     ///     CommitId, ContentHash, GitTag, GitUrl, LockedEntry, LockedSource, PackVersion, ToolName,
     /// };
     ///
-    /// let tree = ContentHash::parse(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
+    /// let tree = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
     /// let tag = GitTag::new("packs-v0.1.0")?;
     /// let entry = LockedEntry::new(
     ///     ToolName::new("claude")?,
@@ -295,7 +295,7 @@ fn read_source(fields: &mut TomlFields, key_path: &str) -> Option<LockedSource> 
 /// that is not a hash.
 pub(in crate::types::lock) fn read_hash(fields: &mut TomlFields, key: &str) -> Option<ContentHash> {
     let text = fields.required_string(key)?;
-    match ContentHash::parse(&text) {
+    match ContentHash::new(&text) {
         Ok(hash) => Some(hash),
         Err(error) => {
             fields.refuse(key, LockError::from(error));
@@ -387,10 +387,7 @@ mod tests {
             }
         );
         assert_eq!(entry.tag(), Some(&GitTag::new("packs-v0.1.0")?));
-        assert_eq!(
-            entry.tree(),
-            &ContentHash::parse(&format!("sha256:{HEX64}"))?
-        );
+        assert_eq!(entry.tree(), &ContentHash::new(&format!("sha256:{HEX64}"))?);
         assert_eq!(
             entry.source().to_source(),
             Source::Git {
@@ -619,7 +616,7 @@ mod tests {
 
     #[test]
     fn locked_entry_new_keeps_a_git_or_a_path_origin() -> TestResult {
-        let tree = ContentHash::parse(&format!("sha256:{HEX64}"))?;
+        let tree = ContentHash::new(&format!("sha256:{HEX64}"))?;
         let git = LockedEntry::new(
             PackName::new("core")?,
             PackVersion::new("0.3.0")?,

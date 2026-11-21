@@ -27,12 +27,13 @@ use crate::types::manifest::OptionDecl;
 use crate::types::manifest::OptionValue;
 use crate::types::name::OptionName;
 use crate::types::name::PackName;
+use crate::types::pack::KeyPath;
 use crate::types::report::Diagnostic;
 use crate::types::report::Location;
 use crate::types::set::error::SetError;
 
 /// The value of every option of a pack.
-pub(crate) type ResolvedOptions = BTreeMap<OptionName, OptionValue>;
+pub(super) type ResolvedOptions = BTreeMap<OptionName, OptionValue>;
 
 /// The values of the options `decls` that the pack listed as `key` declares, given the `set` table
 /// of its `[packs.<key>.options]` in the project file at `project_file`.
@@ -40,13 +41,14 @@ pub(crate) type ResolvedOptions = BTreeMap<OptionName, OptionValue>;
 /// # Errors
 ///
 /// Returns every refusal when any option does not resolve.
-pub(crate) fn resolve_options(
+pub(super) fn resolve_options(
     project_file: &Path,
     key: &PackName,
-    decls: &[(OptionName, OptionDecl)],
+    decls: &BTreeMap<OptionName, OptionDecl>,
     set: &Table,
 ) -> Result<ResolvedOptions, Vec<Diagnostic>> {
-    let at = |path: String| Location::set_level(project_file, Some(path));
+    let at = |path: KeyPath| Location::set_level(project_file, Some(path.into()));
+    let entry = || KeyPath::new("packs").key(key.as_str());
     let mut resolved = ResolvedOptions::new();
     let mut refusals = Vec::new();
     for (name, decl) in decls {
@@ -56,7 +58,7 @@ pub(crate) fn resolve_options(
                     resolved.insert(name.clone(), default.clone());
                 }
                 None => refusals.push(Diagnostic::new(
-                    at(format!("packs.{key}")),
+                    at(entry()),
                     SetError::OptionRequired {
                         option: name.clone(),
                     },
@@ -69,7 +71,7 @@ pub(crate) fn resolve_options(
                 resolved.insert(name.clone(), value);
             }
             None => refusals.push(Diagnostic::new(
-                at(format!("packs.{key}.options.{name}")),
+                at(entry().key("options").key(name.as_str())),
                 SetError::OptionType {
                     option: name.clone(),
                     expected: decl.option_type().type_word(),
@@ -79,11 +81,11 @@ pub(crate) fn resolve_options(
         }
     }
     for written in set.keys() {
-        if !decls.iter().any(|(name, _)| name.as_str() == written) {
+        if !decls.keys().any(|name| name.as_str() == written) {
             refusals.push(Diagnostic::new(
-                at(format!("packs.{key}.options.{written}")),
+                at(entry().key("options").key(written)),
                 SetError::OptionUndeclared {
-                    key: written.clone(),
+                    text: written.clone(),
                 },
             ));
         }

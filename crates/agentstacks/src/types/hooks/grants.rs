@@ -24,6 +24,7 @@ use crate::types::hooks::policy::Policy;
 use crate::types::manifest::ManifestError;
 use crate::types::name::BinaryName;
 use crate::types::name::EnvName;
+use crate::types::report::ListedTwice;
 use crate::types::tokens::LocatedToken;
 use crate::types::tokens::TokenKind;
 
@@ -112,7 +113,7 @@ impl Grants {
     /// Reads the `grants` table behind `fields`, refusing what is wrong in it.
     ///
     /// `binaries` are the pack's `requires.binaries`; every token found is appended to `tokens`.
-    pub(crate) fn read(
+    pub(in crate::types) fn read(
         fields: &mut TomlFields,
         binaries: &[BinaryName],
         tokens: &mut Vec<LocatedToken>,
@@ -120,7 +121,7 @@ impl Grants {
         let policy = fields
             .optional_string("policy")
             .and_then(|text| {
-                Policy::parse(&text)
+                Policy::new(&text)
                     .map_err(|error| fields.refuse("policy", ManifestError::from(error)))
                     .ok()
             })
@@ -187,7 +188,7 @@ fn read_paths(fields: &mut TomlFields, key: &str, tokens: &mut Vec<LocatedToken>
         if starts_a_path(&text, &tokens[first..]) {
             paths.push(text);
         } else {
-            fields.refuse_path(&item_path, ManifestError::GrantPath { path: text });
+            fields.refuse_path(&item_path, ManifestError::GrantPath { text });
         }
     }
     paths
@@ -213,7 +214,7 @@ fn read_env(fields: &mut TomlFields) -> Vec<EnvName> {
         let item_path = fields.item_path("env", index);
         match EnvName::new(&text) {
             Ok(name) if names.contains(&name) => {
-                fields.refuse_path(&item_path, ManifestError::ListedTwice { text });
+                fields.refuse_path(&item_path, ManifestError::from(ListedTwice::text(text)));
             }
             Ok(name) => names.push(name),
             Err(error) => fields.refuse_path(&item_path, ManifestError::from(error)),
@@ -230,10 +231,10 @@ fn read_exec(fields: &mut TomlFields, binaries: &[BinaryName]) -> Vec<BinaryName
         let allowed = text == AIRSL || binaries.iter().any(|binary| binary.as_str() == text);
         match BinaryName::new(&text) {
             Ok(name) if allowed && granted.contains(&name) => {
-                fields.refuse_path(&item_path, ManifestError::ListedTwice { text });
+                fields.refuse_path(&item_path, ManifestError::from(ListedTwice::text(text)));
             }
             Ok(name) if allowed => granted.push(name),
-            _ => fields.refuse_path(&item_path, ManifestError::NotInBinaries { name: text }),
+            _ => fields.refuse_path(&item_path, ManifestError::NotInBinaries { text }),
         }
     }
     granted
@@ -244,7 +245,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::parse_toml_document;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
     type Read<T> = Result<(T, Vec<LocatedToken>, Vec<String>), Box<dyn std::error::Error>>;

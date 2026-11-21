@@ -167,7 +167,7 @@ impl FrontmatterFields {
         }
         if found != expected.as_str() {
             self.refuse_file(FrontmatterError::NameMismatch {
-                found,
+                text: found,
                 expected: expected.as_str().to_owned(),
             });
             return None;
@@ -202,7 +202,7 @@ impl FrontmatterFields {
                 Err(invalid) => self.refuse_at(
                     &format!("{NATIVE_KEY}.{key}"),
                     FrontmatterError::InvalidToolName {
-                        value: invalid.value().to_owned(),
+                        text: invalid.value().to_owned(),
                     },
                 ),
             }
@@ -232,7 +232,7 @@ impl FrontmatterFields {
             .map(|(key, _)| key.clone())
             .collect();
         for key in unknown {
-            self.refuse_file(FrontmatterError::UnknownKey { key });
+            self.refuse_file(FrontmatterError::UnknownKey { text: key });
         }
         (self.diagnostics, self.tokens)
     }
@@ -242,13 +242,14 @@ impl FrontmatterFields {
 mod tests {
     use super::*;
     use crate::types::TokenKind;
+    use crate::types::format::parse_yaml;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     const FILE: &str = "SKILL.md";
 
     fn fields(block: &str) -> Result<FrontmatterFields, Box<dyn std::error::Error>> {
-        match serde_saphyr::from_str::<YamlValue>(block)? {
+        match parse_yaml(block)? {
             YamlValue::Map(entries) => Ok(FrontmatterFields::new(Path::new(FILE), entries)),
             other => Err(format!("test block is not a mapping: {other:?}").into()),
         }

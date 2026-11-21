@@ -6,7 +6,7 @@
 //! # Responsibilities
 //!
 //! - [`Var`] is the closed set of var names.
-//! - [`Var::parse`] turns a token target into a var, and refuses an unknown name with the list of
+//! - [`Var::new`] turns a token target into a var, and refuses an unknown name with the list of
 //!   known ones.
 //!
 //! # Non-responsibilities
@@ -14,6 +14,7 @@
 //! Where a var may appear (`arguments` only in `SKILL.md`) belongs to the checks over a whole pack.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::tokens::error::TokenError;
 
@@ -24,7 +25,7 @@ use crate::types::tokens::error::TokenError;
 /// ```
 /// use agentstacks::types::Var;
 ///
-/// assert_eq!(Var::parse("project_dir")?, Var::ProjectDir);
+/// assert_eq!(Var::new("project_dir")?, Var::ProjectDir);
 /// assert_eq!(Var::Home.to_string(), "home");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -66,20 +67,20 @@ impl Var {
     /// ```
     /// use agentstacks::types::Var;
     ///
-    /// assert_eq!(Var::parse("arguments")?, Var::Arguments);
-    /// let refused = Var::parse("cwd").err().map(|error| error.to_string());
+    /// assert_eq!(Var::new("arguments")?, Var::Arguments);
+    /// let refused = Var::new("cwd").err().map(|error| error.to_string());
     /// assert_eq!(
     ///     refused.as_deref(),
     ///     Some("unknown var \"cwd\" (known: session_id, arguments, tmpdir, home, airsstack_home, project_dir)"),
     /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn parse(word: &str) -> Result<Self, TokenError> {
+    pub fn new(word: &str) -> Result<Self, TokenError> {
         Self::ALL
             .into_iter()
             .find(|var| var.as_str() == word)
             .ok_or_else(|| TokenError::UnknownVar {
-                name: word.to_owned(),
+                text: word.to_owned(),
             })
     }
 
@@ -116,6 +117,22 @@ impl fmt::Display for Var {
     }
 }
 
+impl FromStr for Var {
+    type Err = TokenError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for Var {
+    type Error = TokenError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,7 +141,7 @@ mod tests {
     fn var_parses_each_known_name() {
         for var in Var::ALL {
             let name = var.to_string();
-            assert_eq!(Var::parse(&name), Ok(var));
+            assert_eq!(Var::new(&name), Ok(var));
         }
         assert_eq!(
             Var::ALL.map(|v| v.to_string()),
@@ -143,11 +160,27 @@ mod tests {
     fn var_refuses_unknown_with_known_list() {
         for name in ["session", "core/tmpdir"] {
             assert_eq!(
-                Var::parse(name).map_err(|e| e.to_string()),
+                Var::new(name).map_err(|e| e.to_string()),
                 Err(format!(
                     "unknown var \"{name}\" (known: session_id, arguments, tmpdir, home, airsstack_home, project_dir)"
                 ))
             );
         }
+    }
+
+    #[test]
+    fn var_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<Var, TokenError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["arguments", "cwd"] {
+            let expected = shown(Var::new(text));
+            assert_eq!(shown(text.parse::<Var>()), expected);
+            assert_eq!(shown(Var::try_from(text)), expected);
+        }
+        assert!(Var::new("arguments").is_ok());
+        assert!(Var::new("cwd").is_err());
     }
 }

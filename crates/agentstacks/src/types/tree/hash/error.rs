@@ -20,7 +20,7 @@
 /// ```
 /// use agentstacks::types::ContentHash;
 ///
-/// let refusal = ContentHash::parse("sha256:ABC").err();
+/// let refusal = ContentHash::new("sha256:ABC").err();
 /// assert_eq!(
 ///     refusal.map(|e| e.to_string()),
 ///     Some("bad hash (expected sha256:<64 lowercase hex>)".to_owned())

@@ -13,6 +13,7 @@
 //! Whether the variable is set belongs to the run of the hook.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::name::InvalidEnvName;
 
@@ -86,6 +87,22 @@ impl fmt::Display for EnvName {
     }
 }
 
+impl FromStr for EnvName {
+    type Err = InvalidEnvName;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for EnvName {
+    type Error = InvalidEnvName;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +139,21 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn env_name_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<EnvName, InvalidEnvName>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["HOME", "home"] {
+            let expected = shown(EnvName::new(text));
+            assert_eq!(shown(text.parse::<EnvName>()), expected);
+            assert_eq!(shown(EnvName::try_from(text)), expected);
+        }
+        assert!(EnvName::new("HOME").is_ok());
+        assert!(EnvName::new("home").is_err());
     }
 }

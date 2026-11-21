@@ -13,6 +13,7 @@
 //! Turning a policy into airsl flags belongs to the extension host.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::hooks::InvalidPolicy;
 
@@ -23,10 +24,10 @@ use crate::types::hooks::InvalidPolicy;
 /// ```
 /// use agentstacks::types::Policy;
 ///
-/// assert_eq!(Policy::parse("pure")?, Policy::Pure);
+/// assert_eq!(Policy::new("pure")?, Policy::Pure);
 /// assert_eq!(Policy::default(), Policy::Confined);
 ///
-/// let refused = Policy::parse("trusted").err().ok_or("expected a refusal")?;
+/// let refused = Policy::new("trusted").err().ok_or("expected a refusal")?;
 /// assert_eq!(refused.to_string(), "\"trusted\" is not allowed for pack hooks");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -46,7 +47,7 @@ impl Policy {
     ///
     /// Returns [`InvalidPolicy::NotAllowed`] for `trusted`, and [`InvalidPolicy::Unknown`] for any
     /// other value but `confined` and `pure`.
-    pub fn parse(text: &str) -> Result<Self, InvalidPolicy> {
+    pub fn new(text: &str) -> Result<Self, InvalidPolicy> {
         let text = text.to_owned();
         match text.as_str() {
             "confined" => Ok(Self::Confined),
@@ -72,6 +73,22 @@ impl fmt::Display for Policy {
     }
 }
 
+impl FromStr for Policy {
+    type Err = InvalidPolicy;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for Policy {
+    type Error = InvalidPolicy;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,8 +98,8 @@ mod tests {
 
     #[test]
     fn policy_parses_confined_and_pure() -> TestResult {
-        assert_eq!(Policy::parse("confined")?, Policy::Confined);
-        assert_eq!(Policy::parse("pure")?, Policy::Pure);
+        assert_eq!(Policy::new("confined")?, Policy::Confined);
+        assert_eq!(Policy::new("pure")?, Policy::Pure);
         assert_eq!(Policy::default(), Policy::Confined);
         assert_eq!(Policy::Confined.to_string(), "confined");
         assert_eq!(Policy::Pure.to_string(), "pure");
@@ -91,7 +108,7 @@ mod tests {
 
     #[test]
     fn policy_refuses_trusted_as_not_allowed() -> TestResult {
-        let error = Policy::parse("trusted").err().ok_or("expected a refusal")?;
+        let error = Policy::new("trusted").err().ok_or("expected a refusal")?;
         let location = Location::at_key("packs/core/pack.toml", "hooks[1].grants.policy");
         assert_eq!(
             Diagnostic::new(location, ManifestError::from(error)).to_string(),
@@ -103,7 +120,7 @@ mod tests {
     #[test]
     fn policy_refuses_an_unknown_value_naming_the_allowed_set() -> TestResult {
         for text in ["foo", "open", ""] {
-            let error = Policy::parse(text).err().ok_or("expected a refusal")?;
+            let error = Policy::new(text).err().ok_or("expected a refusal")?;
             let location = Location::at_key("packs/core/pack.toml", "hooks[1].grants.policy");
             assert_eq!(
                 Diagnostic::new(location, ManifestError::from(error)).to_string(),
@@ -113,5 +130,21 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn policy_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<Policy, InvalidPolicy>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["pure", "trusted"] {
+            let expected = shown(Policy::new(text));
+            assert_eq!(shown(text.parse::<Policy>()), expected);
+            assert_eq!(shown(Policy::try_from(text)), expected);
+        }
+        assert!(Policy::new("pure").is_ok());
+        assert!(Policy::new("trusted").is_err());
     }
 }

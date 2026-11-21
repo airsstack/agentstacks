@@ -17,10 +17,13 @@
 //! pack.
 
 use std::fmt;
+use std::str::FromStr;
 
 use globset::{GlobBuilder, GlobMatcher};
 
 use crate::types::manifest::InvalidExcludeGlob;
+use crate::types::report::MustBeRelative;
+use crate::types::tree::TreePath;
 
 /// A relative glob with its compiled matcher.
 ///
@@ -30,8 +33,7 @@ use crate::types::manifest::InvalidExcludeGlob;
 /// use agentstacks::types::ExcludeGlob;
 ///
 /// let tests = ExcludeGlob::new("**/*_test.lua")?;
-/// assert!(tests.matches("hooks/enforce_test.lua"));
-/// assert!(!tests.matches("hooks/enforce.lua"));
+/// assert_eq!(tests.pattern(), "**/*_test.lua");
 ///
 /// let refused = ExcludeGlob::new("/tmp/**").err().ok_or("expected a refusal")?;
 /// assert_eq!(refused.to_string(), "\"/tmp/**\" must be relative");
@@ -52,15 +54,13 @@ impl ExcludeGlob {
     /// [`InvalidExcludeGlob::NotAGlob`] when the pattern does not compile.
     pub fn new(text: &str) -> Result<Self, InvalidExcludeGlob> {
         if text.starts_with('/') {
-            return Err(InvalidExcludeGlob::MustBeRelative {
-                path: text.to_owned(),
-            });
+            return Err(MustBeRelative::new(text).into());
         }
         let glob = GlobBuilder::new(text)
             .literal_separator(true)
             .build()
             .map_err(|_| InvalidExcludeGlob::NotAGlob {
-                pattern: text.to_owned(),
+                text: text.to_owned(),
             })?;
         Ok(Self {
             pattern: text.to_owned(),
@@ -74,10 +74,45 @@ impl ExcludeGlob {
         &self.pattern
     }
 
-    /// Whether the glob matches `path`, a pack-relative `/`-separated path.
+    /// Whether the glob matches the walked file `path`, relative to the pack root.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::fs::StdFileTree;
+    /// use agentstacks::types::{ExcludeGlob, walk};
+    ///
+    /// let pack = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/valid-render-exclude");
+    /// let (walked, _) = walk(&StdFileTree::new(pack));
+    /// let tests = ExcludeGlob::new("**/*_test.lua")?;
+    /// let excluded: Vec<&str> = walked
+    ///     .files()
+    ///     .iter()
+    ///     .filter(|path| tests.matches(path))
+    ///     .map(|path| path.as_str())
+    ///     .collect();
+    /// assert_eq!(excluded, ["scripts/a_test.lua"]);
+    /// # Ok::<(), agentstacks::types::InvalidExcludeGlob>(())
+    /// ```
     #[must_use]
-    pub fn matches(&self, path: &str) -> bool {
-        self.matcher.is_match(path)
+    pub fn matches(&self, path: &TreePath) -> bool {
+        self.matcher.is_match(path.as_str())
+    }
+}
+
+impl FromStr for ExcludeGlob {
+    type Err = InvalidExcludeGlob;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for ExcludeGlob {
+    type Error = InvalidExcludeGlob;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
     }
 }
 
@@ -98,32 +133,41 @@ impl fmt::Display for ExcludeGlob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Diagnostic, Location, ManifestError};
+    use crate::types::manifest::ManifestError;
+    use crate::types::report::{Diagnostic, Location};
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    /// Whether `glob` matches the pack-relative file written `path`.
+    fn matches(glob: &ExcludeGlob, path: &str) -> bool {
+        glob.matches(&TreePath::from_parts(&[path]))
+    }
 
     #[test]
     fn exclude_glob_compiles_a_typical_pattern() -> TestResult {
         let test_files = ExcludeGlob::new("**/*_test.lua")?;
         assert_eq!(test_files.pattern(), "**/*_test.lua");
         assert_eq!(test_files.to_string(), "**/*_test.lua");
-        assert!(test_files.matches("hooks/enforce_test.lua"));
+        assert!(matches(&test_files, "hooks/enforce_test.lua"));
         let markdown = ExcludeGlob::new("**/*.md")?;
-        assert!(markdown.matches("skills/discuss/SKILL.md"));
-        assert!(!markdown.matches("hooks/enforce.lua"));
+        assert!(matches(&markdown, "skills/discuss/SKILL.md"));
+        assert!(!matches(&markdown, "hooks/enforce.lua"));
         Ok(())
     }
 
     #[test]
     fn exclude_glob_star_stays_in_one_segment_and_double_star_crosses() -> TestResult {
         let single = ExcludeGlob::new("*.md")?;
-        assert!(single.matches("README.md"));
-        assert!(!single.matches("skills/a/SKILL.md"));
+        assert!(matches(&single, "README.md"));
+        assert!(!matches(&single, "skills/a/SKILL.md"));
         let double = ExcludeGlob::new("**/*.md")?;
-        assert!(double.matches("skills/a/SKILL.md"));
-        assert!(double.matches("README.md"));
-        assert!(ExcludeGlob::new("hooks/**")?.matches("hooks/a/b.lua"));
-        assert!(!ExcludeGlob::new("*_test.lua")?.matches("hooks/x_test.lua"));
+        assert!(matches(&double, "skills/a/SKILL.md"));
+        assert!(matches(&double, "README.md"));
+        assert!(matches(&ExcludeGlob::new("hooks/**")?, "hooks/a/b.lua"));
+        assert!(!matches(
+            &ExcludeGlob::new("*_test.lua")?,
+            "hooks/x_test.lua"
+        ));
         Ok(())
     }
 
@@ -141,6 +185,27 @@ mod tests {
                 format!("packs/core/pack.toml: exclude[0]: {message}")
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn exclude_glob_from_str_and_try_from_match_new() -> TestResult {
+        assert_eq!(
+            "**/*.md".parse::<ExcludeGlob>()?,
+            ExcludeGlob::new("**/*.md")?
+        );
+        assert_eq!(
+            ExcludeGlob::try_from("hooks/**")?,
+            ExcludeGlob::new("hooks/**")?
+        );
+        assert_eq!(
+            "/tmp/**".parse::<ExcludeGlob>().err(),
+            ExcludeGlob::new("/tmp/**").err()
+        );
+        assert_eq!(
+            ExcludeGlob::try_from("[").err(),
+            ExcludeGlob::new("[").err()
+        );
         Ok(())
     }
 }

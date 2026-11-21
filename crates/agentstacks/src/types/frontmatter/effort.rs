@@ -44,6 +44,30 @@ impl Effort {
     /// Every value, in declaration order.
     pub const ALL: [Self; 3] = [Self::Low, Self::Medium, Self::High];
 
+    /// Parses `value` as written in frontmatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FrontmatterError::NotOneOf`] when `value` is not one of [`Effort::ALL`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::Effort;
+    ///
+    /// assert_eq!(Effort::new("high")?.as_str(), "high");
+    /// assert!(Effort::new("max").is_err());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(value: &str) -> Result<Self, FrontmatterError> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_str() == value)
+            .ok_or_else(|| {
+                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
+            })
+    }
+
     /// The value as written in frontmatter.
     ///
     /// # Examples
@@ -73,12 +97,15 @@ impl FromStr for Effort {
     type Err = FrontmatterError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|candidate| candidate.as_str() == value)
-            .ok_or_else(|| {
-                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
-            })
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for Effort {
+    type Error = FrontmatterError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -112,5 +139,21 @@ mod tests {
             refused.as_deref(),
             Some("\"max\" (expected low, medium, high)")
         );
+    }
+
+    #[test]
+    fn effort_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<Effort, FrontmatterError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["high", "max"] {
+            let expected = shown(Effort::new(text));
+            assert_eq!(shown(text.parse::<Effort>()), expected);
+            assert_eq!(shown(Effort::try_from(text)), expected);
+        }
+        assert!(Effort::new("high").is_ok());
+        assert!(Effort::new("max").is_err());
     }
 }

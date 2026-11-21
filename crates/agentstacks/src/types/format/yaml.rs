@@ -8,8 +8,9 @@
 //!
 //! - [`YamlValue`] has a variant per YAML kind and keeps mapping keys in source order. Mapping keys
 //!   are unique because the parser refuses a duplicate key.
-//! - Its `Deserialize` reads any YAML node through `deserialize_any`, and refuses an integer above
-//!   `i64::MAX` with the message `integer beyond i64`.
+//! - `parse_yaml` reads YAML text into a [`YamlValue`]. A crate-private wrapper does the
+//!   deserialising through `deserialize_any`, so serde stays out of the public type, and an integer
+//!   above `i64::MAX` is refused with the message `integer beyond i64`.
 //! - [`YamlValue::kind_word`] gives the type word a wrong-type refusal names.
 //!
 //! # Non-responsibilities
@@ -98,6 +99,28 @@ impl YamlValue {
     }
 }
 
+/// Parses YAML `text` into one value, or the parser's error.
+pub(crate) fn parse_yaml(text: &str) -> Result<YamlValue, serde_saphyr::Error> {
+    serde_saphyr::from_str::<Node>(text).map(Node::into_value)
+}
+
+/// The deserialisable form of a [`YamlValue`], kept crate-private so serde's trait is no part of
+/// the public type.
+struct Node(YamlValue);
+
+impl Node {
+    /// The value this node holds.
+    fn into_value(self) -> YamlValue {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Node {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(ValueVisitor).map(Self)
+    }
+}
+
 /// Reads one node of any kind.
 struct ValueVisitor;
 
@@ -143,29 +166,23 @@ impl<'de> Visitor<'de> for ValueVisitor {
     }
 
     fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<YamlValue, D::Error> {
-        YamlValue::deserialize(deserializer)
+        Node::deserialize(deserializer).map(Node::into_value)
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<YamlValue, A::Error> {
         let mut items = Vec::new();
-        while let Some(item) = seq.next_element()? {
-            items.push(item);
+        while let Some(item) = seq.next_element::<Node>()? {
+            items.push(item.into_value());
         }
         Ok(YamlValue::Seq(items))
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<YamlValue, A::Error> {
         let mut entries = Vec::new();
-        while let Some(entry) = map.next_entry::<String, YamlValue>()? {
-            entries.push(entry);
+        while let Some((key, value)) = map.next_entry::<String, Node>()? {
+            entries.push((key, value.into_value()));
         }
         Ok(YamlValue::Map(entries))
-    }
-}
-
-impl<'de> Deserialize<'de> for YamlValue {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_any(ValueVisitor)
     }
 }
 
@@ -178,7 +195,7 @@ mod tests {
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     fn parse(text: &str) -> Result<YamlValue, serde_saphyr::Error> {
-        serde_saphyr::from_str(text)
+        parse_yaml(text)
     }
 
     fn entry(key: &str, value: YamlValue) -> (String, YamlValue) {
@@ -260,14 +277,15 @@ mod tests {
     #[test]
     fn yaml_value_refuses_unsigned_beyond_i64() -> TestResult {
         let beyond = u64::try_from(i64::MAX)? + 1;
-        let refused = YamlValue::deserialize(U64Deserializer::<ValueError>::new(beyond));
+        let refused =
+            Node::deserialize(U64Deserializer::<ValueError>::new(beyond)).map(Node::into_value);
         assert_eq!(
             refused.err().map(|error| error.to_string()).as_deref(),
             Some("integer beyond i64")
         );
         let at_max =
-            YamlValue::deserialize(U64Deserializer::<ValueError>::new(u64::try_from(i64::MAX)?))?;
-        assert_eq!(at_max, YamlValue::Int(i64::MAX));
+            Node::deserialize(U64Deserializer::<ValueError>::new(u64::try_from(i64::MAX)?))?;
+        assert_eq!(at_max.into_value(), YamlValue::Int(i64::MAX));
         Ok(())
     }
 

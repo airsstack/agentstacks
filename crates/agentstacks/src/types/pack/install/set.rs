@@ -30,48 +30,17 @@ use std::path::Path;
 
 use crate::types::manifest::PackManifest;
 use crate::types::pack::error::PackError;
+use crate::types::pack::key::KeyPath;
 use crate::types::pack::layout::{MANIFEST_FILE, NATIVE_DIR, PackLayout, SKILL_FILE, SKILLS_DIR};
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
+use crate::types::report::DoesNotExist;
 use crate::types::report::Location;
 use crate::types::tree::TreePath;
 
-/// The excluded, installed and rendered files of a pack, as pack-relative paths.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-///
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, InstallSet, PackLayout, PackManifest, TreePath, walk};
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/valid-render-exclude");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// let manifest = PackManifest::parse(Path::new("pack.toml"), &tree.read_text(Path::new("pack.toml"))?)
-///     .map_err(|refusals| format!("{refusals:?}"))?;
-/// let (install, refusals) = InstallSet::resolve(Path::new("packs/core"), &layout, &manifest, &[]);
-/// assert!(refusals.is_empty());
-///
-/// // `exclude = ["**/*_test.lua"]` keeps the test script out; `pack.toml` is never installed.
-/// let installed: Vec<&str> = install.installed().map(TreePath::as_str).collect();
-/// assert_eq!(installed, ["enforcement.json", "scripts/a.lua", "skills/a/SKILL.md"]);
-/// // Rendered: every installed `.md` file and each `render` entry.
-/// let rendered: Vec<&str> = install.rendered().map(TreePath::as_str).collect();
-/// assert_eq!(rendered, ["enforcement.json", "skills/a/SKILL.md"]);
-/// let test_script = layout
-///     .files()
-///     .iter()
-///     .find(|file| file.as_str() == "scripts/a_test.lua")
-///     .ok_or("the fixture holds the test script")?;
-/// assert!(install.is_excluded(test_script));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
+/// The installed and rendered files of a pack, as pack-relative paths.
 #[derive(Debug, Clone, Default)]
-pub struct InstallSet {
-    excluded: BTreeSet<TreePath>,
+pub(in crate::types::pack) struct InstallSet {
     installed: BTreeSet<TreePath>,
     rendered: BTreeSet<TreePath>,
 }
@@ -81,36 +50,8 @@ impl InstallSet {
     ///
     /// `protected_runs` are the pack-relative files of the pack's own hook `run`s, which `exclude`
     /// may not remove. Refusals are located under `dir`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::path::Path;
-    ///
-    /// use agentstacks::fs::StdFileTree;
-    /// use agentstacks::types::{FileTree, InstallSet, PackLayout, PackManifest, walk};
-    ///
-    /// let dir = concat!(
-    ///     env!("CARGO_MANIFEST_DIR"),
-    ///     "/tests/fixtures/packs/exclude-protected-skill-md"
-    /// );
-    /// let tree = StdFileTree::new(dir);
-    /// let (walked, _) = walk(&tree);
-    /// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-    /// let manifest = PackManifest::parse(Path::new("pack.toml"), &tree.read_text(Path::new("pack.toml"))?)
-    ///     .map_err(|refusals| format!("{refusals:?}"))?;
-    ///
-    /// // `exclude` may never remove a `SKILL.md`.
-    /// let (_, refusals) = InstallSet::resolve(Path::new("packs/core"), &layout, &manifest, &[]);
-    /// let shown: Vec<String> = refusals.into_sorted().iter().map(ToString::to_string).collect();
-    /// assert_eq!(
-    ///     shown,
-    ///     ["packs/core/pack.toml: exclude[0]: \"**/*.md\" excludes skills/discuss/SKILL.md"]
-    /// );
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
     #[must_use]
-    pub fn resolve(
+    pub(in crate::types::pack) fn resolve(
         dir: &Path,
         layout: &PackLayout,
         manifest: &PackManifest,
@@ -144,18 +85,18 @@ impl InstallSet {
                     continue;
                 }
                 (
-                    Location::at_key(&manifest_file, format!("render[{index}]")),
-                    PackError::DoesNotExist { path: text },
+                    Location::at_key(&manifest_file, KeyPath::new("render").item(index)),
+                    PackError::from(DoesNotExist::new(text)),
                 )
             } else if excluded.contains(&path) {
                 (
-                    Location::at_key(&manifest_file, format!("render[{index}]")),
-                    PackError::AlsoExcluded { path: text },
+                    Location::at_key(&manifest_file, KeyPath::new("render").item(index)),
+                    PackError::AlsoExcluded { text },
                 )
             } else if !installed.contains(&path) {
                 (
-                    Location::at_key(&manifest_file, format!("render[{index}]")),
-                    PackError::NeverInstalled { path: text },
+                    Location::at_key(&manifest_file, KeyPath::new("render").item(index)),
+                    PackError::NeverInstalled { text },
                 )
             } else {
                 rendered.insert(path.clone());
@@ -169,11 +110,11 @@ impl InstallSet {
         let protected = protected_files(layout, &walked, protected_runs);
         for (index, glob) in manifest.exclude().iter().enumerate() {
             for file in &protected {
-                if glob.matches(file.as_str()) && !render_listed.contains(file) {
+                if glob.matches(file) && !render_listed.contains(file) {
                     refusals.push(Diagnostic::new(
-                        Location::at_key(&manifest_file, format!("exclude[{index}]")),
+                        Location::at_key(&manifest_file, KeyPath::new("exclude").item(index)),
                         PackError::ExcludesProtected {
-                            glob: glob.pattern().to_owned(),
+                            text: glob.pattern().to_owned(),
                             path: file.to_string(),
                         },
                     ));
@@ -181,48 +122,33 @@ impl InstallSet {
             }
         }
         let set = Self {
-            excluded,
             installed,
             rendered,
         };
         (set, refusals)
     }
 
-    /// Whether an `exclude` pattern matches the pack-relative file `relative`.
-    #[must_use]
-    pub fn is_excluded(&self, relative: &TreePath) -> bool {
-        self.excluded.contains(relative)
-    }
-
     /// Whether the pack-relative file `relative` is installed.
     #[must_use]
-    pub fn is_installed(&self, relative: &TreePath) -> bool {
+    pub(in crate::types::pack) fn is_installed(&self, relative: &TreePath) -> bool {
         self.installed.contains(relative)
     }
 
     /// Whether the pack-relative file `relative` is rendered.
     #[must_use]
-    pub fn is_rendered(&self, relative: &TreePath) -> bool {
+    pub(in crate::types::pack) fn is_rendered(&self, relative: &TreePath) -> bool {
         self.rendered.contains(relative)
     }
 
     /// The installed files, sorted by path bytes.
-    pub fn installed(&self) -> impl Iterator<Item = &TreePath> {
+    pub(in crate::types::pack) fn installed(&self) -> impl Iterator<Item = &TreePath> {
         self.installed.iter()
-    }
-
-    /// The rendered files, sorted by path bytes.
-    pub fn rendered(&self) -> impl Iterator<Item = &TreePath> {
-        self.rendered.iter()
     }
 }
 
 /// Whether any `exclude` pattern of `manifest` matches the pack-relative file `relative`.
-pub(crate) fn is_excluded_by(manifest: &PackManifest, relative: &TreePath) -> bool {
-    manifest
-        .exclude()
-        .iter()
-        .any(|glob| glob.matches(relative.as_str()))
+pub(in crate::types::pack) fn is_excluded_by(manifest: &PackManifest, relative: &TreePath) -> bool {
+    manifest.exclude().iter().any(|glob| glob.matches(relative))
 }
 
 /// Every file the layout would install before `exclude` is applied, pack-relative.
@@ -309,9 +235,6 @@ mod tests {
             &[],
         )?;
         assert!(refusals.is_empty(), "{refusals:?}");
-        assert!(set.is_excluded(&tp("scripts/a_test.lua")));
-        assert!(set.is_excluded(&tp("skills/a/scripts/b_test.lua")));
-        assert!(set.is_excluded(&tp("docs/x.md")));
         assert!(set.is_installed(&tp("scripts/a.lua")));
         assert!(!set.is_installed(&tp("scripts/a_test.lua")));
         assert!(!set.is_installed(&tp("skills/a/scripts/b_test.lua")));
@@ -321,22 +244,22 @@ mod tests {
 
     #[test]
     fn rendered_set_holds_each_installed_md_and_each_render_file() -> TestResult {
-        let (set, refusals) = resolve(
-            &[
-                "README.md",
-                "agents/b.md",
-                "enforcement.json",
-                "native/claude/hooks.toml",
-                "native/claude/x.md",
-                "pack.toml",
-                "scripts/a.lua",
-                "skills/a/SKILL.md",
-            ],
-            "render = [\"enforcement.json\"]",
-            &[],
-        )?;
+        let files = [
+            "README.md",
+            "agents/b.md",
+            "enforcement.json",
+            "native/claude/hooks.toml",
+            "native/claude/x.md",
+            "pack.toml",
+            "scripts/a.lua",
+            "skills/a/SKILL.md",
+        ];
+        let (set, refusals) = resolve(&files, "render = [\"enforcement.json\"]", &[])?;
         assert!(refusals.is_empty(), "{refusals:?}");
-        let rendered: Vec<&str> = set.rendered().map(TreePath::as_str).collect();
+        let rendered: Vec<&str> = files
+            .into_iter()
+            .filter(|file| set.is_rendered(&tp(file)))
+            .collect();
         assert_eq!(
             rendered,
             [

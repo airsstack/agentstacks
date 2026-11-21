@@ -8,9 +8,9 @@
 //! - [`ProjectFile`]: parses the whole file and returns the tools and packs it lists, or every refusal at once.
 //! - [`PackEntry`]: one `[packs.<name>]` entry, its source plus the `options` table kept raw.
 //! - [`Source`]: where a pack or tool comes from, a git repository with a pin or a directory in the project.
-//! - [`SourceFields`]: the checked source keys (`git`, `path`, `tag`, `rev`, `subdir`) of one entry, read under a pin rule.
+//! - `SourceFields` (crate-internal): the checked source keys (`git`, `path`, `tag`, `rev`, `subdir`) of one entry, read under a pin rule.
 //! - [`Pin`]: what a git source is fixed to, a tag or a commit.
-//! - [`PinRule`]: which pin keys a git source must carry, so one reader serves the project file and the lock.
+//! - `PinRule` (crate-internal): which pin keys a git source must carry, so one reader serves the project file and the lock.
 //! - [`GitUrl`]: a repository URL that cannot be taken for a command-line option.
 //! - [`GitTag`]: a non-empty git tag name.
 //! - [`CommitId`]: a full-length lowercase hex commit id.
@@ -69,11 +69,9 @@ pub use path::LocalPath;
 pub use path::SubPath;
 #[doc(inline)]
 pub use pin::Pin;
-#[doc(inline)]
-pub use pin::PinRule;
+pub(in crate::types) use pin::PinRule;
 #[doc(inline)]
 pub use source::Source;
 #[doc(inline)]
 pub use source::SourceError;
-#[doc(inline)]
-pub use source::SourceFields;
+pub(in crate::types) use source::SourceFields;

@@ -24,6 +24,7 @@ use crate::types::manifest::AirslReq;
 use crate::types::manifest::error::ManifestError;
 use crate::types::name::BinaryName;
 use crate::types::name::PackName;
+use crate::types::report::ListedTwice;
 
 /// The `[requires]` table of a pack manifest.
 ///
@@ -93,14 +94,14 @@ impl Requires {
     /// Reads the `[requires]` table behind `fields`, refusing what is wrong in it.
     ///
     /// `own_name` is the pack's own name when it is valid, so a pack listing itself is refused.
-    pub(crate) fn read(fields: &mut TomlFields, own_name: Option<&PackName>) -> Self {
+    pub(in crate::types) fn read(fields: &mut TomlFields, own_name: Option<&PackName>) -> Self {
         let mut packs: Vec<PackName> = Vec::new();
         for (index, text) in fields.optional_string_list("packs").unwrap_or_default() {
             let item_path = fields.item_path("packs", index);
             match PackName::new(&text) {
                 Err(error) => fields.refuse_path(&item_path, ManifestError::from(error)),
                 Ok(name) if packs.contains(&name) => {
-                    fields.refuse_path(&item_path, ManifestError::ListedTwice { text });
+                    fields.refuse_path(&item_path, ManifestError::from(ListedTwice::text(text)));
                 }
                 Ok(name) => {
                     if own_name == Some(&name) {
@@ -125,7 +126,7 @@ impl Requires {
             match BinaryName::new(&text) {
                 Err(error) => fields.refuse_path(&item_path, ManifestError::from(error)),
                 Ok(name) if binaries.contains(&name) => {
-                    fields.refuse_path(&item_path, ManifestError::ListedTwice { text });
+                    fields.refuse_path(&item_path, ManifestError::from(ListedTwice::text(text)));
                 }
                 Ok(name) => binaries.push(name),
             }
@@ -162,7 +163,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::parse_toml_document;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

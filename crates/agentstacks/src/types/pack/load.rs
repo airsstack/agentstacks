@@ -56,8 +56,9 @@ use crate::types::hooks::NativeHooks;
 use crate::types::manifest::PackManifest;
 use crate::types::name::ItemName;
 use crate::types::name::ToolName;
-use crate::types::pack::install::checks::{check_airsl_declared, check_something_to_install};
-use crate::types::pack::install::set::{InstallSet, is_excluded_by};
+use crate::types::pack::install::{
+    InstallSet, check_airsl_declared, check_something_to_install, is_excluded_by,
+};
 use crate::types::pack::item::loaded::{PackAgent, PackSkill};
 use crate::types::pack::layout::{MANIFEST_FILE, NATIVE_DIR, PackLayout, SKILL_FILE, SKILLS_DIR};
 use crate::types::pack::local::{check_local_tokens, check_native_references};

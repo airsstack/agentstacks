@@ -71,6 +71,14 @@ impl fmt::Display for GitUrl {
     }
 }
 
+impl TryFrom<&str> for GitUrl {
+    type Error = InvalidGitUrl;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,5 +111,21 @@ mod tests {
     fn git_url_keeps_a_dash_that_is_not_leading() -> TestResult {
         assert_eq!(GitUrl::new("a-b")?.as_str(), "a-b");
         Ok(())
+    }
+
+    #[test]
+    fn git_url_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<GitUrl, InvalidGitUrl>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["https://example.org/r", "--upload-pack=x"] {
+            let expected = shown(GitUrl::new(text));
+            assert_eq!(shown(text.parse::<GitUrl>()), expected);
+            assert_eq!(shown(GitUrl::try_from(text)), expected);
+        }
+        assert!(GitUrl::new("https://example.org/r").is_ok());
+        assert!(GitUrl::new("--upload-pack=x").is_err());
     }
 }

@@ -26,6 +26,7 @@ use toml::Table;
 use crate::types::report::Diagnostic;
 use crate::types::report::FormatError;
 use crate::types::report::Location;
+use crate::types::report::ParserMessage;
 
 /// Parses `text`, the content of `file`, into a raw table.
 ///
@@ -33,12 +34,12 @@ use crate::types::report::Location;
 ///
 /// Returns one [`Diagnostic`] located at the line the parser's error span starts on, whose message
 /// is the parser's own.
-pub(crate) fn parse_toml_document(file: &Path, text: &str) -> Result<Table, Diagnostic> {
+pub(in crate::types) fn parse_toml_document(file: &Path, text: &str) -> Result<Table, Diagnostic> {
     text.parse::<Table>().map_err(|error| {
         let offset = error.span().map_or(0, |span| span.start);
         Diagnostic::new(
             Location::at_line(file, line_of(text, offset)),
-            FormatError::TomlSyntax(error.message().to_owned()),
+            FormatError::TomlSyntax(ParserMessage::new(error.message())),
         )
     })
 }

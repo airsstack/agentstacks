@@ -19,26 +19,28 @@
 //! [`InvalidName`].
 
 use crate::types::name::InvalidName;
+use crate::types::name::ItemName;
 use crate::types::name::PackName;
 use crate::types::pack::item::kind::ItemKind;
+use crate::types::report::DoesNotExist;
 
 /// A refusal found while loading a pack directory.
 ///
 /// # Examples
 ///
 /// ```
-/// use agentstacks::types::{ItemKind, PackError, PackName};
+/// use agentstacks::types::{ItemKind, ItemName, PackError, PackName};
 ///
 /// assert_eq!(PackError::NotAPack.to_string(), "not a pack (no pack.toml)");
 /// assert_eq!(
-///     PackError::DoesNotExist { path: "enforcment.json".into() }.to_string(),
-///     "\"enforcment.json\" does not exist"
+///     PackError::NeverInstalled { text: "pack.toml".into() }.to_string(),
+///     "\"pack.toml\" is never installed"
 /// );
 ///
 /// let missing = PackError::NoSuchItem {
 ///     pack: PackName::new("core")?,
 ///     kind: ItemKind::Agent,
-///     item: "codr".to_owned(),
+///     item: ItemName::new("codr")?,
 /// };
 /// assert_eq!(missing.to_string(), "pack \"core\" has no agent \"codr\"");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -67,28 +69,25 @@ pub enum PackError {
     #[error(transparent)]
     Name(#[from] InvalidName),
     /// A `render` entry or a hook `run` that names no file.
-    #[error("\"{path}\" does not exist")]
-    DoesNotExist {
-        /// The path as written.
-        path: String,
-    },
+    #[error(transparent)]
+    DoesNotExist(#[from] DoesNotExist),
     /// A `render` entry that names a file the pack never installs, such as `pack.toml`.
-    #[error("\"{path}\" is never installed")]
+    #[error("\"{text}\" is never installed")]
     NeverInstalled {
         /// The path as written.
-        path: String,
+        text: String,
     },
     /// A `render` entry that an `exclude` pattern matches.
-    #[error("\"{path}\" is also excluded")]
+    #[error("\"{text}\" is also excluded")]
     AlsoExcluded {
         /// The path as written.
-        path: String,
+        text: String,
     },
     /// An `exclude` pattern that matches a file that must stay.
-    #[error("\"{glob}\" excludes {path}")]
+    #[error("\"{text}\" excludes {path}")]
     ExcludesProtected {
         /// The pattern as written.
-        glob: String,
+        text: String,
         /// The pack-relative path it matches.
         path: String,
     },
@@ -115,15 +114,14 @@ pub enum PackError {
         pack: PackName,
         /// Whether a skill or an agent was named.
         kind: ItemKind,
-        /// The item name as written.
-        item: String,
+        /// The item that was named.
+        item: ItemName,
     },
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::name::ItemName;
     use std::error::Error;
 
     #[test]
@@ -132,7 +130,7 @@ mod tests {
             Ok(PackError::NoSuchItem {
                 pack: PackName::new("core")?,
                 kind,
-                item: item.to_owned(),
+                item: ItemName::new(item)?,
             })
         };
         let bad_name = ItemName::new("My_Skill")
@@ -159,26 +157,24 @@ mod tests {
                 "\"My_Skill\" is not a valid name",
             ),
             (
-                PackError::DoesNotExist {
-                    path: "enforcment.json".into(),
-                },
+                PackError::from(DoesNotExist::new("enforcment.json")),
                 "\"enforcment.json\" does not exist",
             ),
             (
                 PackError::NeverInstalled {
-                    path: "pack.toml".into(),
+                    text: "pack.toml".into(),
                 },
                 "\"pack.toml\" is never installed",
             ),
             (
                 PackError::AlsoExcluded {
-                    path: "x.json".into(),
+                    text: "x.json".into(),
                 },
                 "\"x.json\" is also excluded",
             ),
             (
                 PackError::ExcludesProtected {
-                    glob: "**/*.md".into(),
+                    text: "**/*.md".into(),
                     path: "skills/discuss/SKILL.md".into(),
                 },
                 "\"**/*.md\" excludes skills/discuss/SKILL.md",

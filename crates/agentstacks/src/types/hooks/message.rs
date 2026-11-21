@@ -94,7 +94,10 @@ impl MessageHook {
     /// Reads the message hook behind `fields`, refusing what is wrong in it.
     ///
     /// Every token found in `text` is appended to `tokens`.
-    pub(crate) fn read(fields: &mut TomlFields, tokens: &mut Vec<LocatedToken>) -> Option<Self> {
+    pub(in crate::types) fn read(
+        fields: &mut TomlFields,
+        tokens: &mut Vec<LocatedToken>,
+    ) -> Option<Self> {
         let before = fields.refusal_count();
         let text = fields.required_text("text").filter(|text| {
             let key_path = fields.key_path("text");
@@ -124,7 +127,8 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::{TokenKind, parse_toml_document};
+    use crate::types::TokenKind;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
     type Read<T> = Result<(T, Vec<LocatedToken>, Vec<String>), Box<dyn std::error::Error>>;

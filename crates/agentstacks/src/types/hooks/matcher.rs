@@ -13,6 +13,9 @@
 //! Which values an event accepts belongs to [`HookEvent`](crate::types::HookEvent).
 
 use std::fmt;
+use std::str::FromStr;
+
+use crate::types::hooks::InvalidMatchValue;
 
 /// A `match` selector value.
 ///
@@ -21,9 +24,10 @@ use std::fmt;
 /// ```
 /// use agentstacks::types::MatchValue;
 ///
-/// assert_eq!(MatchValue::parse("resume"), Some(MatchValue::Resume));
-/// assert_eq!(MatchValue::parse("bash"), None);
+/// assert_eq!(MatchValue::new("resume")?, MatchValue::Resume);
+/// assert!(MatchValue::new("bash").is_err());
 /// assert_eq!(MatchValue::Edit.to_string(), "edit");
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MatchValue {
@@ -44,18 +48,32 @@ pub enum MatchValue {
 }
 
 impl MatchValue {
-    /// Parses one value of a `match` list; `None` when `text` is not one of the seven.
-    #[must_use]
-    pub fn parse(text: &str) -> Option<Self> {
+    /// Parses one value of a `match` list.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidMatchValue`] when `text` is not one of the seven values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::MatchValue;
+    ///
+    /// assert_eq!(MatchValue::new("write")?, MatchValue::Write);
+    /// let refused = MatchValue::new("bash").err().map(|error| error.to_string());
+    /// assert_eq!(refused.as_deref(), Some("\"bash\" unknown"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(text: &str) -> Result<Self, InvalidMatchValue> {
         match text {
-            "startup" => Some(Self::Startup),
-            "resume" => Some(Self::Resume),
-            "clear" => Some(Self::Clear),
-            "compact" => Some(Self::Compact),
-            "read" => Some(Self::Read),
-            "edit" => Some(Self::Edit),
-            "write" => Some(Self::Write),
-            _ => None,
+            "startup" => Ok(Self::Startup),
+            "resume" => Ok(Self::Resume),
+            "clear" => Ok(Self::Clear),
+            "compact" => Ok(Self::Compact),
+            "read" => Ok(Self::Read),
+            "edit" => Ok(Self::Edit),
+            "write" => Ok(Self::Write),
+            _ => Err(InvalidMatchValue::new(text)),
         }
     }
 
@@ -80,6 +98,22 @@ impl fmt::Display for MatchValue {
     }
 }
 
+impl FromStr for MatchValue {
+    type Err = InvalidMatchValue;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for MatchValue {
+    type Error = InvalidMatchValue;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,10 +124,26 @@ mod tests {
             "startup", "resume", "clear", "compact", "read", "edit", "write",
         ] {
             assert_eq!(
-                MatchValue::parse(name).map(|value| value.to_string()),
-                Some(name.to_owned())
+                MatchValue::new(name).map(|value| value.to_string()),
+                Ok(name.to_owned())
             );
         }
-        assert_eq!(MatchValue::parse("bash"), None);
+        assert_eq!(MatchValue::new("bash"), Err(InvalidMatchValue::new("bash")));
+    }
+
+    #[test]
+    fn match_value_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<MatchValue, InvalidMatchValue>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["read", "bash"] {
+            let expected = shown(MatchValue::new(text));
+            assert_eq!(shown(text.parse::<MatchValue>()), expected);
+            assert_eq!(shown(MatchValue::try_from(text)), expected);
+        }
+        assert!(MatchValue::new("read").is_ok());
+        assert!(MatchValue::new("bash").is_err());
     }
 }

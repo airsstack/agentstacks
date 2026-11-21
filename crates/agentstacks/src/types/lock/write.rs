@@ -191,7 +191,7 @@ mod tests {
     }
 
     fn hash() -> Result<ContentHash, Box<dyn std::error::Error>> {
-        Ok(ContentHash::parse(&format!("sha256:{HEX64}"))?)
+        Ok(ContentHash::new(&format!("sha256:{HEX64}"))?)
     }
 
     fn git_pack(name: &str) -> Result<LockedEntry<PackName>, Box<dyn std::error::Error>> {
@@ -212,7 +212,7 @@ mod tests {
         Ok(FileEntry::new(
             SubPath::new(path)?,
             hash()?,
-            Owner::parse("core")?,
+            Owner::new("core")?,
         ))
     }
 
@@ -221,7 +221,7 @@ mod tests {
             MergeFile::new(file)?,
             MergeKey::new(key)?,
             hash()?,
-            Owner::parse("core")?,
+            Owner::new("core")?,
         ))
     }
 

@@ -48,7 +48,11 @@ pub struct NativeDir {
 impl NativeDir {
     /// A directory for `tool` with its installed `files` and its `hooks`, when it has any.
     #[must_use]
-    pub const fn new(tool: ToolName, files: Vec<TreePath>, hooks: Option<NativeHooks>) -> Self {
+    pub(super) const fn new(
+        tool: ToolName,
+        files: Vec<TreePath>,
+        hooks: Option<NativeHooks>,
+    ) -> Self {
         Self { tool, files, hooks }
     }
 

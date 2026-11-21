@@ -12,12 +12,12 @@
 //!   and no hook in a non-excluded `native/<tool>/hooks.toml`, at the pack directory. A skill or an
 //!   agent always counts, because `exclude` cannot remove `SKILL.md` or an agent file. The check
 //!   judges only what it is given: a caller that knows an item may have been refused before it was
-//!   listed (see [`PackLayout::may_hold_unseen_items`]) does not call it, so the author is not told
+//!   listed (see `PackLayout::may_hold_unseen_items`) does not call it, so the author is not told
 //!   the pack is empty for a reason the refusal already named.
 //!
 //! # Non-responsibilities
 //!
-//! Resolving `exclude` belongs to [`InstallSet`]; reading the hooks of each native directory
+//! Resolving `exclude` belongs to the install set; reading the hooks of each native directory
 //! belongs to the pack loader. Whether the airsl range is satisfiable by an installed airsl
 //! belongs to the checks over a whole set of packs.
 
@@ -36,33 +36,7 @@ use crate::types::report::Location;
 /// # Errors
 ///
 /// The one refusal, located at `requires.airsl` in the `pack.toml` under `dir`.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-///
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{
-///     FileTree, InstallSet, PackLayout, PackManifest, check_airsl_declared, walk,
-/// };
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/lua-without-airsl");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// let manifest = PackManifest::parse(Path::new("pack.toml"), &tree.read_text(Path::new("pack.toml"))?)
-///     .map_err(|refusals| format!("{refusals:?}"))?;
-/// let (install, _) = InstallSet::resolve(Path::new("packs/core"), &layout, &manifest, &[]);
-///
-/// let refusal = check_airsl_declared(Path::new("packs/core"), &manifest, &install).err();
-/// assert_eq!(
-///     refusal.map(|d| d.to_string()),
-///     Some("packs/core/pack.toml: requires.airsl: required (the pack contains .lua files)".to_owned())
-/// );
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-pub fn check_airsl_declared(
+pub(in crate::types::pack) fn check_airsl_declared(
     dir: &Path,
     manifest: &PackManifest,
     install: &InstallSet,
@@ -82,30 +56,7 @@ pub fn check_airsl_declared(
 /// # Errors
 ///
 /// The one refusal, located at the pack directory `dir`.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-///
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, PackLayout, PackManifest, check_something_to_install, walk};
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/nothing-to-install");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// let manifest = PackManifest::parse(Path::new("pack.toml"), &tree.read_text(Path::new("pack.toml"))?)
-///     .map_err(|refusals| format!("{refusals:?}"))?;
-///
-/// let refusal = check_something_to_install(Path::new("packs/core"), &layout, &manifest, &[]).err();
-/// assert_eq!(
-///     refusal.map(|d| d.to_string()),
-///     Some("packs/core: pack declares nothing to install".to_owned())
-/// );
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-pub fn check_something_to_install(
+pub(in crate::types::pack) fn check_something_to_install(
     dir: &Path,
     layout: &PackLayout,
     manifest: &PackManifest,

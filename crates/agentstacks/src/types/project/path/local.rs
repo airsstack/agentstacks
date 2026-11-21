@@ -16,6 +16,7 @@
 //! checking that the directory exists belong to the code that reads it.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::project::InvalidLocalPath;
 use crate::types::report::FieldError;
@@ -80,6 +81,22 @@ impl fmt::Display for LocalPath {
     }
 }
 
+impl FromStr for LocalPath {
+    type Err = InvalidLocalPath;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for LocalPath {
+    type Error = InvalidLocalPath;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +140,21 @@ mod tests {
         }
         assert_eq!(shown(LocalPath::new("")).as_deref(), Some("empty"));
         assert_eq!(shown(LocalPath::new("  ")).as_deref(), Some("empty"));
+    }
+
+    #[test]
+    fn local_path_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<LocalPath, InvalidLocalPath>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["packs/x", "/etc"] {
+            let expected = shown(LocalPath::new(text));
+            assert_eq!(shown(text.parse::<LocalPath>()), expected);
+            assert_eq!(shown(LocalPath::try_from(text)), expected);
+        }
+        assert!(LocalPath::new("packs/x").is_ok());
+        assert!(LocalPath::new("/etc").is_err());
     }
 }

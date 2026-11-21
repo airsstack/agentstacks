@@ -11,6 +11,7 @@
 //! - [`LockedSource`]: where a locked entry came from, a git commit or a project directory.
 //! - [`FileEntry`]: one file an install wrote, with its path, hash and owner.
 //! - [`MergeEntry`]: one merge an install made into a file it does not own.
+//! - [`EntryKey`]: what identifies one entry, so the duplicate refusal can name it.
 //! - [`Owner`]: the name of the pack or tool that wrote a file or merge.
 //! - [`MergeFile`]: the file a merge changed, as the lock records it.
 //! - [`MergeKey`]: the locator of the key a merge changed inside its file.
@@ -39,6 +40,8 @@ mod testing;
 
 #[doc(inline)]
 pub use airsl::check_airsl_presence;
+#[doc(inline)]
+pub use entry::EntryKey;
 #[doc(inline)]
 pub use entry::FileEntry;
 #[doc(inline)]

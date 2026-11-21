@@ -44,6 +44,30 @@ impl Invocation {
     /// Every value, in declaration order.
     pub const ALL: [Self; 2] = [Self::User, Self::Any];
 
+    /// Parses `value` as written in frontmatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FrontmatterError::NotOneOf`] when `value` is not one of [`Invocation::ALL`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::Invocation;
+    ///
+    /// assert_eq!(Invocation::new("user")?.as_str(), "user");
+    /// assert!(Invocation::new("anyone").is_err());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(value: &str) -> Result<Self, FrontmatterError> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_str() == value)
+            .ok_or_else(|| {
+                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
+            })
+    }
+
     /// The value as written in frontmatter.
     ///
     /// # Examples
@@ -72,12 +96,15 @@ impl FromStr for Invocation {
     type Err = FrontmatterError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|candidate| candidate.as_str() == value)
-            .ok_or_else(|| {
-                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
-            })
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for Invocation {
+    type Error = FrontmatterError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -105,5 +132,21 @@ mod tests {
     #[test]
     fn invocation_defaults_to_any() {
         assert_eq!(Invocation::default(), Invocation::Any);
+    }
+
+    #[test]
+    fn invocation_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<Invocation, FrontmatterError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["user", "anyone"] {
+            let expected = shown(Invocation::new(text));
+            assert_eq!(shown(text.parse::<Invocation>()), expected);
+            assert_eq!(shown(Invocation::try_from(text)), expected);
+        }
+        assert!(Invocation::new("user").is_ok());
+        assert!(Invocation::new("anyone").is_err());
     }
 }

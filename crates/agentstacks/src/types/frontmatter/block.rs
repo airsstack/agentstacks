@@ -23,6 +23,7 @@ use serde_saphyr::{DefaultMessageFormatter, MessageFormatter};
 
 use super::syntax::syntax_diagnostic;
 use crate::types::format::YamlValue;
+use crate::types::format::parse_yaml;
 use crate::types::frontmatter::body::BodyStart;
 use crate::types::frontmatter::error::FrontmatterError;
 use crate::types::report::Diagnostic;
@@ -130,7 +131,7 @@ impl<'a> Frontmatter<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn mapping(&self) -> Result<Vec<(String, YamlValue)>, Diagnostic> {
-        match serde_saphyr::from_str::<YamlValue>(self.yaml) {
+        match parse_yaml(self.yaml) {
             Ok(YamlValue::Map(entries)) => Ok(entries),
             Ok(other) => Err(Diagnostic::new(
                 Location::at_key(self.file, "frontmatter"),

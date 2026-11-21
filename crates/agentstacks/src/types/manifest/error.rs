@@ -21,7 +21,6 @@
 //! Where a refusal is located belongs to the [`Diagnostic`](crate::types::Diagnostic) that carries it, and
 //! which field raises which refusal belongs to the types that read the fields.
 
-use crate::types::api::API;
 use crate::types::hooks::HookEvent;
 use crate::types::hooks::InvalidHookEvent;
 use crate::types::hooks::InvalidPolicy;
@@ -34,7 +33,11 @@ use crate::types::name::InvalidEnvName;
 use crate::types::name::InvalidName;
 use crate::types::name::InvalidOptionName;
 use crate::types::name::PackName;
+use crate::types::report::ListedTwice;
+use crate::types::report::NotLuaFile;
+use crate::types::report::Quoted;
 use crate::types::report::TypeWord;
+use crate::types::report::UnsupportedApi;
 
 /// A refusal of a field of `pack.toml` or `native/<tool>/hooks.toml`.
 ///
@@ -43,10 +46,10 @@ use crate::types::report::TypeWord;
 /// ```
 /// use agentstacks::types::{InvalidVersion, ManifestError, PackVersion};
 ///
-/// let repeated = ManifestError::ListedTwice {
-///     text: "core".to_owned(),
+/// let kind = ManifestError::KindUnknown {
+///     text: "sh".to_owned(),
 /// };
-/// assert_eq!(repeated.to_string(), "\"core\" listed twice");
+/// assert_eq!(kind.to_string(), "\"sh\" (expected message, lua)");
 /// assert_eq!(
 ///     ManifestError::RequiresItself.to_string(),
 ///     "a pack cannot require itself"
@@ -90,25 +93,19 @@ pub enum ManifestError {
     #[error(transparent)]
     Event(#[from] InvalidHookEvent),
     /// A `pack.api` this agentstacks does not speak, for a pack with a valid name.
-    #[error("{pack}: api {api} not supported (this agentstacks speaks {})", API)]
-    ApiUnsupported {
+    #[error("{pack}: api {api}")]
+    PackUnsupportedApi {
         /// The pack that asked for the api.
         pack: PackName,
         /// The api asked for.
-        api: i64,
+        api: UnsupportedApi,
     },
     /// A `pack.api` this agentstacks does not speak, for a pack without a valid name.
-    #[error("{api} not supported (this agentstacks speaks {})", API)]
-    ApiUnsupportedUnnamed {
-        /// The api asked for.
-        api: i64,
-    },
+    #[error(transparent)]
+    UnsupportedApi(#[from] UnsupportedApi),
     /// A list entry that repeats an earlier one.
-    #[error("\"{text}\" listed twice")]
-    ListedTwice {
-        /// The repeated entry.
-        text: String,
-    },
+    #[error(transparent)]
+    ListedTwice(#[from] ListedTwice<Quoted>),
     /// A pack listed in its own `requires.packs`.
     #[error("a pack cannot require itself")]
     RequiresItself,
@@ -121,25 +118,22 @@ pub enum ManifestError {
         got: TypeWord,
     },
     /// A hook `run` that is not a Lua file.
-    #[error("\"{run}\" is not a .lua file")]
-    NotLuaFile {
-        /// The refused text.
-        run: String,
-    },
+    #[error(transparent)]
+    NotLuaFile(#[from] NotLuaFile),
     /// A hook `run` written in none of the three allowed forms.
     #[error("must be pack-relative, {{{{root}}}}/… or {{{{root <pack>}}}}/…")]
     RunForm,
     /// A grant path that is neither absolute nor starts with a token.
-    #[error("\"{path}\" must be absolute or start with a token")]
+    #[error("\"{text}\" must be absolute or start with a token")]
     GrantPath {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// An `exec` grant for a binary the pack does not require.
-    #[error("\"{name}\" is not in requires.binaries")]
+    #[error("\"{text}\" is not in requires.binaries")]
     NotInBinaries {
-        /// The refused name.
-        name: String,
+        /// The refused name, as written.
+        text: String,
     },
     /// A hook `kind` that is neither `message` nor `lua`.
     #[error("\"{text}\" (expected message, lua)")]
@@ -154,10 +148,10 @@ pub enum ManifestError {
         event: HookEvent,
     },
     /// A `match` value the event does not accept.
-    #[error("\"{value}\" not valid for {event}")]
+    #[error("\"{text}\" not valid for {event}")]
     MatchNotValid {
-        /// The refused value.
-        value: String,
+        /// The refused value, as written.
+        text: String,
         /// The event the hook is on.
         event: HookEvent,
     },
@@ -180,10 +174,10 @@ pub enum ManifestError {
     #[error("expected true or false")]
     ExpectedBool,
     /// A `render` entry that is code.
-    #[error("\"{path}\" is code; code is installed verbatim")]
+    #[error("\"{text}\" is code; code is installed verbatim")]
     RenderIsCode {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
 }
 
@@ -224,7 +218,7 @@ mod tests {
                 "\"\" must not be empty",
             ),
             (
-                ManifestError::from(InvalidExcludeGlob::NotAGlob { pattern: text("[") }),
+                ManifestError::from(InvalidExcludeGlob::NotAGlob { text: text("[") }),
                 "\"[\" is not a valid glob",
             ),
             (
@@ -245,18 +239,18 @@ mod tests {
     fn metadata_cases() -> Result<Cases, InvalidName> {
         Ok(vec![
             (
-                ManifestError::ApiUnsupported {
+                ManifestError::PackUnsupportedApi {
                     pack: PackName::new("sdlc")?,
-                    api: 1,
+                    api: UnsupportedApi::new(1),
                 },
                 "sdlc: api 1 not supported (this agentstacks speaks 0)",
             ),
             (
-                ManifestError::ApiUnsupportedUnnamed { api: 1 },
+                ManifestError::from(UnsupportedApi::new(1)),
                 "1 not supported (this agentstacks speaks 0)",
             ),
             (
-                ManifestError::ListedTwice { text: text("core") },
+                ManifestError::from(ListedTwice::text("core")),
                 "\"core\" listed twice",
             ),
             (
@@ -265,7 +259,7 @@ mod tests {
             ),
             (
                 ManifestError::RenderIsCode {
-                    path: text("x.lua"),
+                    text: text("x.lua"),
                 },
                 "\"x.lua\" is code; code is installed verbatim",
             ),
@@ -282,7 +276,7 @@ mod tests {
     fn hook_cases() -> Cases {
         vec![
             (
-                ManifestError::NotLuaFile { run: text("x.sh") },
+                ManifestError::from(NotLuaFile::new("x.sh")),
                 "\"x.sh\" is not a .lua file",
             ),
             (
@@ -290,11 +284,11 @@ mod tests {
                 "must be pack-relative, {{root}}/… or {{root <pack>}}/…",
             ),
             (
-                ManifestError::GrantPath { path: text("data") },
+                ManifestError::GrantPath { text: text("data") },
                 "\"data\" must be absolute or start with a token",
             ),
             (
-                ManifestError::NotInBinaries { name: text("git") },
+                ManifestError::NotInBinaries { text: text("git") },
                 "\"git\" is not in requires.binaries",
             ),
         ]
@@ -314,7 +308,7 @@ mod tests {
             ),
             (
                 ManifestError::MatchNotValid {
-                    value: text("bash"),
+                    text: text("bash"),
                     event: HookEvent::ToolBefore,
                 },
                 "\"bash\" not valid for tool.before",

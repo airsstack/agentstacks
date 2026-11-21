@@ -7,6 +7,7 @@
 //!
 //! - [`FileTree`]: a directory root with three reads below it, what an entry is, the names a directory holds and a file's bytes.
 //! - [`EntryKind`]: what an entry is, a file, a directory, a symlink or anything else, read without following a link.
+//! - `utf8_text`: a file's bytes as text, refused with the same `not valid UTF-8` as [`FileTree::read_text`].
 //!
 //! # Non-responsibilities
 //!
@@ -28,3 +29,5 @@ pub use tree::FileTree;
 #[cfg(test)]
 #[doc(inline)]
 pub use fake::FakeFileTree;
+
+pub(crate) use tree::utf8_text;

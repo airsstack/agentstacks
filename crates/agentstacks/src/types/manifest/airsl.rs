@@ -19,6 +19,7 @@
 //! whole set of packs; this type only guarantees what a held range may contain.
 
 use std::fmt;
+use std::str::FromStr;
 
 use semver::{Op, VersionReq};
 
@@ -107,6 +108,22 @@ const fn is_supported(op: Op) -> bool {
     )
 }
 
+impl FromStr for AirslReq {
+    type Err = InvalidAirslReq;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for AirslReq {
+    type Error = InvalidAirslReq;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,5 +192,21 @@ mod tests {
             Diagnostic::new(location, error).to_string(),
             "packs/core/pack.toml: requires.airsl: \">=0.1\" uses an operator this agentstacks does not support"
         );
+    }
+
+    #[test]
+    fn airsl_req_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<AirslReq, InvalidAirslReq>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in [">= 0.1.4", "nope"] {
+            let expected = shown(AirslReq::new(text));
+            assert_eq!(shown(text.parse::<AirslReq>()), expected);
+            assert_eq!(shown(AirslReq::try_from(text)), expected);
+        }
+        assert!(AirslReq::new(">= 0.1.4").is_ok());
+        assert!(AirslReq::new("nope").is_err());
     }
 }

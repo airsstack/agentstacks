@@ -14,6 +14,9 @@
 //! The generic shapes (required, wrong type, empty) belong to [`FieldError`](crate::types::FieldError).
 //! Deciding when a variant applies belongs to the checks over the frontmatter.
 
+use crate::types::report::ListedTwice;
+use crate::types::report::ParserMessage;
+use crate::types::report::Quoted;
 use crate::types::report::TypeWord;
 
 /// A frontmatter refusal with its own wording.
@@ -25,7 +28,7 @@ use crate::types::report::TypeWord;
 ///
 /// assert_eq!(FrontmatterError::Missing.to_string(), "missing frontmatter");
 /// assert_eq!(
-///     FrontmatterError::UnknownKey { key: "colour".to_owned() }.to_string(),
+///     FrontmatterError::UnknownKey { text: "colour".to_owned() }.to_string(),
 ///     "unknown key \"colour\"",
 /// );
 /// ```
@@ -38,7 +41,7 @@ pub enum FrontmatterError {
     #[error("{message}{}", if *quoting_hint { " (a value starting with {{ must be quoted)" } else { "" })]
     Syntax {
         /// The parser's own message.
-        message: String,
+        message: ParserMessage,
         /// Whether to add the hint that a value starting with `{{` must be quoted.
         quoting_hint: bool,
     },
@@ -58,44 +61,41 @@ pub enum FrontmatterError {
     #[error("name must be a literal")]
     NameNotLiteral,
     /// `name` differs from the directory or file stem the item lives at.
-    #[error("name \"{found}\" does not match \"{expected}\"")]
+    #[error("name \"{text}\" does not match \"{expected}\"")]
     NameMismatch {
         /// The `name` the frontmatter holds.
-        found: String,
+        text: String,
         /// The name the directory or file stem gives.
         expected: String,
     },
     /// A key the frontmatter does not define.
-    #[error("unknown key \"{key}\"")]
+    #[error("unknown key \"{text}\"")]
     UnknownKey {
         /// The refused key.
-        key: String,
+        text: String,
     },
     /// A value outside a fixed vocabulary.
-    #[error("\"{value}\" (expected {allowed})")]
+    #[error("\"{text}\" (expected {allowed})")]
     NotOneOf {
         /// The refused value.
-        value: String,
+        text: String,
         /// The allowed values, joined with `", "`.
         allowed: String,
     },
     /// An entry of `tools` that is not an agent tool.
-    #[error("unknown \"{value}\"")]
+    #[error("unknown \"{text}\"")]
     UnknownTool {
         /// The refused tool.
-        value: String,
+        text: String,
     },
     /// An entry of `tools` that is listed more than once.
-    #[error("\"{value}\" listed twice")]
-    DuplicateTool {
-        /// The repeated tool.
-        value: String,
-    },
+    #[error(transparent)]
+    ListedTwice(#[from] ListedTwice<Quoted>),
     /// A key of `native` that is not a valid tool name.
-    #[error("\"{value}\" is not a valid tool name")]
+    #[error("\"{text}\" is not a valid tool name")]
     InvalidToolName {
         /// The refused key.
-        value: String,
+        text: String,
     },
 }
 
@@ -103,7 +103,7 @@ impl FrontmatterError {
     /// A [`FrontmatterError::NotOneOf`] for `value`, listing `allowed` joined with `", "`.
     pub(crate) fn not_one_of<'a>(value: &str, allowed: impl IntoIterator<Item = &'a str>) -> Self {
         Self::NotOneOf {
-            value: value.to_owned(),
+            text: value.to_owned(),
             allowed: allowed.into_iter().collect::<Vec<_>>().join(", "),
         }
     }
@@ -132,39 +132,37 @@ mod tests {
             ),
             (
                 FrontmatterError::NameMismatch {
-                    found: "x".to_owned(),
+                    text: "x".to_owned(),
                     expected: "y".to_owned(),
                 },
                 "name \"x\" does not match \"y\"",
             ),
             (
                 FrontmatterError::UnknownKey {
-                    key: "disable-model-invocation".to_owned(),
+                    text: "disable-model-invocation".to_owned(),
                 },
                 "unknown key \"disable-model-invocation\"",
             ),
             (
                 FrontmatterError::NotOneOf {
-                    value: "manual".to_owned(),
+                    text: "manual".to_owned(),
                     allowed: "user, any".to_owned(),
                 },
                 "\"manual\" (expected user, any)",
             ),
             (
                 FrontmatterError::UnknownTool {
-                    value: "bash".to_owned(),
+                    text: "bash".to_owned(),
                 },
                 "unknown \"bash\"",
             ),
             (
-                FrontmatterError::DuplicateTool {
-                    value: "read".to_owned(),
-                },
+                FrontmatterError::from(ListedTwice::text("read")),
                 "\"read\" listed twice",
             ),
             (
                 FrontmatterError::InvalidToolName {
-                    value: "Claude".to_owned(),
+                    text: "Claude".to_owned(),
                 },
                 "\"Claude\" is not a valid tool name",
             ),
@@ -182,7 +180,7 @@ mod tests {
 
     #[test]
     fn syntax_error_appends_quoting_hint_only_when_set() {
-        let message = "expected string scalar".to_owned();
+        let message = ParserMessage::new("expected string scalar");
         let hinted = FrontmatterError::Syntax {
             message: message.clone(),
             quoting_hint: true,

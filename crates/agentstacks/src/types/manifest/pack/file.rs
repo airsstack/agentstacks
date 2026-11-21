@@ -19,6 +19,7 @@
 //! `SKILL.md`, a `requires.airsl` being present when the pack holds Lua) belong to the pack
 //! loader, and rules that need the whole set of packs belong to the set checks.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::types::api::API;
@@ -35,6 +36,7 @@ use crate::types::name::BinaryName;
 use crate::types::name::OptionName;
 use crate::types::name::PackName;
 use crate::types::report::Diagnostics;
+use crate::types::report::UnsupportedApi;
 use crate::types::tokens::LocatedToken;
 
 /// A parsed `pack.toml`.
@@ -67,7 +69,7 @@ pub struct PackManifest {
     requires: Requires,
     render: Vec<PackPath>,
     exclude: Vec<ExcludeGlob>,
-    options: Vec<(OptionName, OptionDecl)>,
+    options: BTreeMap<OptionName, OptionDecl>,
     hooks: Vec<Hook>,
     tokens: Vec<LocatedToken>,
 }
@@ -201,9 +203,9 @@ impl PackManifest {
         &self.tokens
     }
 
-    /// The options the pack declares, in name order.
+    /// The options the pack declares, keyed and sorted by name.
     #[must_use]
-    pub fn options(&self) -> &[(OptionName, OptionDecl)] {
+    pub const fn options(&self) -> &BTreeMap<OptionName, OptionDecl> {
         &self.options
     }
 }
@@ -236,11 +238,11 @@ fn read_identity(pack: &mut TomlFields) -> (Option<PackName>, Option<Identity>) 
     let api = pack.required_integer("api");
     if let Some(api) = api.filter(|api| *api != API) {
         match &name {
-            Some(pack_name) => pack.refuse_at_file(ManifestError::ApiUnsupported {
+            Some(pack_name) => pack.refuse_at_file(ManifestError::PackUnsupportedApi {
                 pack: pack_name.clone(),
-                api,
+                api: UnsupportedApi::new(api),
             }),
-            None => pack.refuse("api", ManifestError::ApiUnsupportedUnnamed { api }),
+            None => pack.refuse("api", ManifestError::from(UnsupportedApi::new(api))),
         }
     }
     let description = pack.required_text("description");
@@ -265,7 +267,7 @@ fn read_render(root: &mut TomlFields) -> Vec<PackPath> {
         match PackPath::new(&text) {
             Err(error) => root.refuse_path(&item_path, ManifestError::from(error)),
             Ok(path) if path.has_extension("lua") || path.has_extension("sh") => {
-                root.refuse_path(&item_path, ManifestError::RenderIsCode { path: text });
+                root.refuse_path(&item_path, ManifestError::RenderIsCode { text });
             }
             Ok(path) => paths.push(path),
         }
@@ -276,8 +278,8 @@ fn read_render(root: &mut TomlFields) -> Vec<PackPath> {
 /// Reads `[options]`: one declaration per option, keyed by a valid option name.
 ///
 /// A bad name is refused but its declaration is still read, so every error of the entry shows.
-fn read_options(root: &mut TomlFields) -> Vec<(OptionName, OptionDecl)> {
-    let mut declared = Vec::new();
+fn read_options(root: &mut TomlFields) -> BTreeMap<OptionName, OptionDecl> {
+    let mut declared = BTreeMap::new();
     let Some(mut options) = root.optional_table("options") else {
         return declared;
     };
@@ -291,7 +293,7 @@ fn read_options(root: &mut TomlFields) -> Vec<(OptionName, OptionDecl)> {
             decl
         });
         if let (Some(name), Some(decl)) = (name, decl) {
-            declared.push((name, decl));
+            declared.insert(name, decl);
         }
     }
     root.absorb(options);
@@ -584,10 +586,14 @@ binaries = ["git"]
                         .collect::<Vec<_>>()
                 )
             })?;
-        let names: Vec<&str> = manifest.options().iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> = manifest.options().keys().map(OptionName::as_str).collect();
         assert_eq!(names, ["archive_keep"]);
         assert_eq!(
-            manifest.options().first().map(|(_, d)| d.option_type()),
+            manifest
+                .options()
+                .values()
+                .next()
+                .map(OptionDecl::option_type),
             Some(OptionType::Integer)
         );
         Ok(())

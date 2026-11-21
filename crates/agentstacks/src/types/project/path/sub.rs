@@ -19,6 +19,7 @@
 //! belong to the code that reads it.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::project::InvalidSubPath;
 use crate::types::report::FieldError;
@@ -87,6 +88,22 @@ impl fmt::Display for SubPath {
     }
 }
 
+impl FromStr for SubPath {
+    type Err = InvalidSubPath;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for SubPath {
+    type Error = InvalidSubPath;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,5 +150,21 @@ mod tests {
             assert_eq!(SubPath::new(text)?.normalized(), expected, "{text}");
         }
         Ok(())
+    }
+
+    #[test]
+    fn sub_path_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<SubPath, InvalidSubPath>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["a/b", "../core"] {
+            let expected = shown(SubPath::new(text));
+            assert_eq!(shown(text.parse::<SubPath>()), expected);
+            assert_eq!(shown(SubPath::try_from(text)), expected);
+        }
+        assert!(SubPath::new("a/b").is_ok());
+        assert!(SubPath::new("../core").is_err());
     }
 }

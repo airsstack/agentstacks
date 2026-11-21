@@ -12,6 +12,7 @@
 //! - [`ContentHash`]: a `sha256:` digest in the form the lock pins, parsed from text or computed from bytes.
 //! - [`ContentHashError`]: the refusal for text that is not a content hash.
 //! - [`tree_hash()`]: the deterministic hash of every file path and content under a tree.
+//! - `hash_walked`: the same hash over a walk the caller already holds, each file read once.
 //!
 //! # Non-responsibilities
 //!
@@ -39,3 +40,5 @@ pub use walk::WalkError;
 pub use walk::Walked;
 #[doc(inline)]
 pub use walk::walk;
+
+pub(crate) use hash::hash_walked;

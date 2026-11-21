@@ -87,7 +87,7 @@ impl NativeHook {
     /// Reads the `[[hooks]]` item behind `fields`, refusing what is wrong in it.
     ///
     /// `binaries` are the pack's `requires.binaries`; every token found is appended to `tokens`.
-    pub(crate) fn read(
+    pub(in crate::types) fn read(
         fields: &mut TomlFields,
         binaries: &[BinaryName],
         tokens: &mut Vec<LocatedToken>,
@@ -136,7 +136,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::parse_toml_document;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

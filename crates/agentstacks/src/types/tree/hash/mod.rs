@@ -9,6 +9,7 @@
 //!   from bytes.
 //! - [`ContentHashError`]: the refusal for text that is not a content hash.
 //! - [`tree_hash()`]: the deterministic hash of every file path and content under a tree.
+//! - `hash_walked`: the same hash over a walk the caller already holds, each file read once.
 //!
 //! # Non-responsibilities
 //!
@@ -26,3 +27,5 @@ pub use content::ContentHash;
 pub use error::ContentHashError;
 #[doc(inline)]
 pub use tree::tree_hash;
+
+pub(crate) use tree::hash_walked;

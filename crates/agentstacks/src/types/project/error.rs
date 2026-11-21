@@ -17,7 +17,7 @@
 //! Where a refusal is located belongs to the [`Diagnostic`](crate::types::Diagnostic) that carries
 //! it.
 
-use crate::types::api::API;
+use crate::types::report::UnsupportedApi;
 
 /// A refusal of `agentstacks.toml` as a whole or of an entry's name.
 ///
@@ -26,21 +26,14 @@ use crate::types::api::API;
 /// ```
 /// use agentstacks::types::ProjectError;
 ///
-/// assert_eq!(
-///     ProjectError::UnsupportedApi { found: 1 }.to_string(),
-///     "api 1 not supported (this agentstacks speaks 0)"
-/// );
 /// assert_eq!(ProjectError::NothingToInstall.to_string(), "nothing to install");
 /// assert_eq!(ProjectError::InvalidName.to_string(), "not a valid name");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ProjectError {
     /// An `api` this agentstacks does not speak.
-    #[error("api {found} not supported (this agentstacks speaks {})", API)]
-    UnsupportedApi {
-        /// The api the file asks for.
-        found: i64,
-    },
+    #[error("api {0}")]
+    UnsupportedApi(#[from] UnsupportedApi),
     /// A file that lists no tool or no pack.
     #[error("nothing to install")]
     NothingToInstall,
@@ -56,7 +49,7 @@ mod tests {
     #[test]
     fn project_error_messages_are_the_refusal_texts() {
         assert_eq!(
-            ProjectError::UnsupportedApi { found: 1 }.to_string(),
+            ProjectError::from(UnsupportedApi::new(1)).to_string(),
             "api 1 not supported (this agentstacks speaks 0)"
         );
         assert_eq!(

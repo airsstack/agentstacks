@@ -13,12 +13,12 @@
 //! # Non-responsibilities
 //!
 //! Reading and checking the frontmatter belongs to the frontmatter parsers, and deciding which
-//! files are installed belongs to [`InstallSet`].
+//! files are installed belongs to the pack's install set.
 
 use crate::types::frontmatter::AgentMeta;
 use crate::types::frontmatter::SkillMeta;
 use crate::types::name::ItemName;
-use crate::types::pack::install::set::InstallSet;
+use crate::types::pack::install::InstallSet;
 use crate::types::pack::layout::SKILLS_DIR;
 use crate::types::tree::TreePath;
 
@@ -48,7 +48,11 @@ impl PackSkill {
     /// A skill whose directory holds `inside` (paths relative to the directory), keeping the
     /// files `install` installs.
     #[must_use]
-    pub fn from_installed(meta: SkillMeta, install: &InstallSet, inside: &[TreePath]) -> Self {
+    pub(in crate::types::pack) fn from_installed(
+        meta: SkillMeta,
+        install: &InstallSet,
+        inside: &[TreePath],
+    ) -> Self {
         let name = meta.name().clone();
         let files = inside
             .iter()
@@ -104,7 +108,7 @@ pub struct PackAgent {
 impl PackAgent {
     /// An agent read from `file`, a path relative to the pack root.
     #[must_use]
-    pub const fn new(meta: AgentMeta, file: TreePath) -> Self {
+    pub(in crate::types::pack) const fn new(meta: AgentMeta, file: TreePath) -> Self {
         Self { meta, file }
     }
 

@@ -10,23 +10,13 @@
 //!
 //! # Non-responsibilities
 //!
-//! Applying the rule belongs to the reader of a source entry, [`SourceFields`](crate::types::SourceFields).
+//! Applying the rule belongs to the reader of a source entry,
+//! [`SourceFields`](crate::types::project::SourceFields).
 
-/// Which pin keys a git source must carry.
-///
-/// # Examples
-///
-/// ```
-/// use agentstacks::types::PinRule;
-///
-/// // The project file pins by exactly one key; the lock always records the commit.
-/// let rule = PinRule::RevRequired;
-/// assert_ne!(rule, PinRule::ExactlyOneOfTagRev);
-/// let copy = rule;
-/// assert_eq!(rule, copy);
-/// ```
+/// Which pin keys a git source must carry: the project file pins by exactly one key, and the lock
+/// always records the commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PinRule {
+pub(in crate::types) enum PinRule {
     /// Exactly one of `tag` and `rev`.
     ExactlyOneOfTagRev,
     /// `rev` is required and `tag` is optional.

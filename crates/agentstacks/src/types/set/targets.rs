@@ -48,7 +48,7 @@ enum Reach<'a> {
 /// Refuses every token of the loaded `packs` that aims at an unrequired pack, at an item another
 /// required pack does not ship, or at an option its own pack does not declare. `packs` are keyed
 /// by their `[packs.*]` name.
-pub(crate) fn check_token_targets(packs: &BTreeMap<PackName, Pack>) -> Vec<Diagnostic> {
+pub(super) fn check_token_targets(packs: &BTreeMap<PackName, Pack>) -> Vec<Diagnostic> {
     let mut refusals = Vec::new();
     for (key, pack) in packs {
         for found in pack.tokens() {
@@ -77,11 +77,7 @@ fn refusal(
             Reach::Own | Reach::Required(_) => None,
         },
         TokenTarget::Option(option) => {
-            let declared = pack
-                .manifest()
-                .options()
-                .iter()
-                .any(|(name, _)| name == option);
+            let declared = pack.manifest().options().contains_key(option);
             (!declared).then(|| {
                 SetError::NoSuchOption {
                     pack: key.clone(),
@@ -123,7 +119,7 @@ fn item_refusal(
         PackError::NoSuchItem {
             pack: target.clone(),
             kind,
-            item: item.item().to_string(),
+            item: item.item().clone(),
         }
         .into()
     })

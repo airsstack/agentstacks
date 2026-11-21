@@ -142,8 +142,8 @@ fn located_tree_path(dir: &Path, relative: &Path) -> Result<TreePath, Diagnostic
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FormatError;
     use crate::types::port::FakeFileTree;
+    use crate::types::report::FormatError;
 
     const SYMLINK: &str = "symlinks are not allowed in a pack";
     const SPECIAL: &str = "only regular files and directories are allowed";

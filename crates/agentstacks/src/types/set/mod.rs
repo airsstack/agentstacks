@@ -25,14 +25,14 @@
 
 pub mod airsl;
 pub mod check;
-pub mod clash;
+mod clash;
 pub mod error;
-pub mod fetched;
-pub mod graph;
-pub mod interval;
-pub mod options;
-pub mod runs;
-pub mod targets;
+mod fetched;
+mod graph;
+mod interval;
+mod options;
+mod runs;
+mod targets;
 #[cfg(test)]
 mod testing;
 pub mod valid;

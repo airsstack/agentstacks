@@ -6,8 +6,8 @@
 //! # Responsibilities
 //!
 //! - [`Source`]: a git repository with a pin, or a directory in the project.
-//! - [`SourceFields`]: the checked source keys (`git`, `path`, `tag`, `rev`, `subdir`) of one
-//!   entry, read under a pin rule.
+//! - `SourceFields` (crate-internal): the checked source keys (`git`, `path`, `tag`, `rev`,
+//!   `subdir`) of one entry, read under a pin rule.
 //! - [`SourceError`]: the refusals of the source values, wrapping the refusals of their parts.
 //!
 //! # Non-responsibilities
@@ -17,12 +17,11 @@
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
 pub mod error;
-pub mod fields;
+mod fields;
 pub mod kind;
 
 #[doc(inline)]
 pub use error::SourceError;
-#[doc(inline)]
-pub use fields::SourceFields;
+pub(in crate::types) use fields::SourceFields;
 #[doc(inline)]
 pub use kind::Source;

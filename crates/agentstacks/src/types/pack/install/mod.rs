@@ -5,9 +5,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`InstallSet`]: which files of a pack are installed and which of those are rendered.
-//! - [`check_airsl_declared()`]: refuses a pack with `.lua` files and no `requires.airsl`.
-//! - [`check_something_to_install()`]: refuses a pack that installs no skill, agent or hook.
+//! - `InstallSet`: which files of a pack are installed and which of those are rendered.
+//! - `check_airsl_declared`: refuses a pack with `.lua` files and no `requires.airsl`.
+//! - `check_something_to_install`: refuses a pack that installs no skill, agent or hook.
 //!
 //! # Non-responsibilities
 //!
@@ -15,12 +15,8 @@
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-pub mod checks;
-pub mod set;
+mod checks;
+mod set;
 
-#[doc(inline)]
-pub use checks::check_airsl_declared;
-#[doc(inline)]
-pub use checks::check_something_to_install;
-#[doc(inline)]
-pub use set::InstallSet;
+pub(in crate::types::pack) use checks::{check_airsl_declared, check_something_to_install};
+pub(in crate::types::pack) use set::{InstallSet, is_excluded_by};

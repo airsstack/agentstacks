@@ -10,6 +10,9 @@
 //!   nothing; symlinks, special files and non-UTF-8 paths are refused with the walker's
 //!   diagnostics, and every walkable file is still read, so an unreadable file is reported in the
 //!   same run. Nothing is excluded: a file a pack manifest excludes is still hashed.
+//! - `hash_walked` is the hashing half on its own: it reads each file of a walk the caller already
+//!   holds exactly once and hands the caller every file's bytes, so a loader that walks and reads a
+//!   directory itself gets the same tree hash without a second walk or a second read.
 //! - The hash covers raw bytes: no line-ending normalisation, and file modes are never read.
 //!
 //! # Non-responsibilities
@@ -20,8 +23,13 @@
 use std::path::Path;
 
 use crate::types::port::FileTree;
+use crate::types::report::Diagnostic;
+use crate::types::report::Diagnostics;
+use crate::types::report::Location;
 use crate::types::tree::hash::content::ContentHash;
-use crate::types::{Diagnostic, Diagnostics, Location, TreePath, walk};
+use crate::types::tree::path::TreePath;
+use crate::types::tree::walk::Walked;
+use crate::types::tree::walk::walk;
 
 /// Hashes the tree behind `tree`.
 ///
@@ -45,21 +53,42 @@ use crate::types::{Diagnostic, Diagnostics, Location, TreePath, walk};
 /// ```
 pub fn tree_hash<T: FileTree>(tree: &T) -> Result<ContentHash, Diagnostics> {
     let (walked, mut diagnostics) = walk(tree);
+    match hash_walked(tree, &walked, &mut diagnostics, |_, _| {}) {
+        Some(hash) if diagnostics.is_empty() => Ok(hash),
+        _ => Err(diagnostics),
+    }
+}
+
+/// Reads every file of `walked`, the walk of `tree`, exactly once and returns their tree hash,
+/// handing each file's path and bytes to `keep` after hashing them.
+///
+/// A file that cannot be read is pushed onto `diagnostics`, located at its own path under the
+/// tree's root, and the result is `None`: a tree with an unread file has no hash. The walk's own
+/// refusals are the caller's to report; they do not change the result.
+pub(crate) fn hash_walked<T: FileTree>(
+    tree: &T,
+    walked: &Walked,
+    diagnostics: &mut Diagnostics,
+    mut keep: impl FnMut(&TreePath, Vec<u8>),
+) -> Option<ContentHash> {
     let mut entries = Vec::with_capacity(walked.files().len());
+    let mut unread = false;
     for path in walked.files() {
         match tree.read_file(Path::new(path.as_str())) {
-            Ok(bytes) => entries.push((path.clone(), ContentHash::of_bytes(&bytes))),
-            Err(error) => diagnostics.push(Diagnostic::new(
-                Location::file(tree.root().join(path.as_str())),
-                error,
-            )),
+            Ok(bytes) => {
+                entries.push((path.clone(), ContentHash::of_bytes(&bytes)));
+                keep(path, bytes);
+            }
+            Err(error) => {
+                unread = true;
+                diagnostics.push(Diagnostic::new(
+                    Location::file(tree.root().join(path.as_str())),
+                    error,
+                ));
+            }
         }
     }
-    if diagnostics.is_empty() {
-        Ok(combine(entries))
-    } else {
-        Err(diagnostics)
-    }
+    (!unread).then(|| combine(entries))
 }
 
 /// Combines per-file hashes into the tree hash without touching the disk.
@@ -235,5 +264,50 @@ mod tests {
                 format!("{ROOT}/b/c.lua: {}", FakeFileTree::denied())
             ]
         );
+    }
+
+    #[test]
+    fn hash_walked_matches_tree_hash_and_reads_each_file_once() {
+        let tree = example_tree();
+        let (walked, mut diagnostics) = walk(&tree);
+        let mut kept = Vec::new();
+        let hash = hash_walked(&tree, &walked, &mut diagnostics, |path, bytes| {
+            kept.push((path.as_str().to_owned(), bytes));
+        });
+        assert!(diagnostics.is_empty());
+        assert_eq!(hash.map(|h| h.to_string()).as_deref(), Some(EXAMPLE_HASH));
+        assert_eq!(
+            kept,
+            [
+                ("a.md".to_owned(), b"a\n".to_vec()),
+                ("b/c.lua".to_owned(), b"x\n".to_vec())
+            ]
+        );
+    }
+
+    #[test]
+    fn hash_walked_has_no_hash_when_a_file_cannot_be_read() {
+        let tree = example_tree().unreadable("a.md");
+        let (walked, mut diagnostics) = walk(&tree);
+        let mut kept = Vec::new();
+        let hash = hash_walked(&tree, &walked, &mut diagnostics, |path, _| {
+            kept.push(path.as_str().to_owned());
+        });
+        assert!(hash.is_none());
+        assert_eq!(kept, ["b/c.lua"]);
+        assert_eq!(
+            messages(Err(diagnostics)),
+            [format!("{ROOT}/a.md: {}", FakeFileTree::denied())]
+        );
+    }
+
+    #[test]
+    fn hash_walked_leaves_walk_refusals_to_the_caller() {
+        let tree = example_tree().symlink("link");
+        let (walked, mut diagnostics) = walk(&tree);
+        let before = diagnostics.len();
+        let hash = hash_walked(&tree, &walked, &mut diagnostics, |_, _| {});
+        assert_eq!(hash.map(|h| h.to_string()).as_deref(), Some(EXAMPLE_HASH));
+        assert_eq!(diagnostics.len(), before);
     }
 }

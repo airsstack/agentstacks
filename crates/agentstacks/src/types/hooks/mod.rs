@@ -14,7 +14,8 @@
 //! - [`HookRun`]: a Lua hook's `run`: as written, the pack it names and its pack-relative path.
 //! - [`Grants`]: what a Lua hook may touch: paths, environment variables and binaries.
 //! - [`Policy`]: the sandbox policy, `confined` or `pure`.
-//! - [`InvalidHookEvent`], [`InvalidPolicy`]: the refusal [`HookEvent`] and [`Policy`] return.
+//! - [`InvalidHookEvent`], [`InvalidMatchValue`], [`InvalidPolicy`]: the refusals [`HookEvent`],
+//!   [`MatchValue`] and [`Policy`] return.
 //! - [`NativeHook`]: a hook of a tool's own event vocabulary, kept opaque.
 //! - [`NativeHooks`]: a whole `native/<tool>/hooks.toml`.
 //!
@@ -46,6 +47,8 @@ pub use event::HookEvent;
 pub use grants::Grants;
 #[doc(inline)]
 pub use invalid::InvalidHookEvent;
+#[doc(inline)]
+pub use invalid::InvalidMatchValue;
 #[doc(inline)]
 pub use invalid::InvalidPolicy;
 #[doc(inline)]

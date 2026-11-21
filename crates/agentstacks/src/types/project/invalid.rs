@@ -21,6 +21,8 @@
 //! Whether a URL is reachable, a tag or commit exists, or a directory exists is decided when it
 //! is fetched or read.
 
+use crate::types::report::phrase::OUTSIDE_PROJECT;
+
 /// A text that cannot be a [`GitUrl`](crate::types::GitUrl).
 ///
 /// # Examples
@@ -116,7 +118,7 @@ pub enum InvalidLocalPath {
     #[error("absolute paths are not portable")]
     AbsolutePath,
     /// A path whose `..` segments climb above the project directory.
-    #[error("must stay inside the project")]
+    #[error("{}", OUTSIDE_PROJECT)]
     OutsideProject,
 }
 

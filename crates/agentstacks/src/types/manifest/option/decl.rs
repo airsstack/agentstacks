@@ -47,7 +47,7 @@ use crate::types::manifest::error::ManifestError;
 /// "#;
 /// let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), text)
 ///     .map_err(|found| format!("{found:?}"))?;
-/// let (name, option) = manifest.options().first().ok_or("one option")?;
+/// let (name, option) = manifest.options().first_key_value().ok_or("one option")?;
 /// assert_eq!(name.as_str(), "retries");
 /// assert_eq!(option.option_type(), OptionType::Integer);
 /// assert_eq!(option.default(), Some(&OptionValue::Integer(3)));
@@ -96,9 +96,9 @@ impl OptionDecl {
     ///
     /// Returns the declaration when `type`, `default` and `description` are valid; an unknown key
     /// is refused without withholding it.
-    pub(crate) fn read(fields: &mut TomlFields) -> Option<Self> {
+    pub(in crate::types) fn read(fields: &mut TomlFields) -> Option<Self> {
         let option_type = fields.required_text("type").and_then(|text| {
-            OptionType::parse(&text)
+            OptionType::new(&text)
                 .map_err(|error| fields.refuse("type", ManifestError::from(error)))
                 .ok()
         });
@@ -157,7 +157,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::parse_toml_document;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

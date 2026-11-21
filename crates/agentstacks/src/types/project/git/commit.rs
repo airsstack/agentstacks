@@ -81,6 +81,14 @@ impl fmt::Display for CommitId {
     }
 }
 
+impl TryFrom<&str> for CommitId {
+    type Error = InvalidCommitId;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,5 +126,21 @@ mod tests {
         }
         let shown = CommitId::new("").err().map(|e| e.to_string());
         assert_eq!(shown.as_deref(), Some("empty"));
+    }
+
+    #[test]
+    fn commit_id_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<CommitId, InvalidCommitId>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["0123456789abcdef0123456789abcdef01234567", "0123abc"] {
+            let expected = shown(CommitId::new(text));
+            assert_eq!(shown(text.parse::<CommitId>()), expected);
+            assert_eq!(shown(CommitId::try_from(text)), expected);
+        }
+        assert!(CommitId::new("0123456789abcdef0123456789abcdef01234567").is_ok());
+        assert!(CommitId::new("0123abc").is_err());
     }
 }

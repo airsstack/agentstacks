@@ -45,6 +45,30 @@ impl ModelTier {
     /// Every value, in declaration order.
     pub const ALL: [Self; 3] = [Self::Fast, Self::Balanced, Self::Deep];
 
+    /// Parses `value` as written in frontmatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FrontmatterError::NotOneOf`] when `value` is not one of [`ModelTier::ALL`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::ModelTier;
+    ///
+    /// assert_eq!(ModelTier::new("deep")?.as_str(), "deep");
+    /// assert!(ModelTier::new("huge").is_err());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(value: &str) -> Result<Self, FrontmatterError> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_str() == value)
+            .ok_or_else(|| {
+                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
+            })
+    }
+
     /// The value as written in frontmatter.
     ///
     /// # Examples
@@ -74,12 +98,15 @@ impl FromStr for ModelTier {
     type Err = FrontmatterError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|candidate| candidate.as_str() == value)
-            .ok_or_else(|| {
-                FrontmatterError::not_one_of(value, Self::ALL.into_iter().map(Self::as_str))
-            })
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for ModelTier {
+    type Error = FrontmatterError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -113,5 +140,21 @@ mod tests {
             refused.as_deref(),
             Some("\"sonnet\" (expected fast, balanced, deep)")
         );
+    }
+
+    #[test]
+    fn model_tier_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<ModelTier, FrontmatterError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["deep", "huge"] {
+            let expected = shown(ModelTier::new(text));
+            assert_eq!(shown(text.parse::<ModelTier>()), expected);
+            assert_eq!(shown(ModelTier::try_from(text)), expected);
+        }
+        assert!(ModelTier::new("deep").is_ok());
+        assert!(ModelTier::new("huge").is_err());
     }
 }

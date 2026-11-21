@@ -29,14 +29,14 @@ type Triple = (u64, u64, u64);
 
 /// The release versions from `lower` up to, not including, `upper`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct VersionInterval {
+pub(super) struct VersionInterval {
     lower: Triple,
     upper: Option<Triple>,
 }
 
 impl VersionInterval {
     /// Every release version.
-    pub(crate) const UNBOUNDED: Self = Self {
+    pub(super) const UNBOUNDED: Self = Self {
         lower: (0, 0, 0),
         upper: None,
     };
@@ -48,7 +48,7 @@ impl VersionInterval {
     };
 
     /// The release versions every comparator of `req` admits.
-    pub(crate) fn of_req(req: &VersionReq) -> Self {
+    pub(super) fn of_req(req: &VersionReq) -> Self {
         req.comparators
             .iter()
             .map(Self::of_comparator)
@@ -86,7 +86,7 @@ impl VersionInterval {
     }
 
     /// The versions both intervals admit.
-    pub(crate) fn intersect(&self, other: &Self) -> Self {
+    pub(super) fn intersect(&self, other: &Self) -> Self {
         let upper = match (self.upper, other.upper) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (bound, None) | (None, bound) => bound,
@@ -98,7 +98,7 @@ impl VersionInterval {
     }
 
     /// Whether no version is admitted.
-    pub(crate) fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.upper.is_some_and(|upper| upper <= self.lower)
     }
 }

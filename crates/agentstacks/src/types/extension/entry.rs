@@ -18,8 +18,10 @@
 //! extension loader.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::extension::error::ExtensionError;
+use crate::types::report::NotLuaFile;
 
 /// A path inside an extension that ends in `.lua`.
 ///
@@ -43,7 +45,7 @@ impl EntryPath {
     /// # Errors
     ///
     /// Returns [`ExtensionError::EntryOutside`] when `value` starts with `/` or has a `..`
-    /// segment, and otherwise [`ExtensionError::EntryNotLua`] when it does not end in `.lua`.
+    /// segment, and otherwise [`ExtensionError::NotLuaFile`] when it does not end in `.lua`.
     ///
     /// # Examples
     ///
@@ -63,13 +65,11 @@ impl EntryPath {
     pub fn new(value: &str) -> Result<Self, ExtensionError> {
         if value.starts_with('/') || value.split('/').any(|segment| segment == "..") {
             return Err(ExtensionError::EntryOutside {
-                value: value.to_owned(),
+                text: value.to_owned(),
             });
         }
         if !value.as_bytes().ends_with(b".lua") {
-            return Err(ExtensionError::EntryNotLua {
-                value: value.to_owned(),
-            });
+            return Err(NotLuaFile::new(value).into());
         }
         Ok(Self(value.to_owned()))
     }
@@ -100,6 +100,22 @@ impl EntryPath {
             rest = tail.trim_start_matches('/');
         }
         rest
+    }
+}
+
+impl FromStr for EntryPath {
+    type Err = ExtensionError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for EntryPath {
+    type Error = ExtensionError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -182,6 +198,27 @@ mod tests {
         for value in ["a..b.lua", "lib/.x.lua"] {
             assert_eq!(EntryPath::new(value)?.as_str(), value);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn entry_path_from_str_and_try_from_match_new() -> TestResult {
+        assert_eq!(
+            "adapter.lua".parse::<EntryPath>()?,
+            EntryPath::new("adapter.lua")?
+        );
+        assert_eq!(
+            EntryPath::try_from("lib/a.lua")?,
+            EntryPath::new("lib/a.lua")?
+        );
+        assert_eq!(
+            "../a.lua".parse::<EntryPath>().err(),
+            EntryPath::new("../a.lua").err()
+        );
+        assert_eq!(
+            EntryPath::try_from("a.js").err(),
+            EntryPath::new("a.js").err()
+        );
         Ok(())
     }
 }

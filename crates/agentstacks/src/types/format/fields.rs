@@ -40,7 +40,7 @@ use crate::types::tokens::scan;
 ///
 /// Crate-internal: it hands out `toml` types, which the public API does not expose.
 #[derive(Debug)]
-pub(crate) struct TomlFields {
+pub(in crate::types) struct TomlFields {
     file: PathBuf,
     prefix: String,
     table: Table,
@@ -363,7 +363,8 @@ impl TomlFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{FieldError, parse_toml_document};
+    use crate::types::FieldError;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 

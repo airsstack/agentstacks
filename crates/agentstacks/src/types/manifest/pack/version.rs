@@ -7,8 +7,10 @@
 //!
 //! - [`PackVersion`] is a semantic version (`major.minor.patch`, with optional pre-release and
 //!   build parts) that parsed, so a held version is always valid. It orders by semver precedence
-//!   and displays as written. A pack's `pack.version`, an extension's version and a locked airsl
-//!   version all use it.
+//!   and displays as written. A pack's `pack.version`, an extension's version, a locked entry's
+//!   version and the locked airsl version all use it.
+//! - Its refusal is [`InvalidVersion`]. The lock's `[airsl] version` replaces it with its own
+//!   message, [`LockError::NotAVersion`](crate::types::LockError::NotAVersion).
 //!
 //! # Non-responsibilities
 //!
@@ -16,6 +18,7 @@
 //! versions.
 
 use std::fmt;
+use std::str::FromStr;
 
 use semver::Version;
 
@@ -84,6 +87,22 @@ impl fmt::Display for PackVersion {
     }
 }
 
+impl FromStr for PackVersion {
+    type Err = InvalidVersion;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for PackVersion {
+    type Error = InvalidVersion;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +141,21 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn pack_version_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<PackVersion, InvalidVersion>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["0.4.2", "1.2"] {
+            let expected = shown(PackVersion::new(text));
+            assert_eq!(shown(text.parse::<PackVersion>()), expected);
+            assert_eq!(shown(PackVersion::try_from(text)), expected);
+        }
+        assert!(PackVersion::new("0.4.2").is_ok());
+        assert!(PackVersion::new("1.2").is_err());
     }
 }

@@ -6,7 +6,7 @@
 //! # Responsibilities
 //!
 //! - [`TokenTarget`] has a variant per [`TokenKind`], so a kind and its target cannot disagree.
-//! - [`TokenTarget::parse`] applies the grammar rules for a kind and its target words.
+//! - [`TokenTarget::new`] applies the grammar rules for a kind and its target words.
 //!
 //! # Non-responsibilities
 //!
@@ -29,9 +29,9 @@ use crate::types::tokens::var::Var;
 /// ```
 /// use agentstacks::types::{TokenKind, TokenTarget};
 ///
-/// let target = TokenTarget::parse(TokenKind::Skill, &["core/review"])?;
+/// let target = TokenTarget::new(TokenKind::Skill, &["core/review"])?;
 /// assert_eq!(target.to_string(), "core/review");
-/// assert_eq!(TokenTarget::parse(TokenKind::Root, &[])?.to_string(), "");
+/// assert_eq!(TokenTarget::new(TokenKind::Root, &[])?.to_string(), "");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -64,11 +64,11 @@ impl TokenTarget {
     /// ```
     /// use agentstacks::types::{TokenKind, TokenTarget};
     ///
-    /// assert!(TokenTarget::parse(TokenKind::Option, &["verbose"]).is_ok());
-    /// let refused = TokenTarget::parse(TokenKind::Skill, &[]).err().map(|error| error.to_string());
+    /// assert!(TokenTarget::new(TokenKind::Option, &["verbose"]).is_ok());
+    /// let refused = TokenTarget::new(TokenKind::Skill, &[]).err().map(|error| error.to_string());
     /// assert_eq!(refused.as_deref(), Some("token \"skill\" needs a target"));
     /// ```
-    pub fn parse(kind: TokenKind, words: &[&str]) -> Result<Self, TokenError> {
+    pub fn new(kind: TokenKind, words: &[&str]) -> Result<Self, TokenError> {
         let word = match words {
             [] => {
                 return match kind {
@@ -80,14 +80,14 @@ impl TokenTarget {
             _ => return Err(TokenError::TakesOneTarget { kind }),
         };
         match kind {
-            TokenKind::Skill => Ok(Self::Skill(ItemRef::parse(word)?)),
-            TokenKind::Agent => Ok(Self::Agent(ItemRef::parse(word)?)),
-            TokenKind::SkillDir => Ok(Self::SkillDir(ItemRef::parse(word)?)),
+            TokenKind::Skill => Ok(Self::Skill(ItemRef::new(word)?)),
+            TokenKind::Agent => Ok(Self::Agent(ItemRef::new(word)?)),
+            TokenKind::SkillDir => Ok(Self::SkillDir(ItemRef::new(word)?)),
             TokenKind::Root if word.contains('/') => Err(TokenError::RootTakesPackName {
-                target: word.to_owned(),
+                text: word.to_owned(),
             }),
             TokenKind::Root => Ok(Self::Root(Some(PackName::new(word)?))),
-            TokenKind::Var => Ok(Self::Var(Var::parse(word)?)),
+            TokenKind::Var => Ok(Self::Var(Var::new(word)?)),
             TokenKind::Option if word.contains('/') => Err(TokenError::OptionNotThisPack),
             TokenKind::Option => Ok(Self::Option(OptionName::new(word)?)),
         }
@@ -100,7 +100,7 @@ impl TokenTarget {
     /// ```
     /// use agentstacks::types::{TokenKind, TokenTarget};
     ///
-    /// let target = TokenTarget::parse(TokenKind::Var, &["tmpdir"])?;
+    /// let target = TokenTarget::new(TokenKind::Var, &["tmpdir"])?;
     /// assert_eq!(target.kind(), TokenKind::Var);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -135,7 +135,7 @@ mod tests {
     use super::*;
 
     fn parse_shown(kind: TokenKind, words: &[&str]) -> Result<String, String> {
-        TokenTarget::parse(kind, words)
+        TokenTarget::new(kind, words)
             .map(|t| t.to_string())
             .map_err(|e| e.to_string())
     }
@@ -154,17 +154,17 @@ mod tests {
         for (kind, words, shown) in cases {
             assert_eq!(parse_shown(kind, words), Ok(shown.to_owned()), "{kind}");
             assert_eq!(
-                TokenTarget::parse(kind, words).map(|t| t.kind()),
+                TokenTarget::new(kind, words).map(|t| t.kind()),
                 Ok(kind),
                 "{kind}"
             );
         }
         assert!(matches!(
-            TokenTarget::parse(TokenKind::Root, &[]),
+            TokenTarget::new(TokenKind::Root, &[]),
             Ok(TokenTarget::Root(None))
         ));
         assert!(matches!(
-            TokenTarget::parse(TokenKind::Root, &["core"]),
+            TokenTarget::new(TokenKind::Root, &["core"]),
             Ok(TokenTarget::Root(Some(_)))
         ));
     }

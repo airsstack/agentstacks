@@ -6,7 +6,7 @@
 //! # Responsibilities
 //!
 //! - [`ItemRef`] holds an optional pack and an item name, both validated on construction.
-//! - [`ItemRef::parse`] reads the `[pack/]item` text of a token target.
+//! - [`ItemRef::new`] reads the `[pack/]item` text of a token target.
 //!
 //! # Non-responsibilities
 //!
@@ -14,6 +14,7 @@
 //! packs.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::name::ItemName;
 use crate::types::name::PackName;
@@ -26,8 +27,8 @@ use crate::types::tokens::error::TokenError;
 /// ```
 /// use agentstacks::types::ItemRef;
 ///
-/// assert_eq!(ItemRef::parse("review")?.to_string(), "review");
-/// assert_eq!(ItemRef::parse("core/review")?.to_string(), "core/review");
+/// assert_eq!(ItemRef::new("review")?.to_string(), "review");
+/// assert_eq!(ItemRef::new("core/review")?.to_string(), "core/review");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -50,16 +51,16 @@ impl ItemRef {
     /// ```
     /// use agentstacks::types::ItemRef;
     ///
-    /// assert!(ItemRef::parse("core/review").is_ok());
-    /// let refused = ItemRef::parse("a/b/c").err().map(|error| error.to_string());
+    /// assert!(ItemRef::new("core/review").is_ok());
+    /// let refused = ItemRef::new("a/b/c").err().map(|error| error.to_string());
     /// assert_eq!(
     ///     refused.as_deref(),
     ///     Some("\"a/b/c\" is not a valid target (expected [pack/]name)"),
     /// );
     /// ```
-    pub fn parse(target: &str) -> Result<Self, TokenError> {
+    pub fn new(target: &str) -> Result<Self, TokenError> {
         let invalid = || TokenError::InvalidTarget {
-            target: target.to_owned(),
+            text: target.to_owned(),
         };
         match target.split_once('/') {
             None => Ok(Self {
@@ -83,8 +84,8 @@ impl ItemRef {
     /// ```
     /// use agentstacks::types::ItemRef;
     ///
-    /// assert_eq!(ItemRef::parse("core/review")?.pack().map(|pack| pack.as_str()), Some("core"));
-    /// assert!(ItemRef::parse("review")?.pack().is_none());
+    /// assert_eq!(ItemRef::new("core/review")?.pack().map(|pack| pack.as_str()), Some("core"));
+    /// assert!(ItemRef::new("review")?.pack().is_none());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use]
@@ -99,7 +100,7 @@ impl ItemRef {
     /// ```
     /// use agentstacks::types::ItemRef;
     ///
-    /// assert_eq!(ItemRef::parse("core/review")?.item().as_str(), "review");
+    /// assert_eq!(ItemRef::new("core/review")?.item().as_str(), "review");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use]
@@ -117,19 +118,35 @@ impl fmt::Display for ItemRef {
     }
 }
 
+impl FromStr for ItemRef {
+    type Err = TokenError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for ItemRef {
+    type Error = TokenError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn item_ref_parses_own_and_cross_pack() {
-        let own = ItemRef::parse("discuss");
+        let own = ItemRef::new("discuss");
         assert_eq!(
             own.as_ref()
                 .map(|r| (r.pack().map(ToString::to_string), r.item().to_string())),
             Ok((None, "discuss".to_owned()))
         );
-        let cross = ItemRef::parse("sdlc/status");
+        let cross = ItemRef::new("sdlc/status");
         assert_eq!(
             cross
                 .as_ref()
@@ -138,7 +155,7 @@ mod tests {
         );
         for text in ["discuss", "sdlc/status"] {
             assert_eq!(
-                ItemRef::parse(text).map(|r| r.to_string()),
+                ItemRef::new(text).map(|r| r.to_string()),
                 Ok(text.to_owned())
             );
         }
@@ -148,15 +165,31 @@ mod tests {
     fn item_ref_refuses_bad_shapes() {
         for target in ["a/b/c", "/x", "core/"] {
             assert_eq!(
-                ItemRef::parse(target).map_err(|e| e.to_string()),
+                ItemRef::new(target).map_err(|e| e.to_string()),
                 Err(format!(
                     "\"{target}\" is not a valid target (expected [pack/]name)"
                 ))
             );
         }
         assert_eq!(
-            ItemRef::parse("Core/x").map_err(|e| e.to_string()),
+            ItemRef::new("Core/x").map_err(|e| e.to_string()),
             Err("\"Core\" is not a valid name".to_owned())
         );
+    }
+
+    #[test]
+    fn item_ref_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<ItemRef, TokenError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["core/review", "a/b/c"] {
+            let expected = shown(ItemRef::new(text));
+            assert_eq!(shown(text.parse::<ItemRef>()), expected);
+            assert_eq!(shown(ItemRef::try_from(text)), expected);
+        }
+        assert!(ItemRef::new("core/review").is_ok());
+        assert!(ItemRef::new("a/b/c").is_err());
     }
 }

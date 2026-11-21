@@ -65,6 +65,14 @@ impl fmt::Display for GitTag {
     }
 }
 
+impl TryFrom<&str> for GitTag {
+    type Error = InvalidGitTag;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,5 +94,21 @@ mod tests {
             let shown = GitTag::new(text).err().map(|e| e.to_string());
             assert_eq!(shown.as_deref(), Some("empty"));
         }
+    }
+
+    #[test]
+    fn git_tag_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<GitTag, InvalidGitTag>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["v1", "  "] {
+            let expected = shown(GitTag::new(text));
+            assert_eq!(shown(text.parse::<GitTag>()), expected);
+            assert_eq!(shown(GitTag::try_from(text)), expected);
+        }
+        assert!(GitTag::new("v1").is_ok());
+        assert!(GitTag::new("  ").is_err());
     }
 }

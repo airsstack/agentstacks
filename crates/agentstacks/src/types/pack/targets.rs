@@ -18,7 +18,7 @@
 //!
 //! # Non-responsibilities
 //!
-//! Whether a `run` is excluded belongs to [`InstallSet`](crate::types::InstallSet): an excluded
+//! Whether a `run` is excluded belongs to the install set: an excluded
 //! file exists, so it is refused there and not here. The form of a `run` was checked when the hook
 //! was read.
 
@@ -32,9 +32,11 @@ use crate::types::name::PackName;
 use crate::types::name::ToolName;
 use crate::types::pack::error::PackError;
 use crate::types::pack::item::kind::ItemKind;
-use crate::types::pack::layout::{MANIFEST_FILE, NATIVE_DIR, NATIVE_HOOKS_FILE, PackLayout};
+use crate::types::pack::key::KeyPath;
+use crate::types::pack::layout::{MANIFEST_FILE, PackLayout, native_hooks_file};
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
+use crate::types::report::DoesNotExist;
 use crate::types::report::Location;
 use crate::types::tokens::names_own_pack;
 use crate::types::tree::TreePath;
@@ -60,42 +62,8 @@ struct AgentRef {
 }
 
 /// The own-pack runs and agents the hooks of one pack name.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-///
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, HookTargets, PackLayout, PackManifest, TreePath, walk};
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/hook-run-missing");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// let manifest = PackManifest::parse(Path::new("pack.toml"), &tree.read_text(Path::new("pack.toml"))?)
-///     .map_err(|refusals| format!("{refusals:?}"))?;
-///
-/// let targets = HookTargets::collect(manifest.name(), &manifest, &[]);
-/// let paths = targets.run_paths();
-/// let shown: Vec<&str> = paths.iter().map(TreePath::as_str).collect();
-/// assert_eq!(shown, ["hooks/a.lua", "hooks/missing.lua"]);
-///
-/// // Only the script the pack does not ship is refused.
-/// let refusals: Vec<String> = targets
-///     .check(Path::new("packs/core"), &layout)
-///     .into_sorted()
-///     .iter()
-///     .map(ToString::to_string)
-///     .collect();
-/// assert_eq!(
-///     refusals,
-///     ["packs/core/pack.toml: hooks[1].run: \"hooks/missing.lua\" does not exist"]
-/// );
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[derive(Debug, Clone)]
-pub struct HookTargets {
+pub(super) struct HookTargets {
     pack: PackName,
     runs: Vec<OwnRun>,
     agents: Vec<AgentRef>,
@@ -105,7 +73,7 @@ impl HookTargets {
     /// Gathers the targets of the hooks of the pack `pack`: its `manifest` hooks and the hooks of
     /// each tool in `native`.
     #[must_use]
-    pub fn collect(
+    pub(super) fn collect(
         pack: &PackName,
         manifest: &PackManifest,
         native: &[(&ToolName, &NativeHooks)],
@@ -124,7 +92,7 @@ impl HookTargets {
             }
         }
         for (tool, hooks) in native {
-            let file = TreePath::from_parts(&[NATIVE_DIR, tool.as_str(), NATIVE_HOOKS_FILE]);
+            let file = native_hooks_file(tool);
             for (index, hook) in hooks.hooks().iter().enumerate() {
                 collect_run(&mut runs, pack, &file, index, hook.action());
             }
@@ -138,7 +106,7 @@ impl HookTargets {
 
     /// The pack-relative files the own runs resolve to, in declaration order.
     #[must_use]
-    pub fn run_paths(&self) -> Vec<TreePath> {
+    pub(super) fn run_paths(&self) -> Vec<TreePath> {
         self.runs.iter().map(|run| run.path.clone()).collect()
     }
 
@@ -147,7 +115,7 @@ impl HookTargets {
     /// `agents` entry is located at that entry, `hooks[n].agents[i]`. A target the walk refused is
     /// not refused again.
     #[must_use]
-    pub fn check(&self, dir: &Path, layout: &PackLayout) -> Diagnostics {
+    pub(super) fn check(&self, dir: &Path, layout: &PackLayout) -> Diagnostics {
         let mut refusals = Diagnostics::new();
         for run in &self.runs {
             let exists = layout.root_files().contains(&run.path);
@@ -155,11 +123,9 @@ impl HookTargets {
                 refusals.push(Diagnostic::new(
                     Location::at_key(
                         dir.join(run.file.as_str()),
-                        format!("hooks[{}].run", run.index),
+                        KeyPath::new("hooks").item(run.index).key("run"),
                     ),
-                    PackError::DoesNotExist {
-                        path: run.written.clone(),
-                    },
+                    PackError::from(DoesNotExist::new(run.written.as_str())),
                 ));
             }
         }
@@ -168,12 +134,15 @@ impl HookTargets {
                 refusals.push(Diagnostic::new(
                     Location::at_key(
                         dir.join(MANIFEST_FILE),
-                        format!("hooks[{}].agents[{}]", agent.index, agent.position),
+                        KeyPath::new("hooks")
+                            .item(agent.index)
+                            .key("agents")
+                            .item(agent.position),
                     ),
                     PackError::NoSuchItem {
                         pack: self.pack.clone(),
                         kind: ItemKind::Agent,
-                        item: agent.name.to_string(),
+                        item: agent.name.clone(),
                     },
                 ));
             }

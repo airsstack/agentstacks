@@ -7,7 +7,7 @@
 //!
 //! - [`TokenKind`] is the closed set of token keywords: `skill`, `agent`, `skill_dir`, `root`,
 //!   `var` and `option`.
-//! - [`TokenKind::parse`] turns the first word of a token into a kind.
+//! - [`TokenKind::new`] turns the first word of a token into a kind.
 //! - [`TokenKind::needs_target`] says whether a kind must be followed by a target.
 //!
 //! # Non-responsibilities
@@ -15,6 +15,7 @@
 //! What a target may be per kind belongs to [`TokenTarget`](crate::types::TokenTarget).
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::tokens::error::TokenError;
 
@@ -25,7 +26,7 @@ use crate::types::tokens::error::TokenError;
 /// ```
 /// use agentstacks::types::TokenKind;
 ///
-/// assert_eq!(TokenKind::parse("skill_dir")?, TokenKind::SkillDir);
+/// assert_eq!(TokenKind::new("skill_dir")?, TokenKind::SkillDir);
 /// assert_eq!(TokenKind::SkillDir.to_string(), "skill_dir");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -57,12 +58,12 @@ impl TokenKind {
     /// ```
     /// use agentstacks::types::TokenKind;
     ///
-    /// assert_eq!(TokenKind::parse("agent")?, TokenKind::Agent);
-    /// let refused = TokenKind::parse("bogus").err().map(|error| error.to_string());
+    /// assert_eq!(TokenKind::new("agent")?, TokenKind::Agent);
+    /// let refused = TokenKind::new("bogus").err().map(|error| error.to_string());
     /// assert_eq!(refused.as_deref(), Some("unknown token kind \"bogus\""));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn parse(word: &str) -> Result<Self, TokenError> {
+    pub fn new(word: &str) -> Result<Self, TokenError> {
         match word {
             "skill" => Ok(Self::Skill),
             "agent" => Ok(Self::Agent),
@@ -71,7 +72,7 @@ impl TokenKind {
             "var" => Ok(Self::Var),
             "option" => Ok(Self::Option),
             _ => Err(TokenError::UnknownKind {
-                word: word.to_owned(),
+                text: word.to_owned(),
             }),
         }
     }
@@ -119,6 +120,22 @@ impl fmt::Display for TokenKind {
     }
 }
 
+impl FromStr for TokenKind {
+    type Err = TokenError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for TokenKind {
+    type Error = TokenError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,7 +152,7 @@ mod tests {
     #[test]
     fn token_kind_parses_each_keyword() {
         for word in ["skill", "agent", "skill_dir", "root", "var", "option"] {
-            let parsed = TokenKind::parse(word);
+            let parsed = TokenKind::new(word);
             assert_eq!(
                 parsed.as_ref().map(ToString::to_string),
                 Ok(word.to_owned())
@@ -143,7 +160,7 @@ mod tests {
         }
         let parsed: Vec<_> = ["skill", "agent", "skill_dir", "root", "var", "option"]
             .into_iter()
-            .map(TokenKind::parse)
+            .map(TokenKind::new)
             .collect();
         assert_eq!(parsed, ALL.map(Ok).to_vec());
     }
@@ -151,7 +168,7 @@ mod tests {
     #[test]
     fn token_kind_refuses_unknown_word() {
         assert_eq!(
-            TokenKind::parse("skil").map_err(|e| e.to_string()),
+            TokenKind::new("skil").map_err(|e| e.to_string()),
             Err("unknown token kind \"skil\"".to_owned())
         );
     }
@@ -168,5 +185,21 @@ mod tests {
             assert!(kind.needs_target(), "{kind}");
         }
         assert!(!TokenKind::Root.needs_target());
+    }
+
+    #[test]
+    fn token_kind_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<TokenKind, TokenError>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["agent", "bogus"] {
+            let expected = shown(TokenKind::new(text));
+            assert_eq!(shown(text.parse::<TokenKind>()), expected);
+            assert_eq!(shown(TokenKind::try_from(text)), expected);
+        }
+        assert!(TokenKind::new("agent").is_ok());
+        assert!(TokenKind::new("bogus").is_err());
     }
 }

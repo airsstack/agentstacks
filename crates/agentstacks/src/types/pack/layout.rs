@@ -41,45 +41,34 @@ use crate::types::tree::TreePath;
 use crate::types::tree::Walked;
 
 /// The file that makes a directory a pack.
-pub(crate) const MANIFEST_FILE: &str = "pack.toml";
+pub(in crate::types) const MANIFEST_FILE: &str = "pack.toml";
 
 /// The file every skill directory must hold.
-pub(crate) const SKILL_FILE: &str = "SKILL.md";
+pub(super) const SKILL_FILE: &str = "SKILL.md";
 
 /// The directory every skill lives under.
-pub(crate) const SKILLS_DIR: &str = "skills";
+pub(super) const SKILLS_DIR: &str = "skills";
 
 /// The directory every agent file lives under.
-pub(crate) const AGENTS_DIR: &str = "agents";
+pub(super) const AGENTS_DIR: &str = "agents";
 
 /// The directory every tool's content lives under.
-pub(crate) const NATIVE_DIR: &str = "native";
+pub(super) const NATIVE_DIR: &str = "native";
 
 /// The file that declares a tool's native hooks.
-pub(crate) const NATIVE_HOOKS_FILE: &str = "hooks.toml";
+pub(super) const NATIVE_HOOKS_FILE: &str = "hooks.toml";
+
+/// The pack-relative path of the hooks file of `tool`: `native/<tool>/hooks.toml`.
+pub(in crate::types) fn native_hooks_file(tool: &ToolName) -> TreePath {
+    TreePath::from_parts(&[NATIVE_DIR, tool.as_str(), NATIVE_HOOKS_FILE])
+}
 
 /// The directories the format reserves.
 const RESERVED_DIRECTORIES: [&str; 2] = ["commands", "rules"];
 
 /// The files of one `native/<tool>/` directory.
-///
-/// # Examples
-///
-/// ```
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, PackLayout, ToolName, TreePath, walk};
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/valid-native-hooks");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// let claude = layout.native().get(&ToolName::new("claude")?).ok_or("native/claude")?;
-/// assert!(claude.files().is_empty());
-/// assert_eq!(claude.hooks().map(TreePath::as_str), Some("native/claude/hooks.toml"));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct NativeLayout {
+pub(super) struct NativeLayout {
     files: Vec<TreePath>,
     hooks: Option<TreePath>,
 }
@@ -87,39 +76,20 @@ pub struct NativeLayout {
 impl NativeLayout {
     /// The files to install, relative to the tool's directory, `hooks.toml` not among them.
     #[must_use]
-    pub fn files(&self) -> &[TreePath] {
+    pub(super) fn files(&self) -> &[TreePath] {
         &self.files
     }
 
     /// The tool's `hooks.toml`, relative to the pack root, when the directory holds one.
     #[must_use]
-    pub const fn hooks(&self) -> Option<&TreePath> {
+    pub(super) const fn hooks(&self) -> Option<&TreePath> {
         self.hooks.as_ref()
     }
 }
 
 /// A pack's files sorted by the group they belong to.
-///
-/// # Examples
-///
-/// ```
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, ItemName, PackLayout, ToolName, TreePath, walk};
-///
-/// let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/valid-native-files");
-/// let tree = StdFileTree::new(dir);
-/// let (walked, _) = walk(&tree);
-/// let (layout, refusals) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-/// assert!(refusals.is_empty());
-/// assert!(layout.has_skill(&ItemName::new("a")?));
-/// assert!(!layout.has_agent(&ItemName::new("a")?));
-/// let claude = layout.native().get(&ToolName::new("claude")?).ok_or("native/claude")?;
-/// let files: Vec<&str> = claude.files().iter().map(TreePath::as_str).collect();
-/// assert_eq!(files, ["agents/x.md", "x.json"]);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[derive(Debug, Clone, Default)]
-pub struct PackLayout {
+pub(super) struct PackLayout {
     all: Vec<TreePath>,
     skills: BTreeMap<ItemName, Vec<TreePath>>,
     agents: BTreeMap<ItemName, TreePath>,
@@ -138,37 +108,7 @@ impl PackLayout {
     /// The one refusal that `dir` is not a pack, when it holds no `pack.toml` and the walk did not
     /// refuse `pack.toml` or a directory above it: a pack directory the walk could not list is not
     /// reported as holding no `pack.toml`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use agentstacks::fs::StdFileTree;
-    /// use agentstacks::types::{FileTree, PackLayout, walk};
-    ///
-    /// let root = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs");
-    ///
-    /// // A skill directory without a `SKILL.md` is a layout refusal.
-    /// let tree = StdFileTree::new(format!("{root}/skill-missing-skill-md"));
-    /// let (walked, _) = walk(&tree);
-    /// let (_, refusals) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-    /// let shown: Vec<String> = refusals
-    ///     .into_sorted()
-    ///     .iter()
-    ///     .map(|d| d.error().to_string())
-    ///     .collect();
-    /// assert_eq!(shown, ["missing SKILL.md"]);
-    ///
-    /// // A directory with no `pack.toml` is not a pack.
-    /// let tree = StdFileTree::new(format!("{root}/no-pack-toml"));
-    /// let (walked, _) = walk(&tree);
-    /// let refusal = PackLayout::classify(tree.root(), &walked).err();
-    /// assert_eq!(
-    ///     refusal.map(|d| d.error().to_string()),
-    ///     Some("not a pack (no pack.toml)".to_owned())
-    /// );
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn classify(dir: &Path, walked: &Walked) -> Result<(Self, Diagnostics), Diagnostic> {
+    pub(super) fn classify(dir: &Path, walked: &Walked) -> Result<(Self, Diagnostics), Diagnostic> {
         let files = walked.files();
         let has_manifest = files.iter().any(|file| file.as_str() == MANIFEST_FILE)
             || walked.covers(Path::new(MANIFEST_FILE));
@@ -184,50 +124,50 @@ impl PackLayout {
 
     /// Every walked file, relative to the pack root, sorted by path bytes.
     #[must_use]
-    pub fn files(&self) -> &[TreePath] {
+    pub(super) fn files(&self) -> &[TreePath] {
         &self.all
     }
 
     /// The skills with their files, relative to each skill's directory, `SKILL.md` included.
     #[must_use]
-    pub const fn skills(&self) -> &BTreeMap<ItemName, Vec<TreePath>> {
+    pub(super) const fn skills(&self) -> &BTreeMap<ItemName, Vec<TreePath>> {
         &self.skills
     }
 
     /// The agents with their file, relative to the pack root.
     #[must_use]
-    pub const fn agents(&self) -> &BTreeMap<ItemName, TreePath> {
+    pub(super) const fn agents(&self) -> &BTreeMap<ItemName, TreePath> {
         &self.agents
     }
 
     /// The `native/<tool>/` directories.
     #[must_use]
-    pub const fn native(&self) -> &BTreeMap<ToolName, NativeLayout> {
+    pub(super) const fn native(&self) -> &BTreeMap<ToolName, NativeLayout> {
         &self.native
     }
 
     /// The files installed under the pack's install root, relative to the pack root.
     #[must_use]
-    pub fn root_files(&self) -> &[TreePath] {
+    pub(super) fn root_files(&self) -> &[TreePath] {
         &self.root
     }
 
     /// Whether the pack has a skill directory called `name`.
     #[must_use]
-    pub fn has_skill(&self, name: &ItemName) -> bool {
+    pub(super) fn has_skill(&self, name: &ItemName) -> bool {
         self.skills.contains_key(name)
     }
 
     /// Whether the pack has an agent called `name`.
     #[must_use]
-    pub fn has_agent(&self, name: &ItemName) -> bool {
+    pub(super) fn has_agent(&self, name: &ItemName) -> bool {
         self.agents.contains_key(name)
     }
 
     /// Whether the pack has no skill called `name` and the walk did not refuse the directory it
     /// would be in.
     #[must_use]
-    pub fn lacks_skill(&self, name: &ItemName) -> bool {
+    pub(super) fn lacks_skill(&self, name: &ItemName) -> bool {
         !self.has_skill(name)
             && !self.is_refused(&TreePath::from_parts(&[SKILLS_DIR, name.as_str()]))
     }
@@ -235,14 +175,14 @@ impl PackLayout {
     /// Whether the pack has no agent called `name` and the walk did not refuse the file it would
     /// be in.
     #[must_use]
-    pub fn lacks_agent(&self, name: &ItemName) -> bool {
+    pub(super) fn lacks_agent(&self, name: &ItemName) -> bool {
         let file = format!("{name}.md");
         !self.has_agent(name) && !self.is_refused(&TreePath::from_parts(&[AGENTS_DIR, &file]))
     }
 
     /// Whether the walk refused `path` or a directory above it.
     #[must_use]
-    pub fn is_refused(&self, path: &TreePath) -> bool {
+    pub(super) fn is_refused(&self, path: &TreePath) -> bool {
         self.refused.covers(Path::new(path.as_str()))
     }
 
@@ -250,7 +190,7 @@ impl PackLayout {
     /// because the walk or a name rule refused it. A rule that asks "does the pack hold at least
     /// one?" cannot answer while this is true.
     #[must_use]
-    pub const fn may_hold_unseen_items(&self) -> bool {
+    pub(super) const fn may_hold_unseen_items(&self) -> bool {
         self.unseen_items
     }
 }
@@ -685,6 +625,16 @@ mod tests {
         }
         let (layout, _) = classify_refused(&["pack.toml"], &["scripts/link", "link"])?;
         assert!(!layout.may_hold_unseen_items());
+        Ok(())
+    }
+
+    #[test]
+    fn native_hooks_file_is_the_hooks_toml_of_the_tool_directory() -> TestResult {
+        let claude = ToolName::new("claude")?;
+        assert_eq!(
+            native_hooks_file(&claude).as_str(),
+            "native/claude/hooks.toml"
+        );
         Ok(())
     }
 }

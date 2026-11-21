@@ -18,12 +18,13 @@
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-pub mod document;
-pub mod fields;
+mod document;
+mod fields;
 pub mod yaml;
 
 #[doc(inline)]
 pub use yaml::YamlValue;
 
-pub(crate) use document::parse_toml_document;
-pub(crate) use fields::TomlFields;
+pub(in crate::types) use document::parse_toml_document;
+pub(in crate::types) use fields::TomlFields;
+pub(crate) use yaml::parse_yaml;

@@ -21,6 +21,7 @@ use std::path::Path;
 use crate::types::extension::Extension;
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
+use crate::types::pack::KeyPath;
 use crate::types::pack::Pack;
 use crate::types::report::Diagnostic;
 use crate::types::report::Location;
@@ -28,7 +29,7 @@ use crate::types::set::error::SetError;
 
 /// Refuses each loaded pack and extension whose own name differs from its key in the project file
 /// at `project_file`.
-pub(crate) fn check_fetched_names(
+pub(super) fn check_fetched_names(
     project_file: &Path,
     packs: &BTreeMap<PackName, Pack>,
     extensions: &BTreeMap<ToolName, Extension>,
@@ -38,7 +39,10 @@ pub(crate) fn check_fetched_names(
         let name = pack.manifest().name();
         if name != key {
             refusals.push(Diagnostic::new(
-                Location::set_level(project_file, Some(format!("packs.{key}"))),
+                Location::set_level(
+                    project_file,
+                    Some(KeyPath::new("packs").key(key.as_str()).into()),
+                ),
                 SetError::SourcePack { name: name.clone() },
             ));
         }
@@ -47,7 +51,10 @@ pub(crate) fn check_fetched_names(
         let name = extension.manifest().name();
         if name != key {
             refusals.push(Diagnostic::new(
-                Location::set_level(project_file, Some(format!("tools.{key}"))),
+                Location::set_level(
+                    project_file,
+                    Some(KeyPath::new("tools").key(key.as_str()).into()),
+                ),
                 SetError::SourceExtension { name: name.clone() },
             ));
         }

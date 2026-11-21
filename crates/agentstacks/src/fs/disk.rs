@@ -23,7 +23,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use crate::types::{EntryKind, FileTree};
+use crate::types::port::{EntryKind, FileTree};
 
 /// The refusal for a symlink met on the way to a read, worded without naming a pack or extension.
 const SYMLINK_REFUSED: &str = "symlinks are not followed";
@@ -150,7 +150,7 @@ impl FileTree for StdFileTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{tree_hash, walk};
+    use crate::types::tree::{tree_hash, walk};
     use std::error::Error;
     use std::fs;
 

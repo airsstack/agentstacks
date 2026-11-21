@@ -28,7 +28,7 @@ use crate::types::name::ItemName;
 use crate::types::name::PackName;
 use crate::types::pack::error::PackError;
 use crate::types::pack::item::kind::ItemKind;
-use crate::types::pack::layout::{PackLayout, SKILL_FILE, SKILLS_DIR};
+use crate::types::pack::layout::{NATIVE_DIR, PackLayout, SKILL_FILE, SKILLS_DIR};
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::tokens::ItemRef;
@@ -38,38 +38,9 @@ use crate::types::tokens::Var;
 use crate::types::tokens::names_own_pack;
 
 /// Refuses each token of neutral content (outside `<dir>/native/`) that reaches into `native/`.
-///
-/// # Examples
-///
-/// ```
-/// use std::num::NonZeroUsize;
-/// use std::path::Path;
-///
-/// use agentstacks::types::{check_native_references, scan_body};
-///
-/// let dir = Path::new("packs/core");
-/// let line = NonZeroUsize::new(6).ok_or("line 6")?;
-/// let text = "{{root}}/native/claude/x\n";
-///
-/// let (neutral, _) = scan_body(&dir.join("skills/a/SKILL.md"), text, line);
-/// let refusals: Vec<String> = check_native_references(dir, &neutral)
-///     .into_sorted()
-///     .iter()
-///     .map(ToString::to_string)
-///     .collect();
-/// assert_eq!(
-///     refusals,
-///     ["packs/core/skills/a/SKILL.md:6: neutral content must not reference native/"]
-/// );
-///
-/// // The same token inside `native/` is allowed.
-/// let (native, _) = scan_body(&dir.join("native/claude/agents/x.md"), text, line);
-/// assert!(check_native_references(dir, &native).is_empty());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[must_use]
-pub fn check_native_references(dir: &Path, tokens: &[LocatedToken]) -> Diagnostics {
-    let native = dir.join("native");
+pub(super) fn check_native_references(dir: &Path, tokens: &[LocatedToken]) -> Diagnostics {
+    let native = dir.join(NATIVE_DIR);
     let mut refusals = Diagnostics::new();
     refusals.extend(
         tokens
@@ -83,37 +54,8 @@ pub fn check_native_references(dir: &Path, tokens: &[LocatedToken]) -> Diagnosti
 
 /// Applies the placement and own-pack target rules to every token of the pack `pack` in the
 /// directory `dir`.
-///
-/// # Examples
-///
-/// ```
-/// use std::num::NonZeroUsize;
-/// use std::path::Path;
-///
-/// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{FileTree, PackLayout, PackName, check_local_tokens, scan_body, walk};
-///
-/// let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/packs/own-agent-missing");
-/// let tree = StdFileTree::new(fixture);
-/// let (walked, _) = walk(&tree);
-/// let (layout, _) = PackLayout::classify(tree.root(), &walked).map_err(|d| d.to_string())?;
-///
-/// let dir = Path::new("packs/core");
-/// let line = NonZeroUsize::new(6).ok_or("line 6")?;
-/// let (tokens, _) = scan_body(&dir.join("skills/a/SKILL.md"), "{{agent codr}}\n", line);
-/// let refusals: Vec<String> = check_local_tokens(dir, &PackName::new("core")?, &layout, &tokens)
-///     .into_sorted()
-///     .iter()
-///     .map(ToString::to_string)
-///     .collect();
-/// assert_eq!(
-///     refusals,
-///     ["packs/core/skills/a/SKILL.md:6: pack \"core\" has no agent \"codr\""]
-/// );
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[must_use]
-pub fn check_local_tokens(
+pub(super) fn check_local_tokens(
     dir: &Path,
     pack: &PackName,
     layout: &PackLayout,
@@ -166,7 +108,7 @@ fn missing(
     (names_own_pack(item.pack(), pack) && lacks(item.item())).then(|| PackError::NoSuchItem {
         pack: pack.clone(),
         kind,
-        item: item.item().to_string(),
+        item: item.item().clone(),
     })
 }
 

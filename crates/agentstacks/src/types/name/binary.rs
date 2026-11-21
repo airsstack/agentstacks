@@ -13,6 +13,7 @@
 //! Whether the binary exists on the machine belongs to the checks that run at apply time.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::name::InvalidName;
 use crate::types::name::item::ItemName;
@@ -75,6 +76,22 @@ impl fmt::Display for BinaryName {
     }
 }
 
+impl FromStr for BinaryName {
+    type Err = InvalidName;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for BinaryName {
+    type Error = InvalidName;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,5 +117,21 @@ mod tests {
             "packs/core/pack.toml: requires.binaries: \"Git\" is not a valid name"
         );
         Ok(())
+    }
+
+    #[test]
+    fn binary_name_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<BinaryName, InvalidName>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["git", "Git"] {
+            let expected = shown(BinaryName::new(text));
+            assert_eq!(shown(text.parse::<BinaryName>()), expected);
+            assert_eq!(shown(BinaryName::try_from(text)), expected);
+        }
+        assert!(BinaryName::new("git").is_ok());
+        assert!(BinaryName::new("Git").is_err());
     }
 }

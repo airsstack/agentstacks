@@ -11,11 +11,13 @@
 //!   empty directories are ignored, and symlinks, special files and non-UTF-8 paths are refused,
 //!   with the symlink refusal worded for an extension. A walk refusal does not stop the load: it is
 //!   reported together with every other refusal.
+//! - It reads every walked file exactly once, hashing it as it goes; the manifest's text comes from
+//!   that same read. A file that cannot be read is an I/O refusal at its own path, reported with
+//!   every other refusal, and leaves the extension without a tree hash.
 //! - It requires `extension.toml` (a manifest the walk refused is not reported as absent), parses
 //!   it, and checks that `entry`, without its leading `./` segments, is one of the walked regular
 //!   files. An `entry` the walk refused is not reported as missing. Every refusal of those checks
-//!   is reported together. A manifest that cannot be read is an I/O refusal; one that is not UTF-8
-//!   is refused as `<file>: not valid UTF-8`.
+//!   is reported together. A manifest that is not UTF-8 is refused as `<file>: not valid UTF-8`.
 //! - When nothing is refused it records the directory's tree hash and the dot entries it ignored.
 //!
 //! # Non-responsibilities
@@ -29,13 +31,15 @@ use std::path::{Path, PathBuf};
 use crate::types::extension::error::ExtensionError;
 use crate::types::extension::manifest::ExtensionManifest;
 use crate::types::port::FileTree;
+use crate::types::port::utf8_text;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
+use crate::types::report::DoesNotExist;
 use crate::types::report::FormatError;
 use crate::types::report::Location;
 use crate::types::tree::ContentHash;
 use crate::types::tree::WalkError;
-use crate::types::tree::tree_hash;
+use crate::types::tree::hash_walked;
 use crate::types::tree::walk;
 
 /// The manifest every extension directory holds at its root.
@@ -97,6 +101,12 @@ impl Extension {
         let (walked, walk_refusals) = walk(tree);
         let mut diagnostics = Diagnostics::new();
         diagnostics.extend(walk_refusals.into_iter().map(reword_walk_diagnostic));
+        let mut manifest_bytes = None;
+        let hash = hash_walked(tree, &walked, &mut diagnostics, |path, bytes| {
+            if path.as_str() == MANIFEST_FILE {
+                manifest_bytes = Some(bytes);
+            }
+        });
         let manifest_path = tree.root().join(MANIFEST_FILE);
         let listed = walked
             .files()
@@ -111,7 +121,11 @@ impl Extension {
             }
             return Err(diagnostics);
         }
-        let text = match tree.read_text(Path::new(MANIFEST_FILE)) {
+        // A listed manifest without bytes failed to read, and that refusal is already reported.
+        let Some(bytes) = manifest_bytes else {
+            return Err(diagnostics);
+        };
+        let text = match utf8_text(bytes) {
             Ok(text) => text,
             Err(error) => {
                 diagnostics.push(Diagnostic::new(Location::file(&manifest_path), error));
@@ -132,16 +146,14 @@ impl Extension {
             if !walked_file && !walked.covers(Path::new(wanted)) {
                 diagnostics.push(Diagnostic::new(
                     Location::at_key(&manifest_path, "extension.entry"),
-                    ExtensionError::EntryMissing {
-                        value: entry.as_str().to_owned(),
-                    },
+                    ExtensionError::from(DoesNotExist::new(entry.as_str())),
                 ));
             }
         }
-        let Some(manifest) = manifest.filter(|_| diagnostics.is_empty()) else {
+        let (Some(manifest), Some(hash)) = (manifest.filter(|_| diagnostics.is_empty()), hash)
+        else {
             return Err(diagnostics);
         };
-        let hash = tree_hash(tree)?;
         Ok(Self {
             dir: tree.root().to_path_buf(),
             manifest,
@@ -191,6 +203,7 @@ mod tests {
 
     use super::*;
     use crate::types::port::FakeFileTree;
+    use crate::types::tree::tree_hash;
 
     type TestResult = Result<(), Box<dyn Error>>;
 
@@ -478,6 +491,33 @@ mod tests {
         assert_eq!(
             refusals(Extension::load(&tree)),
             [format!("{ROOT}/adapter.lua: {}", FakeFileTree::denied())]
+        );
+    }
+
+    #[test]
+    fn extension_load_reports_an_unreadable_file_with_the_manifest_refusals() {
+        let manifest = manifest_with("\"claude\"", "\"Claude\"");
+        let tree = FakeFileTree::new(ROOT)
+            .file("extension.toml", manifest.as_bytes())
+            .unreadable("adapter.lua");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [
+                format!("{ROOT}/adapter.lua: {}", FakeFileTree::denied()),
+                format!("{MANIFEST}: extension.name: \"Claude\" is not a valid name"),
+            ]
+        );
+    }
+
+    #[test]
+    fn extension_load_reports_an_unreadable_file_without_a_manifest() {
+        let tree = FakeFileTree::new(ROOT).unreadable("adapter.lua");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [
+                format!("{ROOT}: not an extension (no extension.toml)"),
+                format!("{ROOT}/adapter.lua: {}", FakeFileTree::denied()),
+            ]
         );
     }
 

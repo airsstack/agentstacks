@@ -1,12 +1,15 @@
 //! The one error type a located diagnostic carries.
 //!
-//! Every module's error enum joins here through a single `#[from]` variant, so a diagnostic holds
-//! one type whatever produced it.
+//! Every module's error enum joins here through one variant and a `From` conversion, so a
+//! diagnostic holds one type whatever produced it. The conversion is a `#[from]` on every variant
+//! but [`FormatError::Set`], whose hand-written `From<SetError>` boxes the error.
 //!
 //! # Responsibilities
 //!
 //! - [`FormatError`] has a variant per module error enum, each displaying its inner error
 //!   unchanged.
+//! - [`FormatError::TomlSyntax`] carries a TOML parser's own words as a
+//!   [`ParserMessage`] and displays them unchanged.
 //! - [`FormatError::Io`] is the only I/O variant. An I/O failure is located at the path that
 //!   failed ([`Location::file`](crate::types::Location::file)), so it reads `<path>: <the std::io::Error
 //!   Display>`.
@@ -28,6 +31,7 @@ use crate::types::pack::PackError;
 use crate::types::project::ProjectError;
 use crate::types::project::SourceError;
 use crate::types::report::FieldError;
+use crate::types::report::ParserMessage;
 use crate::types::set::SetError;
 use crate::types::tokens::TokenError;
 use crate::types::tree::WalkError;
@@ -76,7 +80,7 @@ pub enum FormatError {
     Set(Box<SetError>),
     /// A TOML syntax error, in the parser's own words.
     #[error("{0}")]
-    TomlSyntax(String),
+    TomlSyntax(ParserMessage),
     /// A token the scanner refused.
     #[error(transparent)]
     Token(#[from] TokenError),
@@ -162,6 +166,13 @@ mod tests {
             "source contains pack \"kore\""
         );
         Ok(())
+    }
+
+    #[test]
+    fn toml_syntax_displays_the_parser_message_unchanged() {
+        let text = "expected `.`, `=`";
+        let error = FormatError::TomlSyntax(ParserMessage::new(text));
+        assert_eq!(error.to_string(), text);
     }
 
     #[test]

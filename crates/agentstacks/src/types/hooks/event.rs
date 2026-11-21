@@ -15,6 +15,7 @@
 //! Tool-specific events belong to `native/<tool>/hooks.toml`, where the event is an opaque string.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::hooks::InvalidHookEvent;
 use crate::types::hooks::MatchValue;
@@ -26,7 +27,7 @@ use crate::types::hooks::MatchValue;
 /// ```
 /// use agentstacks::types::{HookEvent, MatchValue};
 ///
-/// let event = HookEvent::parse("tool.before")?;
+/// let event = HookEvent::new("tool.before")?;
 /// assert_eq!(event.as_str(), "tool.before");
 /// assert_eq!(
 ///     event.match_values(),
@@ -35,7 +36,7 @@ use crate::types::hooks::MatchValue;
 /// assert!(!event.allows_agents());
 /// assert!(HookEvent::AgentStop.allows_agents());
 ///
-/// let refused = HookEvent::parse("tool.pre").err().ok_or("expected a refusal")?;
+/// let refused = HookEvent::new("tool.pre").err().ok_or("expected a refusal")?;
 /// assert_eq!(refused.to_string(), "\"tool.pre\" unknown");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -61,7 +62,7 @@ impl HookEvent {
     /// # Errors
     ///
     /// Returns [`InvalidHookEvent`] for a name outside the vocabulary.
-    pub fn parse(text: &str) -> Result<Self, InvalidHookEvent> {
+    pub fn new(text: &str) -> Result<Self, InvalidHookEvent> {
         match text {
             "session.start" => Ok(Self::SessionStart),
             "session.end" => Ok(Self::SessionEnd),
@@ -116,6 +117,22 @@ impl fmt::Display for HookEvent {
     }
 }
 
+impl FromStr for HookEvent {
+    type Err = InvalidHookEvent;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for HookEvent {
+    type Error = InvalidHookEvent;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,17 +159,17 @@ mod tests {
             "tool.after",
             "agent.stop",
         ] {
-            assert_eq!(HookEvent::parse(name)?.to_string(), name);
+            assert_eq!(HookEvent::new(name)?.to_string(), name);
         }
         let parsed: Result<Vec<HookEvent>, InvalidHookEvent> =
-            ALL.iter().map(|e| HookEvent::parse(e.as_str())).collect();
+            ALL.iter().map(|e| HookEvent::new(e.as_str())).collect();
         assert_eq!(parsed?, ALL);
         Ok(())
     }
 
     #[test]
     fn hook_event_refuses_unknown_events() -> TestResult {
-        let error = HookEvent::parse("tool.pre")
+        let error = HookEvent::new("tool.pre")
             .err()
             .ok_or("expected a refusal")?;
         let location = Location::at_key("packs/core/pack.toml", "hooks[0].event");
@@ -194,5 +211,21 @@ mod tests {
                 "{event}"
             );
         }
+    }
+
+    #[test]
+    fn hook_event_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<HookEvent, InvalidHookEvent>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["tool.before", "tool.pre"] {
+            let expected = shown(HookEvent::new(text));
+            assert_eq!(shown(text.parse::<HookEvent>()), expected);
+            assert_eq!(shown(HookEvent::try_from(text)), expected);
+        }
+        assert!(HookEvent::new("tool.before").is_ok());
+        assert!(HookEvent::new("tool.pre").is_err());
     }
 }

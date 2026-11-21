@@ -152,7 +152,7 @@ mod tests {
     use super::*;
 
     fn token(kind: TokenKind, words: &[&str]) -> Option<Token> {
-        TokenTarget::parse(kind, words)
+        TokenTarget::new(kind, words)
             .ok()
             .map(|target| Token::new(target, 0..1, false))
     }
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn accessors_return_constructed_parts() {
-        let built = TokenTarget::parse(TokenKind::Root, &[])
+        let built = TokenTarget::new(TokenKind::Root, &[])
             .ok()
             .map(|target| Token::new(target, 4..12, true));
         assert_eq!(built.as_ref().map(Token::kind), Some(TokenKind::Root));

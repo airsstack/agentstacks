@@ -47,8 +47,8 @@ const NIBBLES: [char; 16] = [
 /// );
 ///
 /// // Text parses back to the same value; anything else is refused.
-/// assert_eq!(ContentHash::parse(&empty.to_string())?, empty);
-/// assert!(ContentHash::parse("sha256:ABC").is_err());
+/// assert_eq!(ContentHash::new(&empty.to_string())?, empty);
+/// assert!(ContentHash::new("sha256:ABC").is_err());
 /// # Ok::<(), agentstacks::types::ContentHashError>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -62,7 +62,7 @@ impl ContentHash {
     /// # Errors
     ///
     /// [`ContentHashError`] for any other text.
-    pub fn parse(text: &str) -> Result<Self, ContentHashError> {
+    pub fn new(text: &str) -> Result<Self, ContentHashError> {
         let hex = text.strip_prefix(PREFIX).ok_or(ContentHashError)?;
         let well_formed = hex.len() == HEX_LEN
             && hex
@@ -99,7 +99,15 @@ impl FromStr for ContentHash {
     type Err = ContentHashError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::parse(text)
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for ContentHash {
+    type Error = ContentHashError;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
     }
 }
 
@@ -134,11 +142,12 @@ mod tests {
     }
 
     #[test]
-    fn content_hash_parse_round_trips_display() {
+    fn content_hash_new_round_trips_display() {
         let hash = ContentHash::of_bytes(b"a\n");
         let text = hash.to_string();
-        assert_eq!(ContentHash::parse(&text), Ok(hash.clone()));
-        assert_eq!(text.parse::<ContentHash>(), Ok(hash));
+        assert_eq!(ContentHash::new(&text), Ok(hash.clone()));
+        assert_eq!(text.parse::<ContentHash>(), Ok(hash.clone()));
+        assert_eq!(ContentHash::try_from(text.as_str()), Ok(hash));
     }
 
     #[test]
@@ -157,7 +166,7 @@ mod tests {
             "",
             with_g.as_str(),
         ] {
-            let message = ContentHash::parse(bad).err().map(|e| e.to_string());
+            let message = ContentHash::new(bad).err().map(|e| e.to_string());
             assert_eq!(
                 message.as_deref(),
                 Some("bad hash (expected sha256:<64 lowercase hex>)"),

@@ -8,12 +8,16 @@
 //! - [`LockedEntry`], [`LockedSource`]: one locked tool or pack and where it came from.
 //! - [`FileEntry`], [`MergeEntry`]: one file an install wrote, and one merge it made into a file
 //!   it does not own.
+//! - [`EntryKey`]: what identifies one entry, so the duplicate refusal can name it.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
+pub mod key;
 pub mod locked;
 pub mod written;
 
+#[doc(inline)]
+pub use key::EntryKey;
 #[doc(inline)]
 pub use locked::LockedEntry;
 #[doc(inline)]

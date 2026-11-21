@@ -18,6 +18,8 @@
 //! words a refusal differently maps the error into its own message. The tests assert the exact
 //! `Display` text of every variant.
 
+use crate::types::report::MustBeRelative;
+
 /// A text that cannot be an [`AirslReq`](crate::types::AirslReq).
 ///
 /// # Examples
@@ -59,16 +61,13 @@ pub enum InvalidAirslReq {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum InvalidExcludeGlob {
     /// A pattern that starts with `/`.
-    #[error("\"{path}\" must be relative")]
-    MustBeRelative {
-        /// The refused pattern.
-        path: String,
-    },
+    #[error(transparent)]
+    MustBeRelative(#[from] MustBeRelative),
     /// A pattern the glob parser refuses.
-    #[error("\"{pattern}\" is not a valid glob")]
+    #[error("\"{text}\" is not a valid glob")]
     NotAGlob {
-        /// The refused pattern.
-        pattern: String,
+        /// The refused pattern, as written.
+        text: String,
     },
 }
 
@@ -79,7 +78,7 @@ pub enum InvalidExcludeGlob {
 /// ```
 /// use agentstacks::types::OptionType;
 ///
-/// let refused = OptionType::parse("number").err();
+/// let refused = OptionType::new("number").err();
 /// assert_eq!(
 ///     refused.as_ref().map(ToString::to_string).as_deref(),
 ///     Some("\"number\" (expected boolean, integer, string)")
@@ -123,44 +122,47 @@ pub enum InvalidPackPath {
     #[error("\".\" must name a file inside the pack")]
     IsDot,
     /// A path that starts with `/`.
-    #[error("\"{path}\" must be relative")]
-    MustBeRelative {
-        /// The refused path.
-        path: String,
-    },
+    #[error(transparent)]
+    MustBeRelative(#[from] MustBeRelative),
     /// A path written with `\` instead of `/`.
-    #[error("\"{path}\" must use / as the separator")]
+    #[error("\"{text}\" must use / as the separator")]
     Backslash {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// A path with a `..` segment.
-    #[error("\"{path}\" must stay inside the pack")]
+    #[error("\"{text}\" must stay inside the pack")]
     MustStayInsidePack {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// A path with a `.` segment, such as `./x` or `a/./b`.
-    #[error("\"{path}\" must not have a . segment")]
+    #[error("\"{text}\" must not have a . segment")]
     DotSegment {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// A path that ends with `/`.
-    #[error("\"{path}\" must not end with /")]
+    #[error("\"{text}\" must not end with /")]
     TrailingSlash {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
     /// A path with an empty segment, such as `a//b`.
-    #[error("\"{path}\" must not have an empty segment")]
+    #[error("\"{text}\" must not have an empty segment")]
     EmptySegment {
-        /// The refused path.
-        path: String,
+        /// The refused path, as written.
+        text: String,
     },
 }
 
 /// A version that is not a semantic version.
+///
+/// A pack's `pack.version`, an extension's `version` and a locked entry's version are refused with
+/// this error, through [`ManifestError::Version`](crate::types::ManifestError::Version),
+/// [`ExtensionError::Version`](crate::types::ExtensionError::Version) and
+/// [`LockError::Version`](crate::types::LockError::Version). The lock's `[airsl] version` words its
+/// refusal itself, as [`LockError::NotAVersion`](crate::types::LockError::NotAVersion).
 ///
 /// # Examples
 ///
@@ -220,14 +222,12 @@ mod tests {
     fn invalid_exclude_glob_displays_each_message() {
         let cases = [
             (
-                InvalidExcludeGlob::MustBeRelative {
-                    path: "/x".to_owned(),
-                },
+                InvalidExcludeGlob::from(MustBeRelative::new("/x")),
                 "\"/x\" must be relative",
             ),
             (
                 InvalidExcludeGlob::NotAGlob {
-                    pattern: "[".to_owned(),
+                    text: "[".to_owned(),
                 },
                 "\"[\" is not a valid glob",
             ),
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn invalid_pack_path_displays_each_message() {
-        let path = || "p".to_owned();
+        let text = || "p".to_owned();
         let cases = [
             (InvalidPackPath::Empty, "\"\" must not be empty"),
             (
@@ -257,27 +257,27 @@ mod tests {
                 "\".\" must name a file inside the pack",
             ),
             (
-                InvalidPackPath::MustBeRelative { path: path() },
+                InvalidPackPath::from(MustBeRelative::new(text())),
                 "\"p\" must be relative",
             ),
             (
-                InvalidPackPath::Backslash { path: path() },
+                InvalidPackPath::Backslash { text: text() },
                 "\"p\" must use / as the separator",
             ),
             (
-                InvalidPackPath::MustStayInsidePack { path: path() },
+                InvalidPackPath::MustStayInsidePack { text: text() },
                 "\"p\" must stay inside the pack",
             ),
             (
-                InvalidPackPath::DotSegment { path: path() },
+                InvalidPackPath::DotSegment { text: text() },
                 "\"p\" must not have a . segment",
             ),
             (
-                InvalidPackPath::TrailingSlash { path: path() },
+                InvalidPackPath::TrailingSlash { text: text() },
                 "\"p\" must not end with /",
             ),
             (
-                InvalidPackPath::EmptySegment { path: path() },
+                InvalidPackPath::EmptySegment { text: text() },
                 "\"p\" must not have an empty segment",
             ),
         ];

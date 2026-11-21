@@ -27,6 +27,7 @@ use crate::types::format::TomlFields;
 use crate::types::manifest::ManifestError;
 use crate::types::manifest::PackPath;
 use crate::types::name::PackName;
+use crate::types::report::NotLuaFile;
 use crate::types::tokens::LocatedToken;
 use crate::types::tokens::TokenTarget;
 
@@ -106,7 +107,10 @@ impl HookRun {
     /// Reads the `run` field of the hook behind `fields`, refusing what is wrong in it.
     ///
     /// Every token found in the field is appended to `tokens`.
-    pub(crate) fn read(fields: &mut TomlFields, tokens: &mut Vec<LocatedToken>) -> Option<Self> {
+    pub(in crate::types) fn read(
+        fields: &mut TomlFields,
+        tokens: &mut Vec<LocatedToken>,
+    ) -> Option<Self> {
         let written = fields.required_text("run")?;
         let key_path = fields.key_path("run");
         let first = tokens.len();
@@ -119,9 +123,7 @@ impl HookRun {
         if !is_lua {
             fields.refuse(
                 "run",
-                ManifestError::NotLuaFile {
-                    run: written.clone(),
-                },
+                ManifestError::from(NotLuaFile::new(written.as_str())),
             );
         }
         let Some((pack, path)) = split_form(&written, &tokens[first..]) else {
@@ -178,7 +180,8 @@ fn split_form(text: &str, found: &[LocatedToken]) -> Option<(Option<PackName>, P
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{TokenKind, parse_toml_document};
+    use crate::types::TokenKind;
+    use crate::types::format::parse_toml_document;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
     type Read<T> = Result<(T, Vec<LocatedToken>, Vec<String>), Box<dyn std::error::Error>>;

@@ -9,8 +9,8 @@
 //!   file at once: a bad entry never hides the others. A syntax error stops only this file and is
 //!   its only diagnostic.
 //! - It reads `api`, `[tools.*]` and `[packs.*]`. Entry names follow the name rule; each entry is
-//!   read through [`SourceFields`] under [`PinRule::ExactlyOneOfTagRev`]; a pack entry may also
-//!   hold an `options` table, kept raw.
+//!   read through the source reader under the pin rule "exactly one of `tag` and `rev`"; a pack
+//!   entry may also hold an `options` table, kept raw.
 //! - A file must list at least one tool and one pack. A section that is missing or empty is
 //!   reported as `nothing to install`; a section of the wrong type is reported for its type only.
 //! - Empty text is an empty table, so the fields it lacks are refused one by one.
@@ -40,6 +40,7 @@ use crate::types::project::error::ProjectError;
 use crate::types::report::Diagnostics;
 use crate::types::report::FieldError;
 use crate::types::report::TypeWord;
+use crate::types::report::UnsupportedApi;
 
 /// The keys `agentstacks.toml` may hold at its top level.
 const TOP_LEVEL_KEYS: [&str; 3] = ["api", "tools", "packs"];
@@ -121,7 +122,7 @@ impl ProjectFile {
         let mut root = TomlFields::new(file, "", table);
         root.refuse_unknown_keys(&TOP_LEVEL_KEYS);
         if let Some(api) = root.required_integer("api").filter(|api| *api != API) {
-            root.refuse_at_file(ProjectError::UnsupportedApi { found: api });
+            root.refuse_at_file(ProjectError::from(UnsupportedApi::new(api)));
         }
         let tools = read_section(&mut root, "tools", ToolName::new, read_tool);
         let packs = read_section(&mut root, "packs", PackName::new, read_pack);

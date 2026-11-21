@@ -25,7 +25,7 @@ use crate::types::hooks::HookAction;
 use crate::types::hooks::HookRun;
 use crate::types::name::PackName;
 use crate::types::pack::Pack;
-use crate::types::pack::{MANIFEST_FILE, NATIVE_DIR, NATIVE_HOOKS_FILE};
+use crate::types::pack::{KeyPath, MANIFEST_FILE, native_hooks_file};
 use crate::types::report::Diagnostic;
 use crate::types::report::Location;
 use crate::types::set::error::SetError;
@@ -41,7 +41,7 @@ struct DeclaredRun<'a> {
 
 /// Refuses each hook `run` of the loaded `packs` that points at a file another required, loaded
 /// pack does not install at its root. `packs` are keyed by their `[packs.*]` name.
-pub(crate) fn check_hook_runs(packs: &BTreeMap<PackName, Pack>) -> Vec<Diagnostic> {
+pub(super) fn check_hook_runs(packs: &BTreeMap<PackName, Pack>) -> Vec<Diagnostic> {
     let mut refusals = Vec::new();
     for pack in packs.values() {
         for declared in declared_runs(pack) {
@@ -60,9 +60,12 @@ pub(crate) fn check_hook_runs(packs: &BTreeMap<PackName, Pack>) -> Vec<Diagnosti
             let script = TreePath::from_parts(&[declared.run.path().as_str()]);
             if !other.root_files().contains(&script) {
                 refusals.push(Diagnostic::new(
-                    Location::at_key(declared.file, format!("hooks[{}].run", declared.index)),
+                    Location::at_key(
+                        declared.file,
+                        KeyPath::new("hooks").item(declared.index).key("run"),
+                    ),
                     SetError::RunMissing {
-                        run: declared.run.written().to_owned(),
+                        text: declared.run.written().to_owned(),
                         pack: target.clone(),
                     },
                 ));
@@ -91,11 +94,7 @@ fn declared_runs(pack: &Pack) -> Vec<DeclaredRun<'_>> {
         let Some(hooks) = native.hooks() else {
             continue;
         };
-        let file = pack
-            .dir()
-            .join(NATIVE_DIR)
-            .join(native.tool().as_str())
-            .join(NATIVE_HOOKS_FILE);
+        let file = pack.dir().join(native_hooks_file(native.tool()).as_str());
         declared.extend(
             hooks
                 .hooks()

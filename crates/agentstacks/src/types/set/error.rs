@@ -110,10 +110,10 @@ pub enum SetError {
         option: OptionName,
     },
     /// A hook `run` into another pack that names no installed root file there.
-    #[error("\"{run}\" does not exist in {pack}")]
+    #[error("\"{text}\" does not exist in {pack}")]
     RunMissing {
         /// The `run` as written.
-        run: String,
+        text: String,
         /// The pack the `run` points into.
         pack: PackName,
     },
@@ -134,10 +134,10 @@ pub enum SetError {
         got: TypeWord,
     },
     /// An option value for an option the pack does not declare.
-    #[error("no option \"{key}\"")]
+    #[error("no option \"{text}\"")]
     OptionUndeclared {
         /// The key as written in the project file.
-        key: String,
+        text: String,
     },
     /// `requires.airsl` ranges that no version satisfies together.
     #[error("airsl: {}", Needs(needs))]
@@ -297,7 +297,7 @@ mod tests {
             ),
             (
                 SetError::RunMissing {
-                    run: "{{root core}}/hooks/enforc.lua".to_owned(),
+                    text: "{{root core}}/hooks/enforc.lua".to_owned(),
                     pack: pack("core")?,
                 },
                 "\"{{root core}}/hooks/enforc.lua\" does not exist in core",
@@ -318,7 +318,7 @@ mod tests {
             ),
             (
                 SetError::OptionUndeclared {
-                    key: "archive_kep".to_owned(),
+                    text: "archive_kep".to_owned(),
                 },
                 "no option \"archive_kep\"",
             ),

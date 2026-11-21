@@ -1,6 +1,6 @@
 //! Where a pack or an extension comes from.
 //!
-//! It is separate from [`SourceFields`] because the fields keep everything as read (including the
+//! It is separate from the crate-internal `SourceFields` because the fields keep everything as read (including the
 //! `tag` written beside a `rev`), while the source is the resolved value the rest of the program
 //! uses.
 //!
@@ -8,7 +8,7 @@
 //!
 //! - [`Source`] is a git repository pinned to a tag or a commit, with an optional directory inside
 //!   it, or a directory inside the project.
-//! - [`Source::from_fields`] converts read [`SourceFields`] into a source. It cannot fail, because
+//! - `Source::from_fields` (crate-internal) converts read `SourceFields` into a source. It cannot fail, because
 //!   the fields were checked when they were read.
 //!
 //! # Non-responsibilities
@@ -55,34 +55,8 @@ pub enum Source {
 impl Source {
     /// The source `fields` describe, keeping the pin the fields resolved (a `rev` wins over a
     /// `tag` written beside it).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use agentstacks::types::{GitTag, GitUrl, LocalPath, Pin, Source, SourceFields};
-    ///
-    /// let url = GitUrl::new("https://example.org/r")?;
-    /// let tag = GitTag::new("v1")?;
-    /// let fields = SourceFields::Git {
-    ///     url: url.clone(),
-    ///     pin: Pin::Tag(tag.clone()),
-    ///     tag: Some(tag.clone()),
-    ///     subdir: None,
-    /// };
-    /// assert_eq!(
-    ///     Source::from_fields(fields),
-    ///     Source::Git { url, pin: Pin::Tag(tag), subdir: None }
-    /// );
-    ///
-    /// let path = LocalPath::new("packs/team-lint")?;
-    /// assert_eq!(
-    ///     Source::from_fields(SourceFields::Path(path.clone())),
-    ///     Source::Path(path)
-    /// );
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
     #[must_use]
-    pub fn from_fields(fields: SourceFields) -> Self {
+    pub(in crate::types) fn from_fields(fields: SourceFields) -> Self {
         match fields {
             SourceFields::Git {
                 url, pin, subdir, ..

@@ -35,54 +35,13 @@ use crate::types::tokens::scan;
 /// # Errors
 ///
 /// The refusal located at `file` when `bytes` are not valid UTF-8.
-///
-/// # Examples
-///
-/// ```
-/// use std::path::Path;
-///
-/// use agentstacks::types::rendered_text;
-///
-/// let file = Path::new("packs/core/data.json");
-/// assert_eq!(
-///     rendered_text(file, b"a\n".to_vec()).ok().as_deref(),
-///     Some("a\n")
-/// );
-/// assert_eq!(
-///     rendered_text(file, vec![0x66, 0xFF]).err().map(|d| d.to_string()),
-///     Some("packs/core/data.json: not valid UTF-8, cannot render".to_owned())
-/// );
-/// ```
-pub fn rendered_text(file: &Path, bytes: Vec<u8>) -> Result<String, Diagnostic> {
+pub(super) fn rendered_text(file: &Path, bytes: Vec<u8>) -> Result<String, Diagnostic> {
     String::from_utf8(bytes).map_err(|_| Diagnostic::new(Location::file(file), PackError::NotUtf8))
 }
 
 /// Scans `text`, whose first line is line `start_line` of `file`.
-///
-/// # Examples
-///
-/// ```
-/// use std::num::NonZeroUsize;
-/// use std::path::Path;
-///
-/// use agentstacks::types::scan_body;
-///
-/// let start = NonZeroUsize::new(5).ok_or("line 5")?;
-/// let (tokens, refused) = scan_body(Path::new("a.md"), "text\n{{skill status}}\n", start);
-/// assert!(refused.is_empty());
-/// let shown: Vec<String> = tokens.iter().map(|t| t.location().to_string()).collect();
-/// assert_eq!(shown, ["a.md:6"]);
-///
-/// // A token that does not parse is refused at its own line.
-/// let start = NonZeroUsize::new(6).ok_or("line 6")?;
-/// let (tokens, refused) = scan_body(Path::new("a.md"), "{{skil x}}\n", start);
-/// assert!(tokens.is_empty());
-/// let shown: Vec<String> = refused.into_sorted().iter().map(ToString::to_string).collect();
-/// assert_eq!(shown, ["a.md:6: unknown token kind \"skil\""]);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[must_use]
-pub fn scan_body(
+pub(super) fn scan_body(
     file: &Path,
     text: &str,
     start_line: NonZeroUsize,

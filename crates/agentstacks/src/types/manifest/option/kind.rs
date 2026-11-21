@@ -6,7 +6,7 @@
 //! # Responsibilities
 //!
 //! - [`OptionType`] is `boolean`, `integer` or `string`; an integer is an `i64`.
-//! - [`OptionType::parse`] reads the `type` field, and [`OptionType::type_word`] names the type in
+//! - [`OptionType::new`] reads the `type` field, and [`OptionType::type_word`] names the type in
 //!   the words wrong-type messages use.
 //!
 //! # Non-responsibilities
@@ -14,6 +14,7 @@
 //! Checking a value against the type belongs to the code that holds the value.
 
 use std::fmt;
+use std::str::FromStr;
 
 use crate::types::manifest::InvalidOptionType;
 use crate::types::report::TypeWord;
@@ -25,10 +26,10 @@ use crate::types::report::TypeWord;
 /// ```
 /// use agentstacks::types::OptionType;
 ///
-/// assert_eq!(OptionType::parse("integer")?, OptionType::Integer);
+/// assert_eq!(OptionType::new("integer")?, OptionType::Integer);
 /// assert_eq!(OptionType::Boolean.to_string(), "boolean");
 ///
-/// let refused = OptionType::parse("number").err().ok_or("expected a refusal")?;
+/// let refused = OptionType::new("number").err().ok_or("expected a refusal")?;
 /// assert_eq!(
 ///     refused.to_string(),
 ///     "\"number\" (expected boolean, integer, string)"
@@ -51,7 +52,7 @@ impl OptionType {
     /// # Errors
     ///
     /// Returns [`InvalidOptionType`] for anything but `boolean`, `integer` and `string`.
-    pub fn parse(text: &str) -> Result<Self, InvalidOptionType> {
+    pub fn new(text: &str) -> Result<Self, InvalidOptionType> {
         match text {
             "boolean" => Ok(Self::Boolean),
             "integer" => Ok(Self::Integer),
@@ -77,6 +78,22 @@ impl fmt::Display for OptionType {
     }
 }
 
+impl FromStr for OptionType {
+    type Err = InvalidOptionType;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::new(text)
+    }
+}
+
+impl TryFrom<&str> for OptionType {
+    type Error = InvalidOptionType;
+
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        Self::new(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,9 +103,9 @@ mod tests {
 
     #[test]
     fn option_type_parses_the_three_types() -> TestResult {
-        assert_eq!(OptionType::parse("boolean")?, OptionType::Boolean);
-        assert_eq!(OptionType::parse("integer")?, OptionType::Integer);
-        assert_eq!(OptionType::parse("string")?, OptionType::String);
+        assert_eq!(OptionType::new("boolean")?, OptionType::Boolean);
+        assert_eq!(OptionType::new("integer")?, OptionType::Integer);
+        assert_eq!(OptionType::new("string")?, OptionType::String);
         assert_eq!(OptionType::Integer.to_string(), "integer");
         assert_eq!(OptionType::Integer.type_word(), TypeWord::Integer);
         Ok(())
@@ -96,7 +113,7 @@ mod tests {
 
     #[test]
     fn option_type_refuses_others() -> TestResult {
-        let error = OptionType::parse("number")
+        let error = OptionType::new("number")
             .err()
             .ok_or("expected a refusal")?;
         let location = Location::at_key("packs/core/pack.toml", "options.keep.type");
@@ -105,5 +122,21 @@ mod tests {
             "packs/core/pack.toml: options.keep.type: \"number\" (expected boolean, integer, string)"
         );
         Ok(())
+    }
+
+    #[test]
+    fn option_type_builds_alike_through_new_from_str_and_try_from() {
+        fn shown(built: Result<OptionType, InvalidOptionType>) -> Result<String, String> {
+            built
+                .map(|value| value.to_string())
+                .map_err(|error| error.to_string())
+        }
+        for text in ["integer", "number"] {
+            let expected = shown(OptionType::new(text));
+            assert_eq!(shown(text.parse::<OptionType>()), expected);
+            assert_eq!(shown(OptionType::try_from(text)), expected);
+        }
+        assert!(OptionType::new("integer").is_ok());
+        assert!(OptionType::new("number").is_err());
     }
 }

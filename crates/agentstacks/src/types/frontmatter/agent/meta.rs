@@ -34,6 +34,7 @@ use crate::types::frontmatter::wording::StringWording;
 use crate::types::name::ItemName;
 use crate::types::name::ToolName;
 use crate::types::report::Diagnostics;
+use crate::types::report::ListedTwice;
 use crate::types::tokens::LocatedToken;
 
 /// The keys an agent's frontmatter may hold.
@@ -157,7 +158,7 @@ impl AgentMeta {
             let key_path = format!("tools[{index}]");
             match item.parse::<AgentTool>() {
                 Ok(tool) if tools.contains(&tool) => {
-                    fields.refuse_at(&key_path, FrontmatterError::DuplicateTool { value: item });
+                    fields.refuse_at(&key_path, FrontmatterError::from(ListedTwice::text(item)));
                 }
                 Ok(tool) => tools.push(tool),
                 Err(error) => fields.refuse_at(&key_path, error),

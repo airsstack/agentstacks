@@ -9,7 +9,7 @@
 //!
 //! # Non-responsibilities
 //!
-//! Which of the two a file requires belongs to [`PinRule`](crate::types::PinRule).
+//! Which of the two a file requires belongs to the crate-internal pin rule, `PinRule`.
 
 use crate::types::project::CommitId;
 use crate::types::project::GitTag;
