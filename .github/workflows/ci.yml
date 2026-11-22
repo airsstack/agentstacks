@@ -51,10 +51,34 @@ jobs:
         with:
           tool: cargo-make
 
+      # tests/runtime.rs runs the shipped hook runtime on the real binary. The
+      # prebuilt release is downloaded rather than compiled, and checked against
+      # a hash pinned here, not one fetched from the same place. Pinned to the
+      # version the runtime was proven on, the same as the airsl library in
+      # Cargo.toml; bump the version, the hash and the library together.
+      - name: Install the airsl binary
+        env:
+          AIRSL_VERSION: 0.1.4
+          AIRSL_SHA256: 9f64cb082b9cca15b0e9b8e9af298b6a31ccf39cbcfda81565db33093d0ad5bb
+        run: |
+          target=airsl-cli-x86_64-unknown-linux-gnu
+          curl -sSfL -o "$RUNNER_TEMP/airsl.tar.xz" \
+            "https://github.com/airsstack/airsl/releases/download/airsl-cli-v${AIRSL_VERSION}/${target}.tar.xz"
+          echo "${AIRSL_SHA256}  $RUNNER_TEMP/airsl.tar.xz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xJf "$RUNNER_TEMP/airsl.tar.xz" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/${target}/airsl" "$HOME/.local/bin/airsl"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/airsl" --version
+
       # One command, the same one a developer runs locally: fmt-check, clippy,
       # rustdoc, tests, doctests — each with warnings as errors.
+      # AGENTSTACKS_REQUIRE_AIRSL makes the runtime tests fail, not skip, if the
+      # binary above is missing.
       - name: cargo make dod
         run: cargo make dod
+        env:
+          AGENTSTACKS_REQUIRE_AIRSL: "1"
 
   deny:
     name: Supply chain
