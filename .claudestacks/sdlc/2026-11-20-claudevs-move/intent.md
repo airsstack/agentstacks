@@ -32,7 +32,7 @@ the native `.claude/` config that agentstacks renders from packs.
 
 - Keep the crate names (crates.io continuity); `airsl` from crates.io only.
 - claudestacks keeps working until `release-and-migration` archives it.
-- Can start independently of the other chains; checking rendered config needs `claude-extension`.
+- Can start independently of the other chains; checking rendered config needs `cli-and-claude-extension`.
 
 ## Non-goals
 

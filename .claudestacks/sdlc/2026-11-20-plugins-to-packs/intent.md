@@ -35,7 +35,7 @@ cross-references, `${CLAUDE_PLUGIN_ROOT}` paths, Lua scripts, references, enforc
 
 ## Constraints
 
-- Depends on `pack-and-project-formats`, `claude-extension` and `extension-host-and-hooks`.
+- Depends on `pack-and-project-formats`, `cli-and-claude-extension` and `core-plan-and-apply`.
 - Plugin behaviour is the reference; any change in behaviour is called out, not slipped in.
 - claudestacks is not edited or archived by this chain (`release-and-migration`).
 
