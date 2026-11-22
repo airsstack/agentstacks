@@ -124,3 +124,4 @@ CLAUDE.md                                               — modify: Status secti
 
 - 2026-11-22: `path_pack_refusal_names_the_path_as_written` writes `path = "packs/bad"` by hand. The location is the path as written, so a toml entry `./packs/bad` prints `./packs/bad/pack.toml:1: …` and `packs/bad` prints `packs/bad/pack.toml:…`, which is the form the plan states. Real output for `./packs/bad`: `./packs/bad/pack.toml:1: key with no value, expected `=``.
 - 2026-11-22 (process): run directly from `approved` to `done`; built in parallel with plan 08's review because the file sets are disjoint.
+- 2026-11-23 (author request): added `docs/authoring.md`, an agent-followable guide for building a tool extension, linked by its raw URL. Its starter adapter was run on the demo pack with airsl 0.1.4 (`airsl test`: `2 passed, 0 failed`; `init`: 4 written, 2 skipped; `doctor`: healthy).

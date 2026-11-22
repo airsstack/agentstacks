@@ -6,6 +6,7 @@ then moves there.
 | Document | Covers | State |
 |---|---|---|
 | [architecture.md](architecture.md) | layers, dependency rule, where logic lives, how it is tested | built |
+| [authoring.md](authoring.md) | step-by-step guide an AI agent follows to build a tool extension; link it by its raw URL | built |
 | [cli.md](cli.md) | the five commands, `-C`, the plan text, the prompt and `--yes`, streams and exit codes | built |
 | [extensions.md](extensions.md) | how an extension is installed, loaded and run; the `api = 0` Lua surface | built |
 | [hooks.md](hooks.md) | the neutral hook protocol, the shared runtime, `may_block` | built |
