@@ -22,7 +22,7 @@
 
 use std::path::Path;
 
-use crate::types::port::FileTree;
+use crate::port::FileTree;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::report::Location;
@@ -110,7 +110,7 @@ fn combine(mut entries: Vec<(TreePath, ContentHash)>) -> ContentHash {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::port::FakeFileTree;
+    use crate::port::FakeFileTree;
     use std::error::Error;
 
     type TestResult = Result<(), Box<dyn Error>>;

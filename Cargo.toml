@@ -11,11 +11,13 @@ authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
 publish       = false
 
 [workspace.dependencies]
+airsl = "0.1.4"
 clap = { version = "4", features = ["derive"] }
 globset = "0.4"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11"
 tempfile = "3"
 thiserror = "2"

@@ -6,7 +6,7 @@
 //! # Responsibilities
 //!
 //! - [`Grants`] holds a hook's policy and the paths, environment variables and binaries it may
-//!   use. The policy is `confined` unless the hook says `pure`; nothing is granted by default.
+//!   use. The policy is `confined`, the only one api 0 allows; nothing is granted by default.
 //! - `Grants::read` reads a `grants` table. A read or write path must be absolute or start with
 //!   a `{{root}}`, `{{skill_dir}}` or `{{var}}` token; an environment variable must be a valid
 //!   name; an exec grant must be `airsl` or a binary the pack requires. An environment variable or
@@ -52,7 +52,7 @@ use crate::types::tokens::TokenKind;
 /// run = "hooks/flush.lua"
 ///
 /// [hooks.grants]
-/// policy = "pure"
+/// policy = "confined"
 /// read = ["/etc", "{{root}}/data"]
 /// env = ["HOME"]
 /// "#;
@@ -62,7 +62,7 @@ use crate::types::tokens::TokenKind;
 /// let HookAction::Lua(lua) = hook.action() else {
 ///     return Err("a lua hook".into());
 /// };
-/// assert_eq!(lua.grants().policy(), Policy::Pure);
+/// assert_eq!(lua.grants().policy(), Policy::Confined);
 /// assert_eq!(lua.grants().read_paths(), ["/etc", "{{root}}/data"]);
 /// assert!(lua.grants().exec().is_empty());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -352,7 +352,11 @@ mod tests {
             ),
             (
                 "policy = \"foo\"",
-                "hooks[1].grants.policy: \"foo\" (expected confined, pure)",
+                "hooks[1].grants.policy: \"foo\" (expected confined)",
+            ),
+            (
+                "policy = \"pure\"",
+                "hooks[1].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
             ),
         ];
         for (text, message) in cases {

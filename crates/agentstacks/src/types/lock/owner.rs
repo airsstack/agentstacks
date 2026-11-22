@@ -1,11 +1,11 @@
 //! The name a `by` field holds.
 //!
-//! It is its own type, not a [`PackName`] or a [`ToolName`], because a file or merge may be
+//! It is its own type, not a [`PackName`] or a [`ToolName`], because a file may be
 //! written by either, and the lock needs one value that holds whichever it was.
 //!
 //! # Responsibilities
 //!
-//! - [`Owner`] is the name of the pack or tool that wrote a file or merge. Packs and tools share
+//! - [`Owner`] is the name of the pack or tool that wrote a file. Packs and tools share
 //!   one name rule, so an owner parses as either and converts from both without failing.
 //!
 //! # Non-responsibilities
@@ -20,7 +20,7 @@ use crate::types::name::InvalidName;
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
 
-/// The name of the pack or tool that wrote a locked file or merge.
+/// The name of the pack or tool that wrote a locked file.
 ///
 /// # Examples
 ///

@@ -17,14 +17,18 @@
 //! - [`extension`]: a tool extension directory read into one checked extension.
 //! - [`pack`]: a pack directory read into one checked pack, with every rule that needs the files.
 //! - [`set`]: the checks over a whole project, ending in the [`ValidSet`] later stages accept.
-//! - [`port`]: the read-only view of a directory that all disk reads go through.
 //! - [`project`]: the project file `agentstacks.toml` and the source values it is built from.
+//! - [`op`]: an operation a tool extension proposes, and the validation of it.
+//! - [`json`]: editing the text of a JSON document at one key path.
+//! - [`plan`]: the step for each path, decided from the operation, the lock and the disk state.
+//! - [`resolve`]: reconciling the lock with `agentstacks.toml`, and choosing tags.
+//! - [`protocol`]: the hook command line and the text of the hook runtime.
 //! - [`tree`]: walking a directory tree under the layout rules, and hashing files and trees.
 //!
 //! # Non-responsibilities
 //!
-//! It touches nothing outside the process except through the ports it declares; reading the real
-//! disk belongs to `crate::fs`.
+//! It touches nothing outside the process except through the read-only tree port that
+//! `crate::port` declares; reading the real disk belongs to `crate::fs`.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
@@ -33,13 +37,17 @@ pub mod extension;
 pub mod format;
 pub mod frontmatter;
 pub mod hooks;
+pub mod json;
 pub mod lock;
 pub mod manifest;
 pub mod name;
+pub mod op;
 pub mod pack;
-pub mod port;
+pub mod plan;
 pub mod project;
+pub mod protocol;
 pub mod report;
+pub mod resolve;
 pub mod set;
 pub mod tokens;
 pub mod tree;
@@ -117,12 +125,6 @@ pub use lock::LockedSource;
 #[doc(inline)]
 pub use lock::Lockfile;
 #[doc(inline)]
-pub use lock::MergeEntry;
-#[doc(inline)]
-pub use lock::MergeFile;
-#[doc(inline)]
-pub use lock::MergeKey;
-#[doc(inline)]
 pub use lock::Owner;
 #[doc(inline)]
 pub use lock::check_airsl_presence;
@@ -188,10 +190,6 @@ pub use pack::PackAgent;
 pub use pack::PackError;
 #[doc(inline)]
 pub use pack::PackSkill;
-#[doc(inline)]
-pub use port::EntryKind;
-#[doc(inline)]
-pub use port::FileTree;
 #[doc(inline)]
 pub use project::CommitId;
 #[doc(inline)]

@@ -23,7 +23,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use crate::types::port::{EntryKind, FileTree};
+use crate::port::{EntryKind, FileTree};
 
 /// The refusal for a symlink met on the way to a read, worded without naming a pack or extension.
 const SYMLINK_REFUSED: &str = "symlinks are not followed";
@@ -36,7 +36,7 @@ const SYMLINK_REFUSED: &str = "symlinks are not followed";
 /// use std::path::Path;
 ///
 /// use agentstacks::fs::StdFileTree;
-/// use agentstacks::types::{EntryKind, FileTree};
+/// use agentstacks::port::{EntryKind, FileTree};
 ///
 /// let dir = tempfile::tempdir()?;
 /// std::fs::write(dir.path().join("pack.toml"), "name = \"core\"\n")?;
@@ -61,7 +61,7 @@ impl StdFileTree {
     ///
     /// ```
     /// use agentstacks::fs::StdFileTree;
-    /// use agentstacks::types::FileTree;
+    /// use agentstacks::port::FileTree;
     ///
     /// let tree = StdFileTree::new("packs/core");
     /// assert_eq!(tree.root(), std::path::Path::new("packs/core"));

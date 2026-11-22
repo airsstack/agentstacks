@@ -1,0 +1,6 @@
+$ echo '{}' | airsl run --policy confined inspect.lua     # airsl 0.1.4, script = runtime-inspect.lua
+airsstack = env:table ext:table fs:table glob:table hash:table hook:table json:table path:table proc:table regex:table stdio:table time:table
+io=nil os=table print=function require=function
+airsstack.stdio = error isatty lines read write
+airsstack.hook = context emit payload
+exit=0

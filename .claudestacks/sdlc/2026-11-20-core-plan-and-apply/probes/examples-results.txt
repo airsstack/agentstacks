@@ -1,0 +1,30 @@
+found 3 json blocks, 3 lua blocks
+json[0]: parses OK
+json[1]: parses OK
+json[2]: parses OK
+install: global airsstack is nil
+lua[0] values example: eval OK
+lua[0] dispatch values: OK {"agents":{"core/coder":"coder"},"root":".claude/agentstacks","skills":{"core/status":{"dir":".claude/skills/status","invoke":"/status"}},"vars":{"tmpdir":"$TMPDIR"}}
+lua[1] json.edit example: eval OK
+lua[1] output:
+{
+    "permissions": {
+        "allow": [
+            "Bash(x:*)"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Read"
+            }
+        ]
+    }
+}
+<<end>>
+lua[1] output == json[2] block: true
+lua[2] runtime.lua == probes/runtime-runtime.lua: true
+R eval: OK
+R dispatch plan (location from module / from adapter): OK {"at":"lib/settings.lua:3","here":"adapter.lua:3"}
+P eval: OK
+P dispatch plan (pcall around infinite loop): OK {"caught":false,"err":"instruction budget of 10000000 exhausted"}

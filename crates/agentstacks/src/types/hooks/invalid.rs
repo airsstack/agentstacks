@@ -8,8 +8,8 @@
 //!
 //! - [`InvalidHookEvent`]: a hook `event` outside the neutral vocabulary.
 //! - [`InvalidMatchValue`]: a `match` value outside the seven selector values.
-//! - [`InvalidPolicy`]: a `grants.policy` that is `trusted`, which no pack hook may use, or that is
-//!   no policy at all.
+//! - [`InvalidPolicy`]: a `grants.policy` that is `pure`, which api 0 does not support, `trusted`,
+//!   which no pack hook may use, or that is no policy at all.
 //!
 //! # Non-responsibilities
 //!
@@ -101,8 +101,13 @@ pub enum InvalidPolicy {
         /// The refused text.
         text: String,
     },
-    /// A grant policy outside the two a pack hook may use.
-    #[error("\"{text}\" (expected confined, pure)")]
+    /// The grant policy `pure`, which api 0 does not support.
+    #[error(
+        "\"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)"
+    )]
+    PureUnsupported,
+    /// A grant policy other than the one a pack hook may use.
+    #[error("\"{text}\" (expected confined)")]
     Unknown {
         /// The refused text.
         text: String,
@@ -137,10 +142,14 @@ mod tests {
                 "\"trusted\" is not allowed for pack hooks",
             ),
             (
+                InvalidPolicy::PureUnsupported,
+                "\"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
+            ),
+            (
                 InvalidPolicy::Unknown {
                     text: "foo".to_owned(),
                 },
-                "\"foo\" (expected confined, pure)",
+                "\"foo\" (expected confined)",
             ),
         ];
         for (error, message) in cases {

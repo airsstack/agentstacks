@@ -29,8 +29,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use crate::types::port::EntryKind;
-use crate::types::port::FileTree;
+use crate::port::EntryKind;
+use crate::port::FileTree;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::report::Location;
@@ -142,7 +142,7 @@ fn located_tree_path(dir: &Path, relative: &Path) -> Result<TreePath, Diagnostic
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::port::FakeFileTree;
+    use crate::port::FakeFileTree;
     use crate::types::report::FormatError;
 
     const SYMLINK: &str = "symlinks are not allowed in a pack";

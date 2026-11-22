@@ -2,7 +2,8 @@
 //!
 //! Every module's error enum joins here through one variant and a `From` conversion, so a
 //! diagnostic holds one type whatever produced it. The conversion is a `#[from]` on every variant
-//! but [`FormatError::Set`], whose hand-written `From<SetError>` boxes the error.
+//! but the boxed ones, [`FormatError::Set`], [`FormatError::Op`] and [`FormatError::Fetch`], whose
+//! hand-written `From` boxes the error.
 //!
 //! # Responsibilities
 //!
@@ -25,13 +26,17 @@
 
 use crate::types::extension::ExtensionError;
 use crate::types::frontmatter::FrontmatterError;
+use crate::types::json::JsonEditError;
 use crate::types::lock::LockError;
 use crate::types::manifest::ManifestError;
+use crate::types::op::OpError;
 use crate::types::pack::PackError;
+use crate::types::plan::StepError;
 use crate::types::project::ProjectError;
 use crate::types::project::SourceError;
 use crate::types::report::FieldError;
 use crate::types::report::ParserMessage;
+use crate::types::resolve::FetchError;
 use crate::types::set::SetError;
 use crate::types::tokens::TokenError;
 use crate::types::tree::WalkError;
@@ -56,15 +61,26 @@ pub enum FormatError {
     /// An extension message with its own wording.
     #[error(transparent)]
     Extension(#[from] ExtensionError),
+    /// A source fetch message with its own wording. Boxed: its largest variant holds two content
+    /// hashes and a revision, which would grow every `Result` that returns a diagnostic.
+    #[error(transparent)]
+    Fetch(Box<FetchError>),
     /// A frontmatter message with its own wording.
     #[error(transparent)]
     Frontmatter(#[from] FrontmatterError),
+    /// A `json.edit` message with its own wording.
+    #[error(transparent)]
+    JsonEdit(#[from] JsonEditError),
     /// A lockfile message with its own wording.
     #[error(transparent)]
     Lock(#[from] LockError),
     /// A manifest message with its own wording.
     #[error(transparent)]
     Manifest(#[from] ManifestError),
+    /// An operation or extension message with its own wording. Boxed: its largest variants hold
+    /// a location and quoted text, which would grow every `Result` that returns a diagnostic.
+    #[error(transparent)]
+    Op(Box<OpError>),
     /// A pack directory message with its own wording.
     #[error(transparent)]
     Pack(#[from] PackError),
@@ -74,6 +90,9 @@ pub enum FormatError {
     /// A source message with its own wording.
     #[error(transparent)]
     Source(#[from] SourceError),
+    /// A file step message with its own wording.
+    #[error(transparent)]
+    Step(#[from] StepError),
     /// A whole-set message with its own wording. Boxed: its variants are larger than every other
     /// error here, and every `Result` that returns a diagnostic would grow with it.
     #[error(transparent)]
@@ -95,6 +114,18 @@ pub enum FormatError {
 impl From<SetError> for FormatError {
     fn from(error: SetError) -> Self {
         Self::Set(Box::new(error))
+    }
+}
+
+impl From<FetchError> for FormatError {
+    fn from(error: FetchError) -> Self {
+        Self::Fetch(Box::new(error))
+    }
+}
+
+impl From<OpError> for FormatError {
+    fn from(error: OpError) -> Self {
+        Self::Op(Box::new(error))
     }
 }
 
@@ -166,6 +197,38 @@ mod tests {
             "source contains pack \"kore\""
         );
         Ok(())
+    }
+
+    #[test]
+    fn op_error_converts_and_displays_unchanged() {
+        assert_eq!(
+            FormatError::from(OpError::NoPlanHandler).to_string(),
+            "registers no plan handler"
+        );
+    }
+
+    #[test]
+    fn json_edit_error_converts_and_displays_unchanged() {
+        assert_eq!(
+            FormatError::from(JsonEditError::TopLevel).to_string(),
+            "json.edit: top level must be an object"
+        );
+    }
+
+    #[test]
+    fn step_error_converts_and_displays_unchanged() {
+        assert_eq!(
+            FormatError::from(StepError::Changed).to_string(),
+            "changed since the last apply"
+        );
+    }
+
+    #[test]
+    fn fetch_error_converts_and_displays_unchanged() {
+        assert_eq!(
+            FormatError::from(FetchError::HomeUnset).to_string(),
+            "HOME is not set, so the cache (~/.airsstack/cache) has no home"
+        );
     }
 
     #[test]

@@ -123,6 +123,14 @@ pub enum ManifestError {
     /// A hook `run` written in none of the three allowed forms.
     #[error("must be pack-relative, {{{{root}}}}/… or {{{{root <pack>}}}}/…")]
     RunForm,
+    /// A segment of a hook `run` that cannot name a module under the hook runtime.
+    #[error("\"{run}\" segment \"{segment}\" may use only letters, digits, _ and -")]
+    RunSegment {
+        /// The `run` as written.
+        run: String,
+        /// The first segment that is refused.
+        segment: String,
+    },
     /// A grant path that is neither absolute nor starts with a token.
     #[error("\"{text}\" must be absolute or start with a token")]
     GrantPath {
@@ -223,7 +231,7 @@ mod tests {
             ),
             (
                 ManifestError::from(InvalidPolicy::Unknown { text: text("foo") }),
-                "\"foo\" (expected confined, pure)",
+                "\"foo\" (expected confined)",
             ),
             (
                 ManifestError::from(InvalidOptionType::new("number")),
@@ -282,6 +290,13 @@ mod tests {
             (
                 ManifestError::RunForm,
                 "must be pack-relative, {{root}}/… or {{root <pack>}}/…",
+            ),
+            (
+                ManifestError::RunSegment {
+                    run: text("hooks/my.hook.lua"),
+                    segment: text("my.hook"),
+                },
+                "\"hooks/my.hook.lua\" segment \"my.hook\" may use only letters, digits, _ and -",
             ),
             (
                 ManifestError::GrantPath { text: text("data") },

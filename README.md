@@ -19,7 +19,7 @@ into each tool you use. Before anything is written, you see exactly what will ch
  tool extension ── claude · opencode · yours      Lua, sandboxed by airsl, zero authority
         │
         ▼
- plan  ── every file write, config merge, and command, shown before it happens
+ plan  ── every file write, copy and delete, and every required binary, shown before it happens
         │
         ▼
  apply ── the only step that touches disk ──► agentstacks.lock (pinned versions + file hashes)
@@ -31,7 +31,7 @@ into each tool you use. Before anything is written, you see exactly what will ch
 |---|---|
 | **Pack** | *What* the agent gets. A named, versioned bundle of tool-neutral content: skills, agents, commands, hooks (Lua), and rules. No code beyond hooks. |
 | **Tool extension** | *How* one tool gets it. A Lua adapter that turns packs into that tool's artifacts and steps. |
-| **Plan** | The list of operations an apply would perform: write a file, merge a config key, run a declared command, require a binary, or skip an item the tool can't support, with the reason. |
+| **Plan** | The list of operations an apply would perform: write, copy or delete a file, require a binary, or skip an item the tool can't support, with the reason. A config file you share with a tool (such as `.claude/settings.json`) is rewritten by its extension, and the plan shows the diff. |
 | **Lock** | `agentstacks.lock`: pinned pack and extension versions plus a hash of every written file, so `doctor` detects drift and `apply` never silently overwrites your edits. |
 
 ## Usage (planned)
@@ -49,8 +49,17 @@ agentstacks update    # newer pack versions → plan → apply
 
 ```toml
 # agentstacks.toml
-tools = ["claude", "opencode"]
-packs = ["sdlc", "guideline-rust"]
+api = 0
+
+[tools.claude]
+git    = "https://github.com/airsstack/agentstacks"
+tag    = "packs-v0.1.0"
+subdir = "extensions/claude"
+
+[packs.sdlc]
+git    = "https://github.com/airsstack/agentstacks"
+tag    = "packs-v0.1.0"
+subdir = "packs/sdlc"
 ```
 
 A teammate runs `agentstacks apply` and gets the same packs in whichever supported tool they use.
@@ -106,14 +115,21 @@ unstable (`api = 0`) until both official tools run on it.
 ```text
 agentstacks/
 ├─ crates/
-│  ├─ agentstacks/       model · validation · plan · executor · lock · extension host
+│  ├─ agentstacks/       core library: types · port · app · fs · process · host (ports and adapters)
 │  ├─ agentstacks-cli/   init · plan · apply · doctor · update
 │  ├─ claudevs/          deterministic test engine for Claude Code setups (moving from claudestacks)
 │  └─ claudevs-cli/
 ├─ extensions/           official tool extensions: claude/ · opencode/
 ├─ packs/                official packs
+├─ docs/                 contributor docs, until the book exists
 └─ book/
 ```
+
+## Documentation
+
+Contributor docs live in [`docs/`](docs/README.md) until the book exists. Start with
+[`docs/architecture.md`](docs/architecture.md): the layers, the dependency rule, where logic lives,
+and how it is tested.
 
 ## Roadmap
 

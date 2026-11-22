@@ -49,6 +49,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
+use crate::port::FileTree;
 use crate::types::frontmatter::AgentMeta;
 use crate::types::frontmatter::BodyStart;
 use crate::types::frontmatter::SkillMeta;
@@ -65,7 +66,6 @@ use crate::types::pack::local::{check_local_tokens, check_native_references};
 use crate::types::pack::native::NativeDir;
 use crate::types::pack::scan::{rendered_text, scan_body};
 use crate::types::pack::targets::HookTargets;
-use crate::types::port::FileTree;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::report::Location;
@@ -499,7 +499,7 @@ impl<'a, T: FileTree> Run<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::port::FakeFileTree;
+    use crate::port::FakeFileTree;
     use std::error::Error;
 
     type TestResult = Result<(), Box<dyn Error>>;

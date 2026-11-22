@@ -5,9 +5,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`EntryKey`] has a variant per lock array (`tool`, `pack`, `file`, `merge`) holding the typed
-//!   values that identify an entry of it. It displays the array's word, then each value quoted:
-//!   `tool "claude"`, `merge ".claude/settings.json" "hooks"`.
+//! - [`EntryKey`] has a variant per lock array (`tool`, `pack`, `file`) holding the typed values
+//!   that identify an entry of it. It displays the array's word, then each value quoted:
+//!   `tool "claude"`, `file ".claude/x"`.
 //!
 //! # Non-responsibilities
 //!
@@ -15,7 +15,6 @@
 
 use std::fmt;
 
-use crate::types::lock::merge::{MergeFile, MergeKey};
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
 use crate::types::project::SubPath;
@@ -40,13 +39,6 @@ pub enum EntryKey {
     /// A `[[file]]` entry, identified by its path as written by the later of the entries that
     /// name it.
     File(SubPath),
-    /// A `[[merge]]` entry, identified by the file and the key it touched.
-    Merge {
-        /// The file the merge touched.
-        file: MergeFile,
-        /// The key the merge touched.
-        key: MergeKey,
-    },
 }
 
 impl fmt::Display for EntryKey {
@@ -55,7 +47,6 @@ impl fmt::Display for EntryKey {
             Self::Tool(name) => write!(f, "tool \"{name}\""),
             Self::Pack(name) => write!(f, "pack \"{name}\""),
             Self::File(path) => write!(f, "file \"{path}\""),
-            Self::Merge { file, key } => write!(f, "merge \"{file}\" \"{key}\""),
         }
     }
 }
@@ -74,13 +65,6 @@ mod tests {
             (
                 EntryKey::File(SubPath::new(".claude/x")?),
                 "file \".claude/x\"",
-            ),
-            (
-                EntryKey::Merge {
-                    file: MergeFile::new(".claude/settings.json")?,
-                    key: MergeKey::new("hooks")?,
-                },
-                "merge \".claude/settings.json\" \"hooks\"",
             ),
         ];
         for (key, shown) in cases {
