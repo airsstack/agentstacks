@@ -1,7 +1,7 @@
 ---
 status: approved
 created: 2026-11-22
-built-on: a30291e280c8
+built-on: 91feaeeafb2e
 ---
 
 # Spec: CLI commands and Claude Code extension
@@ -18,13 +18,23 @@ Proof convention:
 - `probes/<file>:<line>` is a file in this chain directory holding raw probe output.
 - `probes/docs/<page>.md:<line>` is Claude Code documentation fetched with curl on 2026-11-22
   (`probes/docs-results.md` lists the fetch commands).
-- `src/…` is `crates/agentstacks/src/…` at commit `8107626`.
+- `src/…` is `crates/agentstacks/src/…` at commit `8107626`, except in §8.5, which cites commit `4a5d405`.
 - `core §N` cites the approved core spec (`2026-11-20-core-plan-and-apply/spec.md`), and
   `formats §N` cites the approved formats spec.
 
 Redesigned on 2026-11-22 from `spec-superseded-2026-11-22.md`. The plan-set review found six
 gaps (G1-G6), settled as D19-D24. Its spec review found three more, settled as D25-D27. All are
-proven in `probes/redesign-results.md` or the cited docs. Nothing else changed.
+proven in `probes/redesign-results.md` or the cited docs.
+
+Redesigned again on 2026-11-22 from `spec-superseded-2026-11-22-2.md`, after plans 01-06 and 10
+were built. Three changes, nothing else:
+
+- The intent gained the temp-path symlink requirement, settled as D28 (§8.5), proven in
+  `probes/symlink-results.md`.
+- §13: the workspace dependency carries `version = "0.0.0"`. Plan 05's build showed that
+  `cargo deny check` rejects the path-only form (`probes/deny-results.md`).
+- §5.2: the example rows are in path order, as the row rule says. Plan 05's build showed the old
+  example out of order (`plans/05-cli-presentation.md`, Deviations).
 
 Versions probed:
 
@@ -36,6 +46,7 @@ Versions probed:
 | toml_edit | 0.25.20 |
 | similar | 3.2.1 |
 | rustc | 1.94.1 (`probes/cli-results.md`) |
+| rustc and cargo, symlink probe | 1.94.1 on Darwin 25.3.0 (`probes/symlink-results.md`, S1) |
 | cargo, redesign probes | 1.94.1, the pinned toolchain; G1 and G2 also reproduce on 1.99.0 (`probes/redesign-results.md:3`) |
 | toml (the toml_edit parse comparison) | 1.2.0; it shares `toml_parser` with toml_edit 0.25.20 (`probes/redesign-results.md`, `cargo tree -i toml_parser`) |
 
@@ -72,10 +83,11 @@ All were settled with the author on 2026-11-22.
 | D25 | On `Stop` and `SubagentStop`, Claude treats `additionalContext` as feedback that keeps the agent running. So message hooks there are skipped (neutral `agent.stop`, native `Stop`/`SubagentStop`), and `translate.result` drops a `context` on `SubagentStop`. Only a `may_block` hook's `block` continues the agent (§9.4, §9.6, §9.7). |
 | D26 | `retag` refuses when the tag at re-read differs from the listed current tag: `agentstacks.toml: packs.core: tag changed during update (run update again)` (§7). |
 | D27 | A lua hook whose argv holds a `$` outside the rendered var forms is skipped, because `sh` would expand it (§9.4, §9.6). |
+| D28 | Every temp file the core writes in the project (`agentstacks.toml`, `agentstacks.lock`, each staged file) is written by removing whatever sits at the temp path, then creating it with `create_new`. A planted symlink is discarded, never followed. No new refusal: a failure is the existing `<path>: <io::Error Display>` (§8.5). |
 
 ## 2. Architecture
 
-The author approved this architecture on 2026-11-22, presented on its own. The D20 change (gated fakes, the `testing` feature) was presented on its own and approved on 2026-11-22 during the redesign.
+The author approved this architecture on 2026-11-22, presented on its own. The D20 change (gated fakes, the `testing` feature) was presented on its own and approved on 2026-11-22 during the redesign. The D28 change (temp files through `stage_bytes`) was presented on its own and approved on 2026-11-22 during the second redesign.
 
 ```text
 crates/agentstacks/src/                       library: rules and flows (additions only)
@@ -85,6 +97,7 @@ crates/agentstacks/src/                       library: rules and flows (addition
 ├─ port/workspace            +    write_project(text), and its fake
 ├─ port/**/fake, port/mod    ~    fakes gated #[cfg(any(test, feature = "testing"))] instead of #[cfg(test)]   (D20)
 ├─ fs/workspace              +    write_project via temp + rename; the path-source tree label is the path as written
+├─ fs/workspace/stage        ~    stage_bytes removes what sits at the temp, then create_new; write_project and write_lock stage through it   (D28)
 ├─ app/init.rs               NEW  flow: refuse an existing file, resolve every argument, render, write
 ├─ app/update.rs             +    retag(): write the newer tags through types/project/retag
 └─ assets/runtime.lua        ~    translate.result(result, payload)   (D17)
@@ -129,6 +142,7 @@ extensions/claude: adapter.lua → agentstacks.* (api 0) and lib/*;  lib/* → a
 | `show/*` | Presentation is kept apart from the flows; each renderer is unit-tested on `Plan::new` values (`src/types/plan/built.rs:35`, `pub fn new`) |
 | `prompt` | Terminal detection and line reading are isolated so commands are tested without a terminal |
 | `testing` feature (D20) | Command tests need the library's port fakes. One copy is reused rather than a CLI-local duplicate (modularity Rule 2). The fakes import only `std` and crate items, no dev-dependency (`src/port/fake.rs:19-25`, `src/port/git/fake.rs:23-29`, `src/port/adapter/fake.rs:26-36`, `src/port/binary/fake.rs:19-25`, `src/port/workspace/fake.rs:23-31`). Compiled under `--features testing`, the real fakes pass clippy `-D warnings` and rustdoc `-D warnings` (`probes/redesign-results.md`, G2b). A dev-dependency feature stays off in a normal or release build of the binary (`probes/redesign-results.md`, G2: `main TESTING=false`, `test TESTING=true`) |
+| `fs/workspace/stage` (D28) | It already owns the temp file (`temp_of`, `stage_bytes`, `discard_temp`, `src/fs/workspace/stage.rs:20-49`). One function writes every temp, so the three writers cannot drift apart again (modularity Rule 2) |
 | `lib/*.lua` | Pure Lua that `airsl test` can load, which requires no `agentstacks.*` table (`probes/airsl-test-results.md`) |
 
 **Rust guideline rules applied** (claudestacks-guideline-rust 0.1.6):
@@ -297,14 +311,14 @@ A refused plan prints its refusals and exits 1.
 ```text
 agentstacks plan
 
-  create   .claude/skills/status/SKILL.md   core
-  update   .claude/agentstacks/runtime.lua  claude
   delete   .claude/agents/old.md            team-lint
+  update   .claude/agentstacks/runtime.lua  claude
   update   .claude/settings.json            shared
     --- .claude/settings.json
     +++ .claude/settings.json
     @@ -3,5 +3,17 @@
     …
+  create   .claude/skills/status/SKILL.md   core
   skip     core/hook/2: claude gives hooks the session id in the event (event.session_id), not as {{var session_id}}
 
   airsl    0.1.4 (pinned)
@@ -313,7 +327,7 @@ agentstacks plan
 3 to write, 1 to delete, 12 unchanged, 1 skipped
 ```
 
-(The `…` stands for the rest of the diff; the rows are exact.)
+(The `…` stands for the rest of the diff; the rows are exact. `Plan::new` sorts steps by path, `a.path.cmp(&b.path)` (`src/types/plan/built.rs:45`), and `agents/` sorts before `agentstacks/` because `/` is byte 0x2F and `t` is 0x74. The CLI test `spec_example_rows_render_exactly` (`crates/agentstacks-cli/src/show/plan.rs:239`) renders these four rows in this order and passes.)
 
 **Rows:**
 
@@ -406,7 +420,7 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 
 ### 8.1 `Workspace::write_project(text)`
 
-- `fs`: write `.agentstacks.toml.agentstacks-tmp` beside the file, then rename it over `agentstacks.toml`, keeping the old mode as the lock does (core R21).
+- `fs`: write `.agentstacks.toml.agentstacks-tmp` beside the file through `stage_bytes` (§8.5), then rename it over `agentstacks.toml`, keeping the old mode as the lock does (core R21).
 - Refusal: `agentstacks.toml: <io::Error Display>`.
 - The fake records the text.
 
@@ -431,6 +445,42 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 - **Why:** `airsstack.hook.payload()` returns the payload only once; a second call gives `nil` (`probes/payload-once-results.md`). For a native hook, `translate.event` is never called (core §11.3).
 - **Proof:** the changed text ran on airsl 0.1.4 for both kinds and printed `{"context":"ctx","event":"PreToolUse"}` (`probes/runtime-payload-results.md`).
 - **Translator contract** (core §11.4, `docs/hooks.md`): it becomes `M.result(result or nil, payload)`.
+
+### 8.5 Temp files (D28)
+
+Citations in this section are at commit `4a5d405`.
+
+**Today.** `write_project` and `write_lock` call `std::fs::write(&temp, text)` (`src/fs/workspace/swap.rs:52-66`). `stage_bytes` does the same after `create_dir_all` (`src/fs/workspace/stage.rs:32-37`). The temp is `.<name>.agentstacks-tmp` beside the target (`src/fs/workspace/stage.rs:20-25`). `std::fs::write` follows a symlink at the temp path. A probe wrote `tools = []\n` into a file outside the project through a planted link (`probes/symlink-results.md`, S1 case 1).
+
+**Change.** `stage_bytes(temp, bytes)`:
+
+1. creates the directories above `temp`, as today;
+2. removes whatever is at `temp`, treating `NotFound` as done. Removing a symlink removes the link, never its target (S1 case 4);
+3. opens `temp` with `OpenOptions::new().write(true).create_new(true)` and writes `bytes`. `create_new` refuses any entry at the path, a symlink included, live or dangling, without following it (S1 cases 2, 3, 6). After step 2 it creates a regular file (S1 case 5).
+
+`write_project` and `write_lock` write their temp through `stage_bytes`, then `swap_onto` as today.
+
+**Behaviour.** Proven on macOS (S1). Linux is covered by the §12 tests, which CI runs on ubuntu-latest; the Linux probe could not run (S2).
+
+| At the temp path | Result |
+|---|---|
+| nothing | written, as today |
+| a leftover regular file from a crashed run | removed, then written (today it is overwritten, which `stage_overwrites_a_leftover_temp` in `src/fs/workspace/stage.rs` pins) |
+| a symlink to a file outside the project | the link is removed, the outside file is untouched, a regular temp is written and renamed in |
+| a dangling symlink | the link is removed, nothing is created at its target |
+| a FIFO, a socket or a symlink to a directory | removed by step 2 like any non-directory entry, never followed |
+| a directory | step 2 fails: macOS `Operation not permitted (os error 1)` (S1 case 7). The write refuses with that error |
+| something created between steps 2 and 3 | step 3 fails with `File exists (os error 17)` (S1 cases 2, 6). The write refuses with that error and nothing is followed |
+
+**Refusals.** No new message. A failure is the platform's error, located as today:
+
+| Writer | Message | Owner |
+|---|---|---|
+| `stage_bytes` in apply | `<step path>: <io::Error Display>` (`src/app/apply/stage.rs:79`). For a directory at the temp path, apply's cleanup then fails on the same directory and adds the same line again (`src/app/apply/stage.rs:52-54`): two identical lines, exit 1, nothing applied. Settled 2026-11-22: kept as today, no new logic | `app/apply` |
+| `write_project` | `agentstacks.toml: <io::Error Display>` (§8.1) | `app/init`, `app/update::retag` |
+| `write_lock` | `agentstacks.lock: <io::Error Display>` (`src/app/apply/lock.rs:45`) | `app/apply` |
+
+The platform text differs by OS. Only the macOS text is probed (S1); the Linux probe could not run (S2).
 
 ## 9. The claude extension
 
@@ -737,6 +787,8 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | a native message hook on `PostToolUseFailure` | rendered (it takes `additionalContext`, D24) | `lib/hooks` |
 | a lua hook on `agent.stop` returning only `context` | no output; the subagent stops (D25) | `translate.lua` |
 | a lua argv element `^a$` / `$TMPDIR/x` | skipped (D27) / rendered | `lib/hooks` |
+| a symlink at `.agentstacks.toml.agentstacks-tmp`, `.agentstacks.lock.agentstacks-tmp` or `.<name>.agentstacks-tmp` beside a staged file | the link is removed; the write stays inside the project; no refusal (D28) | `fs/workspace/stage` |
+| a directory at one of those temp paths | `<path>: <io::Error Display>`, exit 1 (D28). For a staged file the line prints twice (stage, then cleanup) | `fs`, then the caller's location |
 | `agentstacks.toml` tag edited by hand between `update`'s list and its retag | `agentstacks.toml: packs.core: tag changed during update (run update again)`, exit 1, the file unchanged (D26) | `types/project/retag` |
 
 ## 12. Testing
@@ -746,6 +798,7 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | `types/project/render`, `retag`, `types/shorthand` | colocated unit tests on plain values: every row of §4.2-§4.4 and §7, including the `# pinned` comment kept and the R2 byte string | nothing |
 | `app/init`, `app/update::retag` | library fakes (`FakeWorkspace`, `FakeGit`): exists, every §4.3 row, duplicate key, write | nothing |
 | `fs` `write_project`, the label | contract tests on a `tempfile` directory: mode kept; a refusal label reads `packs/core/…` | disk |
+| `fs` temp files (D28) | contract tests gated `#[cfg(all(test, unix))]` (as `swap.rs`'s are; `stage.rs`'s new ones get the same gate) on a `tempfile` directory, one per writer (`stage_bytes`, `write_project`, `write_lock`): a symlink to an outside file at the temp path leaves that file's bytes unchanged and the target a regular file holding the new text; a dangling link creates nothing at its target; a directory at the temp path is an `Err` and the directory stays. CI runs them on ubuntu-latest (`.github/workflows/ci.yml:28`), which covers Linux (S2) | disk |
 | `runtime.lua` | the existing runtime test, updated for D17, adds a native case reading `p.hook_event_name` | airsl binary when present |
 | CLI `show/*`, `command/*`, `prompt`, `exit` | unit tests with `Plan::new` values, an injected terminal flag and line reader, and the library fakes through the `testing` feature (D20): every §5.2 row, every §5.3 branch including D21, every §7 outcome including D22, every exit code | nothing |
 | CLI end to end | `crates/agentstacks-cli/tests/`: run the binary on a temp project with path sources and a copy of `extensions/claude`: `init` (plus `--yes`), `plan`, `apply --yes`, `doctor` healthy then changed, the no-terminal refusal | disk, airsl |
@@ -768,7 +821,7 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | `similar = "3"` (workspace; used by `agentstacks-cli`), `Apache-2.0` | R3, R5 |
 | `deny.toml` | unchanged (R5) |
 | `agentstacks-cli` depends on `agentstacks` (workspace path dependency) | composition root (docs/architecture.md) |
-| `agentstacks` gains `[features] testing = []`; `[workspace.dependencies]` gains `agentstacks = { path = "crates/agentstacks" }`; `agentstacks-cli` has `agentstacks = { workspace = true }` and `[dev-dependencies] agentstacks = { workspace = true, features = ["testing"] }` (D20) | `probes/redesign-results.md`, G2 (resolver 3: on in `cargo test`, off in `cargo run` and `--release`) |
+| `agentstacks` gains `[features] testing = []`; `[workspace.dependencies]` gains `agentstacks = { path = "crates/agentstacks", version = "0.0.0" }`; `agentstacks-cli` has `agentstacks = { workspace = true }` and `[dev-dependencies] agentstacks = { workspace = true, features = ["testing"] }` (D20) | `probes/redesign-results.md`, G2 (resolver 3: on in `cargo test`, off in `cargo run` and `--release`). The `version` is needed because `deny.toml:74` sets `wildcards = "deny"`: the path-only form gave `error[wildcard]: found 2 wildcard dependencies for crate 'agentstacks-cli'` and `bans FAILED`; with `version = "0.0.0"`, `advisories ok, bans ok, licenses ok, sources ok` (cargo-deny 0.20.2, `probes/deny-results.md`, D1 and D2). |
 | docs | `docs/hooks.md`: the translator contract gains `payload`, where `M.result` is documented (`docs/hooks.md:101`, `:153`). New `docs/cli.md`: the commands, output, prompt and exit codes. `docs/README.md` table updated. `CLAUDE.md` Status: CLI commands and the claude extension built |
 
 ## 14. Handed to other chains

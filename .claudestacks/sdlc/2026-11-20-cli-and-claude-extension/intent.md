@@ -22,12 +22,19 @@ marketplace plugins do today, but without a plugin namespace or a plugin root. T
 resolve the pack format's tool-neutral cross-references and install root into what Claude Code
 reads. Any item Claude Code cannot express must become a visible skip.
 
+The core's writes inside the project are not safe against a planted symlink. `agentstacks.toml`,
+`agentstacks.lock` and every staged file are written through a temp path beside the target. A repo
+that ships a symlink at one of those temp paths makes `init`, `update` or `apply` overwrite the file
+the link points to, outside the project, and leaves the target as a link. Found in review on
+2026-11-22 (reviewer probe: an outside file ended up holding `tools = []`).
+
 ## Affected systems
 
 - `crates/agentstacks-cli`: argument parsing, subcommands, exit codes, output.
 - Calls into `crates/agentstacks` (formats, plan, apply, doctor, update, extension host).
 - New `extensions/claude/` (Lua `adapter.lua` and `translate.lua`).
 - `.claude/` in the user's project, including the shared `.claude/settings.json`.
+- The disk adapter in `crates/agentstacks` (`fs/`): every write the core makes inside the project.
 
 ## Desired outcome
 
@@ -43,6 +50,8 @@ reads. Any item Claude Code cannot express must become a visible skip.
 - `.claude/settings.json` is read by the extension (declared `reads`), edited with
   `agentstacks.json.edit` and rewritten whole, keeping the user's existing keys (core D2).
 - Each item the extension cannot express appears in the plan as a skip with a reason.
+- No write the core makes inside the project follows a symlink planted at its temp path. A repo
+  that ships one cannot make `init`, `update` or `apply` change a file outside the project.
 
 ## Constraints
 
