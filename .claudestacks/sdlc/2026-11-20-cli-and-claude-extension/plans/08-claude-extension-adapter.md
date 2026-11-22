@@ -2,7 +2,7 @@
 status: approved
 created: 2026-11-22
 depends-on: [04, 07]
-built-on: cefc42fbbc4c
+built-on: 7b4a3a8f175f
 ---
 
 # Claude extension adapter Implementation Plan
