@@ -19,7 +19,8 @@
 
 use crate::types::report::UnsupportedApi;
 
-/// A refusal of `agentstacks.toml` as a whole or of an entry's name.
+/// A refusal of `agentstacks.toml` as a whole, of an entry's name, or of the arguments `init`
+/// writes it from.
 ///
 /// # Examples
 ///
@@ -40,6 +41,35 @@ pub enum ProjectError {
     /// A `[tools.*]` or `[packs.*]` key that is not a valid name.
     #[error("not a valid name")]
     InvalidName,
+    /// A tag rewrite found a tag other than the one it expected: the file changed after `update`
+    /// listed the new tags.
+    #[error("tag changed during update (run update again)")]
+    TagChanged,
+    /// A tag rewrite found no `tag` at the entry it was asked to change.
+    #[error("no tag to update (run update again)")]
+    NoTagToUpdate,
+    /// `init` found an `agentstacks.toml` already there.
+    #[error("already exists (edit it and run apply)")]
+    AlreadyExists,
+    /// The official repository lists no release tag that starts with `prefix`.
+    #[error("no {prefix} release tag in {url}")]
+    NoReleaseTag {
+        /// The tag prefix searched for.
+        prefix: String,
+        /// The repository that was listed.
+        url: String,
+    },
+    /// Two `init` arguments of one option resolve to the same `key`; `first` is the flag text of
+    /// the argument that gave it first.
+    #[error("{noun} \"{key}\" is already given by {first}")]
+    AlreadyGiven {
+        /// `pack` or `tool`.
+        noun: &'static str,
+        /// The shared key.
+        key: String,
+        /// The earlier argument as written, flag included.
+        first: String,
+    },
 }
 
 #[cfg(test)]
@@ -57,5 +87,34 @@ mod tests {
             "nothing to install"
         );
         assert_eq!(ProjectError::InvalidName.to_string(), "not a valid name");
+        assert_eq!(
+            ProjectError::TagChanged.to_string(),
+            "tag changed during update (run update again)"
+        );
+        assert_eq!(
+            ProjectError::NoTagToUpdate.to_string(),
+            "no tag to update (run update again)"
+        );
+        assert_eq!(
+            ProjectError::AlreadyExists.to_string(),
+            "already exists (edit it and run apply)"
+        );
+        assert_eq!(
+            ProjectError::NoReleaseTag {
+                prefix: "packs-v".to_owned(),
+                url: "https://x/y".to_owned()
+            }
+            .to_string(),
+            "no packs-v release tag in https://x/y"
+        );
+        assert_eq!(
+            ProjectError::AlreadyGiven {
+                noun: "pack",
+                key: "core".to_owned(),
+                first: "--pack \"core\"".to_owned()
+            }
+            .to_string(),
+            "pack \"core\" is already given by --pack \"core\""
+        );
     }
 }

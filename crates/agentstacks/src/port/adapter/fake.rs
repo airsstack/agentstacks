@@ -19,7 +19,8 @@
 //!
 //! # Non-responsibilities
 //!
-//! It is compiled for tests only. How the real engine runs Lua is proven by the tests of the
+//! It is compiled for tests and under the `testing` feature.
+//! How the real engine runs Lua is proven by the tests of the
 //! `host` module. Each script answers once: the open refusal, the `values` answer and the `plan`
 //! steps are taken when used.
 

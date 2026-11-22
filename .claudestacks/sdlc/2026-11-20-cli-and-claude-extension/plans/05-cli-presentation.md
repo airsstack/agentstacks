@@ -1,8 +1,9 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01]
 built-on: cefc42fbbc4c
+disproves: cefc42fbbc4c
 ---
 
 # CLI presentation Implementation Plan
@@ -189,3 +190,16 @@ Commit `feat(agentstacks-cli): confirmation prompt and exit codes`.
 
 - `cargo make dod` green.
 - `cargo test -p agentstacks-cli` green.
+
+## Review findings
+
+- No blocking finding.
+- 🔵 open: plan path column padded by byte length; a test named `spec_example_*`; a CLI unit test walks a fixture in `crates/agentstacks/tests/fixtures`; prompt write-failure path, diff `context_radius(3)` and the `update_text` NewTag-without-current arm untested.
+
+## Deviations
+
+- 2026-11-22 Task 2: spec example `spec.md:300-303` lists steps create, update, delete, update — not path order — while `spec.md:322` says "in the plan's path order" and `Plan::new` sorts by path. Built: path order (delete `old.md`, update `runtime.lua`, update `settings.json`, create `SKILL.md`). Spec claim disproved.
+- 2026-11-22 Task 1: `spec.md:771` gives the workspace dependency `agentstacks = { path = "crates/agentstacks" }`. `cargo deny check` (cargo-deny 0.20.2, `deny.toml:74` `wildcards = "deny"`) → `error[wildcard]: found 2 wildcard dependencies for crate 'agentstacks-cli'` … `advisories ok, bans FAILED, licenses ok, sources ok`. Built: `agentstacks = { path = "crates/agentstacks", version = "0.0.0" }` → `advisories ok, bans ok, licenses ok, sources ok`. Spec claim disproved.
+- 2026-11-22 Task 3: `update_text` renders a NewTag with no current tag as `  <key>: <new>`.
+- 2026-11-22: tests written together with code; red not observed separately.
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

@@ -5,7 +5,7 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Workspace`] is the project as the flows see it: the two project files, the state of any
+//! - [`Workspace`] is the project as the flows see it: the two project files and the writes to them, the state of any
 //!   project-relative path, the tree behind a local source directory, and the writes apply makes.
 //!
 //! # Non-responsibilities
@@ -108,6 +108,14 @@ pub trait Workspace {
     ///
     /// The refusal for a path that leads outside the project, or the I/O failure of the removal.
     fn delete(&self, path: &OpPath) -> io::Result<()>;
+
+    /// Writes `agentstacks.toml` through the temporary file `.agentstacks.toml.agentstacks-tmp` and
+    /// a rename, keeping the permission mode of a file that exists and creating it when absent.
+    ///
+    /// # Errors
+    ///
+    /// The I/O failure of the write.
+    fn write_project(&self, text: &str) -> io::Result<()>;
 
     /// Writes `agentstacks.lock` through the temporary file `.agentstacks.lock.agentstacks-tmp` and
     /// a rename, keeping the permission mode of a lock that exists.

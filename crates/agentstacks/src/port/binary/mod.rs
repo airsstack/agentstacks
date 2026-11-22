@@ -7,18 +7,19 @@
 //! # Non-responsibilities
 //!
 //! No logic and no adapter: searching `PATH` and running `airsl` belong to the `process` module.
-//! The fake that tests build lives here but is compiled for tests only.
+//! The fake that tests build lives here and is compiled for tests and under the `testing`
+//! feature.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 mod fake;
 mod seam;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::BinaryCall;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::FakeBinary;
 #[doc(inline)]

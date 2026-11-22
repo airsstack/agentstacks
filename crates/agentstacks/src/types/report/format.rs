@@ -38,6 +38,7 @@ use crate::types::report::FieldError;
 use crate::types::report::ParserMessage;
 use crate::types::resolve::FetchError;
 use crate::types::set::SetError;
+use crate::types::shorthand::ShorthandError;
 use crate::types::tokens::TokenError;
 use crate::types::tree::WalkError;
 
@@ -87,6 +88,9 @@ pub enum FormatError {
     /// A project file message with its own wording.
     #[error(transparent)]
     Project(#[from] ProjectError),
+    /// An `init` argument message with its own wording.
+    #[error(transparent)]
+    Shorthand(#[from] ShorthandError),
     /// A source message with its own wording.
     #[error(transparent)]
     Source(#[from] SourceError),
@@ -160,6 +164,14 @@ mod tests {
         assert_eq!(
             FormatError::from(ProjectError::NothingToInstall).to_string(),
             "nothing to install"
+        );
+    }
+
+    #[test]
+    fn shorthand_error_converts_and_displays_unchanged() {
+        assert_eq!(
+            FormatError::from(ShorthandError::NotOfficial(crate::types::Flag::Pack)).to_string(),
+            "not an official pack; pass a path, or add a git source to agentstacks.toml"
         );
     }
 

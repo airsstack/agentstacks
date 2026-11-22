@@ -13,7 +13,8 @@
 //!
 //! # Non-responsibilities
 //!
-//! It is compiled for tests only. How the real disk reports the same cases is proven by the tests
+//! It is compiled for tests and under the `testing` feature.
+//! How the real disk reports the same cases is proven by the tests
 //! of the `fs` module.
 
 use std::collections::BTreeMap;

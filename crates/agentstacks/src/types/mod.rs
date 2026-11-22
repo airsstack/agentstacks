@@ -18,6 +18,7 @@
 //! - [`pack`]: a pack directory read into one checked pack, with every rule that needs the files.
 //! - [`set`]: the checks over a whole project, ending in the [`ValidSet`] later stages accept.
 //! - [`project`]: the project file `agentstacks.toml` and the source values it is built from.
+//! - [`shorthand`]: classifying an `init` argument as an official name or a path.
 //! - [`op`]: an operation a tool extension proposes, and the validation of it.
 //! - [`json`]: editing the text of a JSON document at one key path.
 //! - [`plan`]: the step for each path, decided from the operation, the lock and the disk state.
@@ -49,6 +50,7 @@ pub mod protocol;
 pub mod report;
 pub mod resolve;
 pub mod set;
+pub mod shorthand;
 pub mod tokens;
 pub mod tree;
 
@@ -258,6 +260,14 @@ pub use set::SetError;
 pub use set::ValidSet;
 #[doc(inline)]
 pub use set::check as check_pack_set;
+#[doc(inline)]
+pub use shorthand::Argument;
+#[doc(inline)]
+pub use shorthand::Flag;
+#[doc(inline)]
+pub use shorthand::ShorthandError;
+#[doc(inline)]
+pub use shorthand::classify as classify_argument;
 #[doc(inline)]
 pub use tokens::ItemRef;
 #[doc(inline)]

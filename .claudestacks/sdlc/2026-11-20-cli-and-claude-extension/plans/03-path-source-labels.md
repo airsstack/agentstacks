@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02]
 built-on: cefc42fbbc4c
@@ -89,3 +89,11 @@ Commit `fix(agentstacks): name path-source refusals by the path as written`.
 ## Proof
 
 - `cargo make dod` green.
+
+## Review findings
+
+- No blocking finding.
+- 🔵 open: `fs/disk.rs` docs still call the directory read "root" (`:4`, `:10`, doctest `:50`); `port/workspace/seam.rs:73` `source_tree` doc does not promise `root()` is the path as written.
+
+## Deviations
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

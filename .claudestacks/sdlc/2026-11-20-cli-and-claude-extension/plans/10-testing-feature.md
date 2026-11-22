@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01]
 built-on: cefc42fbbc4c
@@ -73,3 +73,13 @@ crates/agentstacks/src/port/workspace/mod.rs        — modify: same gate change
 
 - `cargo make dod` green.
 - `cargo clippy -p agentstacks --lib --features testing -- -D warnings` green.
+
+## Review findings
+
+- 🟡 five `fake.rs` module docs still said "It is compiled for tests only." (blocking). Fixed inline: "It is compiled for tests and under the `testing` feature." in `port/fake.rs`, `port/{adapter,binary,git,workspace}/fake.rs`. `cargo make dod` → exit 0.
+- 🔵 `Makefile.toml:33` still said no crate declares features. Fixed in the same pass.
+
+## Deviations
+
+- 2026-11-22: `Makefile.toml` comment and the five `fake.rs` docs changed outside the file list (the plan's Risks named the Makefile comment).
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

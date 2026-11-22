@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 built-on: cefc42fbbc4c
 ---
@@ -153,3 +153,17 @@ green. Commit `feat(agentstacks): retag agentstacks.toml with comments kept`.
 
 - `cargo make dod` green.
 - `cargo test -p agentstacks types::shorthand types::project` lists every test above passing.
+
+## Review findings
+
+- 🟡 `shorthand.rs`, `retag.rs`: refusals were carried as `FormatError::Io(io::Error::other(..))`. Fixed: `ShorthandError::NotOfficial(Flag)` + `FormatError::Shorthand`; `ProjectError::TagChanged` / `ProjectError::NoTagToUpdate`. Display unchanged. `cargo make dod-crate agentstacks` → exit 0.
+- 🟡 `render.rs`: `Pin::Rev` branch untested. Fixed: `rev_source_renders_rev_instead_of_tag`. `cargo make dod-crate agentstacks` → exit 0.
+- 🔵 open: duplicate names collapse silently in `render_project` (undocumented); `PROJECT_FILE` const repeated (`retag.rs`, `resolve/key.rs`); `(SourceKey, GitTag, GitTag)` is positional; a key given twice in `changes` reports "tag changed"; `Value::from` turns a literal `'packs-v0.1.0'` into a basic string; `types::Flag` is a generic root name; `render_project`/`retag_project` not re-exported at the `types` root.
+
+## Deviations
+
+- 2026-11-22 Task 3: "`get_mut` at every level" — toml_edit 0.25 `Item::get_mut` calls `index_mut`, which inserts. `cargo test -p agentstacks types::project::retag::tests::missing_pack` with an `Item::get_mut` chain left `[packs]\nnope = {}` in the document. Built: `DocumentMut::get_mut` → `as_table_like_mut` → `TableLike::get_mut` → `as_value_mut`. The spec's rule (no inserting lookup) holds; not a disproval.
+- 2026-11-22 Task 2: `render_project` writes `rev` for a `Pin::Rev` source (the match must cover it).
+- 2026-11-22 Tasks 1, 3: refusal types added outside the file list — `FormatError::Shorthand` in `types/report/format.rs`, two `ProjectError` variants in `types/project/error.rs`.
+- 2026-11-22 Task 2: first resolve locked toml_edit 0.25.18; pinned to the probed 0.25.20 with `cargo update -p toml_edit@0.25.18+spec-1.1.0 --precise 0.25.20` (toml_parser 1.1.5→1.1.6, toml_datetime 1.1.2→1.1.3). `cargo tree -i toml_parser -e normal` shows one toml_parser shared by toml and toml_edit.
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

@@ -13,7 +13,8 @@
 //!
 //! # Non-responsibilities
 //!
-//! It is compiled for tests only. How the real `PATH` and `airsl` behave is proven by the tests
+//! It is compiled for tests and under the `testing` feature.
+//! How the real `PATH` and `airsl` behave is proven by the tests
 //! of the `process` module.
 
 use std::cell::RefCell;

@@ -2,7 +2,7 @@
 //! `HookCommand` builds.
 //!
 //! The project under `tests/fixtures/runtime/proj` holds a small translator for a made-up tool and
-//! four hook modules. Each test copies it into a temporary directory, writes the shipped runtime
+//! five hook modules. Each test copies it into a temporary directory, writes the shipped runtime
 //! beside the translator and runs one command from the project directory, as a tool does.
 //! When `airsl` cannot run, each test says so and returns, unless `AGENTSTACKS_REQUIRE_AIRSL` is
 //! set (CI sets it): then each test fails, so a missing binary cannot pass the suite unseen.
@@ -163,7 +163,7 @@ fn runtime_context_with_read_grant() -> TestResult {
             r#"{"context":"event=tool.before session=s1 args=--manifest,x.json read=true:hello\n fs="#,
             "append atomic_write canonicalize copy create_exclusive exists is_dir is_file list ",
             "mkdir read read_lines remove remove_dir rename same_content stat tempdir tempfile ",
-            "walk write\"}\n"
+            "walk write\",\"event\":\"PreToolUse\"}\n"
         )
     );
     assert!(output.status.success());
@@ -208,7 +208,7 @@ fn runtime_passes_block_when_may_block() -> TestResult {
     };
     assert_eq!(
         text(&output.stdout),
-        "{\"decision\":\"block\",\"reason\":\"edits to tool.before are not allowed\"}\n"
+        "{\"decision\":\"block\",\"event\":\"PreToolUse\",\"reason\":\"edits to tool.before are not allowed\"}\n"
     );
     Ok(())
 }
@@ -224,8 +224,25 @@ fn runtime_native_gets_the_raw_payload() -> TestResult {
     };
     assert_eq!(
         text(&output.stdout),
-        "{\"context\":\"native payload tool_name=Edit event=nil\"}\n"
+        "{\"context\":\"native payload tool_name=Edit event=nil\",\"event\":\"PreToolUse\"}\n"
     );
+    Ok(())
+}
+
+#[test]
+fn runtime_native_result_sees_the_payload_event() -> TestResult {
+    let case = Case {
+        kind: HookKind::Native,
+        ..Case::new("native_ctx")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stdout),
+        "{\"context\":\"ctx\",\"event\":\"PreToolUse\"}\n"
+    );
+    assert!(output.status.success());
     Ok(())
 }
 
@@ -236,7 +253,7 @@ fn runtime_keeps_context_and_drops_block() -> TestResult {
     };
     assert_eq!(
         text(&output.stdout),
-        "{\"context\":\"keep this context\"}\n"
+        "{\"context\":\"keep this context\",\"event\":\"PreToolUse\"}\n"
     );
     assert_eq!(
         text(&output.stderr),

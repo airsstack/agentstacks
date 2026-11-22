@@ -20,6 +20,8 @@
 //!   [`InvalidLocalPath`]: the refusal each of those constructors returns.
 //! - [`SourceError`]: the refusals of the source values, wrapping those above.
 //! - [`ProjectError`]: the refusals of the project file with a wording of their own.
+//! - [`render_project`]: the text of a new project file from its tool and pack entries.
+//! - [`retag_project`]: an existing project file with new tags, its comments kept.
 //!
 //! # Non-responsibilities
 //!
@@ -36,6 +38,8 @@ pub mod git;
 pub mod invalid;
 pub mod path;
 pub mod pin;
+pub mod render;
+pub mod retag;
 pub mod source;
 
 #[cfg(test)]
@@ -70,6 +74,10 @@ pub use path::SubPath;
 #[doc(inline)]
 pub use pin::Pin;
 pub(in crate::types) use pin::PinRule;
+#[doc(inline)]
+pub use render::render_project;
+#[doc(inline)]
+pub use retag::retag_project;
 #[doc(inline)]
 pub use source::Source;
 #[doc(inline)]

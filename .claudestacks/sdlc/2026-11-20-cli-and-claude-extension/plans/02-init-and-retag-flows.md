@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01]
 built-on: cefc42fbbc4c
@@ -187,3 +187,17 @@ Every refusal is a `Diagnostic` located as spec §10 shows: the flag text, the p
 
 - `cargo make dod` green.
 - `cargo test -p agentstacks app::init app::update write_project` all pass.
+
+## Review findings
+
+- No blocking finding.
+- 🟡 open: `fs/workspace/swap.rs:54` follows a symlink planted at `.agentstacks.toml.agentstacks-tmp` (reviewer probe overwrote an outside file). `write_lock` and `stage_bytes` share the pattern. Fix for all three: remove a leftover temp, open with `create_new(true)` + `O_NOFOLLOW`.
+- 🟡 open: `app/init.rs:41` `Resolved.key: String` drops the `PackName`/`ToolName` types; the `InvalidName` refusal in `named()` cannot fire and is untested.
+- 🔵 open: duplicate/collapse rules sit in the flow (plan-prescribed); another `PROJECT_FILE` const; `noun: &'static str` duplicates `Flag`; `swap.rs` module title stale and `write_project` copies `write_lock`; doc lines over 100 chars (`seam.rs:8`, `update.rs:28`); a `NewTag` with no current tag is dropped by retag.
+
+## Deviations
+
+- 2026-11-22 Task 2: `ProjectError::{AlreadyExists, NoReleaseTag, AlreadyGiven}` added in `types/project/error.rs` (not in the file list) to hold the init refusal wording.
+- 2026-11-22 Task 1: `FakeWorkspace` project text moved into its `RefCell` disk so `write_project` changes what `project_text` re-reads.
+- 2026-11-22: tests were written alongside the code, not watched failing first.
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

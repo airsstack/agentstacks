@@ -23,7 +23,7 @@ use crate::fs::disk::StdFileTree;
 use crate::fs::workspace::resolve::{Located, link_location, locate, relative_path};
 use crate::fs::workspace::stage::{discard_temp, stage_bytes, temp_of};
 use crate::fs::workspace::state::disk_state;
-use crate::fs::workspace::swap::{delete_file, swap_onto, write_lock};
+use crate::fs::workspace::swap::{delete_file, swap_onto, write_lock, write_project};
 use crate::port::Workspace;
 use crate::types::op::OpPath;
 use crate::types::plan::{DiskState, Link, Resolution};
@@ -136,8 +136,8 @@ impl Workspace for StdWorkspace {
         let relative = relative_path(dir.as_str());
         Ok(match locate(&self.root, &relative)? {
             Located::Outside { .. } => None,
-            Located::Inside { target: dir, .. } | Located::Dangling { at: dir } => {
-                Some(StdFileTree::new(dir))
+            Located::Inside { target, .. } | Located::Dangling { at: target } => {
+                Some(StdFileTree::labelled(target, dir.as_str()))
             }
         })
     }
@@ -173,6 +173,10 @@ impl Workspace for StdWorkspace {
         }
     }
 
+    fn write_project(&self, text: &str) -> io::Result<()> {
+        write_project(&self.root.join(PROJECT_FILE), text)
+    }
+
     fn write_lock(&self, text: &str) -> io::Result<()> {
         write_lock(&self.root.join(LOCK_FILE), text)
     }
@@ -184,6 +188,7 @@ mod tests {
 
     use super::*;
     use crate::port::{FakeWorkspace, FileTree};
+    use crate::types::pack::Pack;
     use crate::types::tree::ContentHash;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -372,11 +377,43 @@ mod tests {
             .source_tree(&LocalPath::new("packs/core")?)?
             .ok_or("expected a tree")?;
         assert_eq!(tree.read_text(Path::new("pack.toml"))?, "name = \"core\"\n");
-        assert_eq!(tree.root(), ws.root().join("packs/core"));
+        assert_eq!(tree.root(), Path::new("packs/core"));
 
         let outside = tempfile::tempdir()?;
         symlink(outside.path(), dir.path().join("away"))?;
         assert!(ws.source_tree(&LocalPath::new("away")?)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn path_source_refusal_names_the_path_as_written() -> TestResult {
+        let (dir, ws) = project()?;
+        std::fs::create_dir_all(dir.path().join("packs/core"))?;
+        std::fs::write(dir.path().join("packs/core/pack.toml"), "[pack]\n")?;
+        let tree = ws
+            .source_tree(&LocalPath::new("packs/core")?)?
+            .ok_or("expected a tree")?;
+        let refusals = Pack::load(&tree).err().ok_or("expected a refusal")?;
+        let shown: Vec<String> = refusals
+            .into_sorted()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert!(!shown.is_empty());
+        assert!(
+            shown
+                .iter()
+                .all(|line| line.starts_with("packs/core/pack.toml:")),
+            "{shown:?}"
+        );
+        let tempdir = dir.path().display().to_string();
+        let canonical = ws.root().display().to_string();
+        assert!(
+            shown
+                .iter()
+                .all(|line| !line.contains(&tempdir) && !line.contains(&canonical)),
+            "{shown:?}"
+        );
         Ok(())
     }
 
@@ -558,6 +595,19 @@ mod tests {
         let error = ws.delete(&p("d/l.md")?).err().ok_or("expected a refusal")?;
         assert_eq!(error.to_string(), "resolves outside the project");
         assert!(outside.path().join("l.md").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn write_project_writes_the_project_through_the_workspace() -> TestResult {
+        let (dir, ws) = project()?;
+        ws.write_project("tools = []\n")?;
+        assert_eq!(ws.project_text()?, "tools = []\n");
+        assert!(
+            !dir.path()
+                .join(".agentstacks.toml.agentstacks-tmp")
+                .exists()
+        );
         Ok(())
     }
 

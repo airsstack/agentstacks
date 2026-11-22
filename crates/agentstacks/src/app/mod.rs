@@ -5,6 +5,7 @@
 //!
 //! - [`plan`]: building a reviewable plan.
 //! - [`apply`]: applying a plan that was shown, as the only writer.
+//! - [`init`]: writing a new `agentstacks.toml` from the arguments of `init`.
 //! - [`doctor`]: reporting drift against the lock.
 //! - [`update`]: finding newer tags for git sources.
 //!
@@ -18,5 +19,6 @@
 
 pub mod apply;
 pub mod doctor;
+pub mod init;
 pub mod plan;
 pub mod update;

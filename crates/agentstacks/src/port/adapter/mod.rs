@@ -7,24 +7,24 @@
 //! # Non-responsibilities
 //!
 //! No logic and no adapter: running Lua belongs to the `host` module. The scripted extension that
-//! tests build lives here but is compiled for tests only.
+//! tests build lives here and is compiled for tests and under the `testing` feature.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 mod fake;
 mod seam;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::AdapterCall;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::FakeAdapter;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::ScriptStep;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::ToolScript;
 #[doc(inline)]

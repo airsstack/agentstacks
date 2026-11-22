@@ -5,6 +5,7 @@
 //! - [`swap_onto`] renames a temp onto its target, first copying the permissions of a target that
 //!   is an existing regular file onto the temp, because a rename installs the temp's mode.
 //! - [`delete_file`] removes a file and leaves the directories above it.
+//! - [`write_project`] writes `agentstacks.toml` the same way.
 //! - [`write_lock`] writes `agentstacks.lock` through a temp beside it and a rename, keeping the
 //!   mode of a lock that exists.
 //!
@@ -40,6 +41,18 @@ pub(super) fn swap_onto(temp: &Path, target: &Path) -> io::Result<()> {
 /// The platform's error from the removal.
 pub(super) fn delete_file(target: &Path) -> io::Result<()> {
     std::fs::remove_file(target)
+}
+
+/// Writes `text` to `project` through `.agentstacks.toml.agentstacks-tmp` beside it, creating the
+/// file when absent and keeping the mode of one that exists.
+///
+/// # Errors
+///
+/// The platform's error from the write, the permission copy or the rename.
+pub(super) fn write_project(project: &Path, text: &str) -> io::Result<()> {
+    let temp = temp_of(project);
+    std::fs::write(&temp, text)?;
+    swap_onto(&temp, project)
 }
 
 /// Writes `text` to `lock` through `.agentstacks.lock.agentstacks-tmp` beside it.
@@ -111,6 +124,41 @@ mod tests {
         delete_file(&file)?;
         assert!(!file.exists());
         assert!(dir.path().join("d").is_dir());
+        Ok(())
+    }
+
+    #[test]
+    fn write_project_replaces_the_file_and_leaves_no_temp() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let project = dir.path().join("agentstacks.toml");
+        std::fs::write(&project, "old")?;
+        write_project(&project, "tools = []\n")?;
+        assert_eq!(std::fs::read_to_string(&project)?, "tools = []\n");
+        assert!(
+            !dir.path()
+                .join(".agentstacks.toml.agentstacks-tmp")
+                .exists()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn write_project_keeps_the_old_mode() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let project = dir.path().join("agentstacks.toml");
+        std::fs::write(&project, "old")?;
+        std::fs::set_permissions(&project, std::fs::Permissions::from_mode(0o600))?;
+        write_project(&project, "new = 1\n")?;
+        assert_eq!(mode_of(&project)?, 0o600);
+        Ok(())
+    }
+
+    #[test]
+    fn write_project_creates_the_file_when_absent() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let project = dir.path().join("agentstacks.toml");
+        write_project(&project, "new = 1\n")?;
+        assert_eq!(std::fs::read_to_string(&project)?, "new = 1\n");
         Ok(())
     }
 

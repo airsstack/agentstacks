@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 built-on: cefc42fbbc4c
 ---
@@ -96,3 +96,14 @@ prints nothing, and `cargo make dod` is green. Commit
 
 - `cargo make dod` green.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test runtime` green.
+
+## Review findings
+
+- No blocking finding.
+- 🟡 open: no DoD step keeps the `docs/hooks.md` §4 copy equal to `assets/runtime.lua` (equal today: the awk diff is empty).
+- 🔵 open: `tests/runtime.rs:5` counts "five hook modules".
+
+## Deviations
+
+- 2026-11-22 Task 1: new fixture hook `tests/fixtures/runtime/proj/.tool/agentstacks/core/hooks/native_ctx.lua` (returns `{context="ctx"}`) for `runtime_native_result_sees_the_payload_event`.
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.

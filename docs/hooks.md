@@ -98,7 +98,7 @@ if type(result) == "table" and result.block ~= nil and not may_block then
     .. tostring(result.block) .. "\n")
   result.block = nil
 end
-local out = translate.result(result)
+local out = translate.result(result, payload)
 if out ~= nil then
   airsstack.stdio.write(out)
 end
@@ -150,7 +150,9 @@ functions:
 
 - `M.event(payload)` returns the neutral event, or `nil` for an event that is not for this runtime
   (the hook is then not run).
-- `M.result(result or nil)` returns the string to print, or `nil`.
+- `M.result(result or nil, payload)` returns the string to print, or `nil`. `payload` is the raw
+  payload for neutral and native hooks alike. The runtime passes it because the payload can be read
+  only once.
 
 The file is required when `runtime.lua` is written and at least one lua hook is covered by a write.
 Without it the plan is refused: `claude/adapter.lua: lua hooks need <root>/translate.lua (write it)`,

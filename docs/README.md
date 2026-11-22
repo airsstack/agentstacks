@@ -6,6 +6,7 @@ then moves there.
 | Document | Covers | State |
 |---|---|---|
 | [architecture.md](architecture.md) | layers, dependency rule, where logic lives, how it is tested | built |
+| [cli.md](cli.md) | the five commands, `-C`, the plan text, the prompt and `--yes`, streams and exit codes | built |
 | [extensions.md](extensions.md) | how an extension is installed, loaded and run; the `api = 0` Lua surface | built |
 | [hooks.md](hooks.md) | the neutral hook protocol, the shared runtime, `may_block` | built |
 | [plan-and-apply.md](plan-and-apply.md) | operations, plan steps, apply order, the lock, `doctor`, sources, `update` | built |

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02, 05, 10]
 built-on: cefc42fbbc4c
@@ -262,3 +262,22 @@ spec section it cites.
 
 - `cargo make dod` green.
 - `cargo run -p agentstacks-cli -- --help` lists `init`, `plan`, `apply`, `doctor` and `update`.
+
+## Review findings
+
+- 🟡 `command/followup.rs` had logic and no tests (blocking). Fixed: 10 tests (Display, `kept`, `fix`, every `Confirmed`→`Outcome` arm). `cargo test -p agentstacks-cli` → 83 unit + 1 integration passed.
+- 🟡 `command/apply.rs:51` `Confirmed::Failed => Outcome::Refused` unguarded. Fixed: `apply_failed_apply_is_refused`, `apply_lock_read_error_is_refused`; flipping the arm to `Success` failed both. `cargo make dod-crate agentstacks-cli` → green.
+- 🔵 `docs/cli.md` said a decline prints `nothing applied` for every command. Fixed: apply only; init/update print their follow-up line.
+- 🔵 open: `Confirmed`/`confirm` are `pub(crate)` where siblings use `pub(super)`; `yes: bool` threaded through (plan-prescribed); `init.rs` refused-plan and lock-read tests do not assert stdout; `ports.rs` lacks an exemption note; `main.rs` dispatch has no inline tests (plan-sanctioned); `version = "0.0.0"` must move with the crate version; `arg_required_else_help = true` added.
+- ❓ open: `command/console.rs` drops stdout write failures (`plan >/dev/full` exits 0); the module doc says it is deliberate.
+
+## Deviations
+
+- 2026-11-22 Tasks 2–5: commands take `&Ports<W,G,B,A>` and `&mut Console<I,O,E>` instead of many separate arguments; new files `command/{console,ports,followup,testing}.rs`. Dispatch stays static.
+- 2026-11-22 Task 2: `confirm` takes a `declined` line. A decline prints only that line: `nothing applied` for apply, the follow-up line for init/update (e.g. `Apply? [y/N] agentstacks.toml written; nothing applied (run apply)`). No terminal prints the refusal, then the follow-up.
+- 2026-11-22 Task 2: `Confirmed::Failed` is a unit variant (`Diagnostics` is not `Clone`; confirm already printed them).
+- 2026-11-22 Task 4: `update` prints the update list only when it has entries.
+- 2026-11-22 Task 3: `doctor::run(workspace, binary, console)` takes only the ports it uses.
+- 2026-11-22 Task 2: `serde_json` dev-dependency added (fake adapter scripts build `ValuesResult` input).
+- 2026-11-22 Task 6: written by a separate coder in parallel with Tasks 1–5.
+- 2026-11-22 (process): coders read their task sections straight from this plan file instead of a task-briefer brief; the ledger came from `grep '^### Task'`. Earlier batches were staged in the git index (not committed) so each review saw only its own batch.
