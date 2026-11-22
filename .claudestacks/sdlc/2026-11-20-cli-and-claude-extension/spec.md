@@ -22,6 +22,10 @@ Proof convention:
 - `core §N` cites the approved core spec (`2026-11-20-core-plan-and-apply/spec.md`), and
   `formats §N` cites the approved formats spec.
 
+Redesigned on 2026-11-22 from `spec-superseded-2026-11-22.md`. The plan-set review found six
+gaps (G1-G6), settled as D19-D24. Its spec review found three more, settled as D25-D27. All are
+proven in `probes/redesign-results.md` or the cited docs. Nothing else changed.
+
 Versions probed:
 
 | Tool | Version |
@@ -32,6 +36,8 @@ Versions probed:
 | toml_edit | 0.25.20 |
 | similar | 3.2.1 |
 | rustc | 1.94.1 (`probes/cli-results.md`) |
+| cargo, redesign probes | 1.94.1, the pinned toolchain; G1 and G2 also reproduce on 1.99.0 (`probes/redesign-results.md:3`) |
+| toml (the toml_edit parse comparison) | 1.2.0; it shares `toml_parser` with toml_edit 0.25.20 (`probes/redesign-results.md`, `cargo tree -i toml_parser`) |
 
 ## 1. Settled decisions
 
@@ -57,10 +63,19 @@ All were settled with the author on 2026-11-22.
 | D16 | Only `hooks.<Event>` arrays that held or will hold the extension's handlers are rewritten. User handlers in those arrays may be reformatted (§9.5). |
 | D17 | The core's `runtime.lua` calls `translate.result(result, payload)`, so the translator knows the event for neutral and native hooks alike (§8.4). |
 | D18 | A message hook renders as `printf` of Claude's `additionalContext` JSON. A message hook on `session.end` is skipped, because Claude has no channel there that reaches the model (§9.4, settled after review). |
+| D19 | `init` with git missing from `PATH` gives one merged refusal at the location `init`, naming every official argument (§4.3). |
+| D20 | The library's port fakes compile under `#[cfg(any(test, feature = "testing"))]`. The CLI enables `testing` only as a dev-dependency feature (§2, §12, §13). |
+| D21 | A lock read error in `confirm` refuses with `agentstacks.lock: <io::Error Display>`, exit 1, nothing applied (§5.3). |
+| D22 | `update` failures follow `init`'s shape. A retag or write refusal exits 1 with the file unchanged. A failed apply or lock read after the rewrite adds `agentstacks.toml updated; fix the above and run apply` (§7). |
+| D23 | An absent `.claude/settings.json` decodes to `{}` without calling decode (§9.5). |
+| D24 | A native message hook on a Claude event that takes no `additionalContext` is skipped with a reason (§9.4, §9.6). |
+| D25 | On `Stop` and `SubagentStop`, Claude treats `additionalContext` as feedback that keeps the agent running. So message hooks there are skipped (neutral `agent.stop`, native `Stop`/`SubagentStop`), and `translate.result` drops a `context` on `SubagentStop`. Only a `may_block` hook's `block` continues the agent (§9.4, §9.6, §9.7). |
+| D26 | `retag` refuses when the tag at re-read differs from the listed current tag: `agentstacks.toml: packs.core: tag changed during update (run update again)` (§7). |
+| D27 | A lua hook whose argv holds a `$` outside the rendered var forms is skipped, because `sh` would expand it (§9.4, §9.6). |
 
 ## 2. Architecture
 
-The author approved this architecture on 2026-11-22, presented on its own.
+The author approved this architecture on 2026-11-22, presented on its own. The D20 change (gated fakes, the `testing` feature) was presented on its own and approved on 2026-11-22 during the redesign.
 
 ```text
 crates/agentstacks/src/                       library: rules and flows (additions only)
@@ -68,6 +83,7 @@ crates/agentstacks/src/                       library: rules and flows (addition
 ├─ types/project/retag.rs    NEW  rule: agentstacks.toml text + (key, new tag) → text, comments kept
 ├─ types/shorthand.rs        NEW  rule: an init argument → an official git source or a path; the unknown-name refusal
 ├─ port/workspace            +    write_project(text), and its fake
+├─ port/**/fake, port/mod    ~    fakes gated #[cfg(any(test, feature = "testing"))] instead of #[cfg(test)]   (D20)
 ├─ fs/workspace              +    write_project via temp + rename; the path-source tree label is the path as written
 ├─ app/init.rs               NEW  flow: refuse an existing file, resolve every argument, render, write
 ├─ app/update.rs             +    retag(): write the newer tags through types/project/retag
@@ -112,6 +128,7 @@ extensions/claude: adapter.lua → agentstacks.* (api 0) and lib/*;  lib/* → a
 | `command/confirm` | `init`, `apply` and `update` share one show → ask → apply sequence |
 | `show/*` | Presentation is kept apart from the flows; each renderer is unit-tested on `Plan::new` values (`src/types/plan/built.rs:35`, `pub fn new`) |
 | `prompt` | Terminal detection and line reading are isolated so commands are tested without a terminal |
+| `testing` feature (D20) | Command tests need the library's port fakes. One copy is reused rather than a CLI-local duplicate (modularity Rule 2). The fakes import only `std` and crate items, no dev-dependency (`src/port/fake.rs:19-25`, `src/port/git/fake.rs:23-29`, `src/port/adapter/fake.rs:26-36`, `src/port/binary/fake.rs:19-25`, `src/port/workspace/fake.rs:23-31`). Compiled under `--features testing`, the real fakes pass clippy `-D warnings` and rustdoc `-D warnings` (`probes/redesign-results.md`, G2b). A dev-dependency feature stays off in a normal or release build of the binary (`probes/redesign-results.md`, G2: `main TESTING=false`, `test TESTING=true`) |
 | `lib/*.lua` | Pure Lua that `airsl test` can load, which requires no `agentstacks.*` table (`probes/airsl-test-results.md`) |
 
 **Rust guideline rules applied** (claudestacks-guideline-rust 0.1.6):
@@ -120,7 +137,7 @@ extensions/claude: adapter.lua → agentstacks.* (api 0) and lib/*;  lib/* → a
 |---|---|
 | `modularity.md` Rule 1 | each unit above states one job; the CLI holds no rule |
 | `modularity.md` Rule 2 | `Plan`, `Finding`, `UpdateEntry`, `Diagnostic` and `Owner` are reused, never copied |
-| `static-dispatch.md` | `app/init` is generic over `W: Workspace, G: Git`; the CLI passes concrete adapters; no new `dyn` |
+| `static-dispatch.md` | `app/init` is generic over `W: Workspace, G: Git`. Each `command/*` function is generic over the ports it uses (`W: Workspace`, `G: Git`, `B: Binary`, `A: Adapter`). `main` passes the concrete adapters from `wire`, and tests pass the library fakes (D20). No new `dyn` |
 | `mod-rs-export-only.md` | `command/mod.rs` and `show/mod.rs` hold only docs and `mod` / `pub use` |
 | `strong-types.md` | arguments become `ToolName` / `PackName` / `LocalPath`; `Answer` and `Outcome` are enums, not `bool` |
 | `unit-test-mandate.md` | every logic file has colocated tests (§12) |
@@ -180,7 +197,7 @@ The value names are `<TOOL>`, `<PACK>` and `<DIR>` (`value_name`).
 2 classify each --tool and --pack argument (types/shorthand)
 3 resolve: an official name → latest packs-v* tag (Git::list_tags + types::resolve::latest_tag)
            a path → read that directory's manifest name (Workspace::source_tree, then its manifest parser)
-4 collect every refusal of steps 2-3; if any, stop, nothing written
+4 collect every refusal of steps 2-3; git missing from PATH is merged into one refusal (D19); if any, stop, nothing written
 5 render agentstacks.toml (types/project/render), Workspace::write_project
 6 the CLI runs plan → show → ask → apply (§5)
 ```
@@ -224,7 +241,8 @@ The unknown-name message replaces the formats §7 wording (`"x" is not an offici
 | file exists | `app/init` | `agentstacks.toml: already exists (edit it and run apply)` |
 | unknown name | `types/shorthand` | `--pack "x": not an official pack; pass a path, or add a git source to agentstacks.toml` / `--tool "x": not an official tool; pass a path, or add a git source to agentstacks.toml` |
 | no release tag | `app/init` | `--pack "core": no packs-v release tag in https://github.com/airsstack/agentstacks` |
-| listing tags fails | `app/init` | `--pack "core": ` + the `FetchError` Display that `Git::list_tags` returns (`src/port/git/seam.rs:44`, `src/types/resolve/error.rs:42`) |
+| listing tags fails (other than git missing) | `app/init` | `--pack "core": ` + the `FetchError` Display that `Git::list_tags` returns (`src/port/git/seam.rs:44`, `src/types/resolve/error.rs:42`) |
+| git missing from `PATH` (D19) | `app/init` | one refusal, `init: git not found on PATH (needed by --tool "claude", --pack "core")` (`probes/redesign-results.md`, G1a) |
 | path absolute / climbs out | `types/shorthand` (`LocalPath` messages, formats §7) | `--pack "/x": absolute paths are not portable` / `--pack "../x": must stay inside the project` |
 | path resolves outside through a symlink (`source_tree` returns `None`) | `app/init` | `--pack "./x": resolves outside the project` |
 | path I/O | `app/init` | `<path as written>: <io::Error Display>` (core R1) |
@@ -232,7 +250,11 @@ The unknown-name message replaces the formats §7 wording (`"x" is not an offici
 | duplicate key | `app/init` | §4.2 |
 | write fails | `fs` | `agentstacks.toml: <io::Error Display>` |
 
-`git` missing from `PATH` is a `FetchError` and shows through the "listing tags fails" row.
+**Git missing (D19):**
+
+- `Git::list_tags` reports git missing as `FetchError::GitNotFound` with an empty `needed_by` on every call, and the flow merges them (`src/port/git/seam.rs:25-26`). Passed through per argument, it would read `--pack "core": git not found on PATH (needed by )` (`probes/redesign-results.md`, G1b).
+- `app/init` therefore collects every official argument that met `GitNotFound`. It emits one `Diagnostic` at `Location::file("init")` whose `needed_by` holds each argument's flag text (`--tool "claude"`), tools first, then packs, each in the order given. Repeated identical arguments are collapsed first (D9), so each appears once.
+- This mirrors `app::update` (`src/app/update.rs:74-82`), which merges at `agentstacks.toml`. `init` has no file yet, so the location is `init`.
 
 The repository is private today, so the official shorthand cannot list its tags yet (core §17). `init` passes git's own refusal through. Making the repository public belongs to `release-and-migration`.
 
@@ -259,7 +281,7 @@ That text parses with `toml::from_str::<toml::Table>` (R2 (c)). A path source re
 | declined | `agentstacks.toml written; nothing applied (run apply)` | 0 |
 | no terminal, no `--yes` | `stdin is not a terminal; pass --yes to apply`, then `agentstacks.toml written; nothing applied (run apply)` | 1 |
 | applied | as §5.4 | 0 |
-| apply failed | the apply diagnostics (§5.4), then `agentstacks.toml written; fix the above and run apply` | 1 |
+| apply failed, or the lock read failed (D21) | the diagnostics (§5.3, §5.4), then `agentstacks.toml written; fix the above and run apply` | 1 |
 
 ## 5. `plan` and `apply`
 
@@ -322,6 +344,7 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 ```
 
 - **Nothing to change** means no listed step, and `write_lock(plan.lock())` (`src/types/lock/write.rs:57`) equals the current lock text (an absent lock is never equal).
+- **Lock read error (D21):** the current lock text is read with `Workspace::lock_text`. An `Err` prints `agentstacks.lock: <io::Error Display>`, the same location and shape `plan` uses (`src/app/plan/read.rs:58-59`). The command exits 1, asks nothing and applies nothing. `init` and `update` add their follow-up line (§4.5, §7).
 - `IsTerminal` on a piped stdin and on `/dev/null` is `false`, and `read_line` on `/dev/null` returns `Ok(0)` (`probes/cli-results.md`, R4).
 
 ### 5.4 After apply
@@ -344,9 +367,28 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 2 print each entry on stdout: NewTag → "  <key>: <current> → <new>" ; Note → "  note     <UpdateNote Display>"
 3 no NewTag → print "nothing to update", exit 0, nothing written
 4 app::update::retag(workspace, entries) → agentstacks.toml rewritten (types/project/retag); stdout "agentstacks.toml updated"
-5 plan → show → confirm → apply exactly as `apply` (§5); a refused plan or a declined / no-terminal prompt adds
-  "agentstacks.toml updated; fix the above and run apply" / "agentstacks.toml updated; nothing applied (run apply)"
+  refused → print the diagnostics, exit 1, the file unchanged, no plan (D22)
+5 plan → show → confirm → apply exactly as `apply` (§5), then the follow-up on stderr (D22)
 ```
+
+| Step 5 outcome | stderr follow-up | Exit |
+|---|---|---|
+| plan refused, apply failed, or lock read failed | `agentstacks.toml updated; fix the above and run apply` | 1 |
+| declined | `agentstacks.toml updated; nothing applied (run apply)` | 0 |
+| no terminal, no `--yes` | `stdin is not a terminal; pass --yes to apply`, then `agentstacks.toml updated; nothing applied (run apply)` | 1 |
+| applied, or nothing to change | none (§5.3, §5.4) | 0 |
+
+**Step 4 refusals (D22):**
+
+| Case | Message | Owner |
+|---|---|---|
+| re-read fails | `agentstacks.toml: <io::Error Display>` | `app/update::retag` |
+| re-read text no longer parses | the `ProjectFile::parse` refusals, e.g. `agentstacks.toml:1: unclosed table, expected `]`` (`probes/redesign-results.md`, second run) | `app/update::retag` |
+| a tag missing at re-read | `agentstacks.toml: packs.core: no tag to update (run update again)` | `types/project/retag` |
+| a tag at re-read that differs from the entry's current tag (D26) | `agentstacks.toml: packs.core: tag changed during update (run update again)` | `types/project/retag` |
+| write fails | `agentstacks.toml: <io::Error Display>` | `app/update::retag` |
+
+`retag` checks the re-read text with `ProjectFile::parse` before editing it with toml_edit. Both use one parser, `toml_parser` (`cargo tree -i toml_parser`), and gave byte-identical errors on three bad inputs (`probes/redesign-results.md`). So text that `ProjectFile::parse` accepts also parses in toml_edit. A toml_edit parse error after that check is still refused, as `agentstacks.toml: ` + its Display, printed as its multi-line text (`probes/redesign-results.md`, P3).
 
 - `<key>` is `SourceKey` Display (`packs.core`, `tools.claude`, `src/types/resolve/key.rs:64`).
 - `UpdateNote` Display is the core's text, e.g. `agentstacks.toml: packs.core: no newer tag than packs-v0.1.0` (`src/types/resolve/update.rs:77`).
@@ -354,7 +396,7 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 **Retag rule:**
 
 - Find the old value with `get_mut` at each level, never with chained `IndexMut`. Indexing a missing pack with `IndexMut` writes `[packs]\nnope = {}` into the document (`probes/cli2-results.md`, T1 (d)).
-- Set `<packs|tools>.<name>.tag` to the new tag, and copy the old value's decor onto the new value. A plain assignment drops the trailing comment (`# pinned` was lost); copying the decor keeps it, along with the alignment and every other comment (`probes/cli-results.md`, R2 (a) and (a2)).
+- Compare the old value with the entry's current tag. A difference is refused (D26), and nothing is written. Otherwise set `<packs|tools>.<name>.tag` to the new tag, and copy the old value's decor onto the new value. A plain assignment drops the trailing comment (`# pinned` was lost); copying the decor keeps it, along with the alignment and every other comment (`probes/cli-results.md`, R2 (a) and (a2)).
 - This works the same for a standard table, an inline table and dotted keys: only the tag text changes, and the trailing comments survive (`probes/cli2-results.md`, T1 (a)-(c)).
 - The value missing at re-read (the file changed during `update`) is refused: `agentstacks.toml: packs.core: no tag to update (run update again)` (same shape for `tools.*`). Owner: `types/project/retag`.
 
@@ -371,7 +413,7 @@ stdin a terminal? ── no ─► "stdin is not a terminal; pass --yes to apply
 ### 8.2 `app/init`, `app/update::retag`
 
 - The flows are as §4.1 and §7.
-- `retag` receives the `UpdateEntry` list, re-reads the text through `Workspace::project_text`, applies every `NewTag` and writes once.
+- `retag` receives the `UpdateEntry` list, re-reads the text through `Workspace::project_text`, checks it with `ProjectFile::parse`, applies every `NewTag` and writes once. With no `NewTag` it writes nothing. Refusals are as §7 (D22).
 
 ### 8.3 Path-source labels (D15)
 
@@ -489,8 +531,13 @@ Two packs that ship the same skill or agent name propose one path twice, which t
 
 **Message hooks:**
 
-- Claude accepts `additionalContext` on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `SubagentStop` (`probes/docs/hooks.md:1179-1185`). The JSON form reached the model on `SessionStart` (`PLUM`, `probes/claude-results.md:350`).
+- Of the neutral events' Claude forms, `additionalContext` is accepted on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `SubagentStop` (`probes/docs/hooks.md:1179-1185`). The JSON form reached the model on `SessionStart` (`PLUM`, `probes/claude-results.md:350`).
 - Claude adds plain stdout to the context only on `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart` and `PostModelSwitch` (`probes/docs/hooks.md:837-840`). That is why `echo` is not used, and why `session.end` is skipped (§9.6).
+- **Native message hooks (D24):** these may name any Claude event. Claude places `additionalContext` only on `SessionStart`, `SubagentStart`, `UserPromptSubmit`, `UserPromptExpansion`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PostToolBatch`, `Stop`, `SubagentStop` and `PostModelSwitch` (`probes/docs/hooks.md:1179-1185`). A native message hook on one of these renders as above, except on `Stop` and `SubagentStop` (D25). On any other event it is skipped (§9.6).
+- **Stop and SubagentStop (D25):**
+  - On these two events, `additionalContext` "keeps the subagent running" (`probes/docs/hooks.md:2736`). It "keeps the conversation going through the same loop protections as `decision: "block"`" (`:2944`), up to an 8-consecutive-continuation cap (`:2865`).
+  - A static `printf` cannot read `stop_hook_active`, so a message hook there would act as a block every time it fires. Formats §6.2 says message hooks cannot block.
+  - So message hooks on neutral `agent.stop` and on native `Stop`/`SubagentStop` are skipped (§9.6).
 - `printf '%s\n'` with single-quoted JSON prints the JSON unchanged, including an escaped `'` and a `\` (`probes/cli2-results.md`, T3).
 
 **Lua hooks:**
@@ -498,7 +545,8 @@ Two packs that ship the same skill or agent name propose one path twice, which t
 - Inside double quotes, `\`, `"` and `` ` `` are escaped with `\`, and `$` is left alone so `$TMPDIR` expands. The argv arrives with `$TMPDIR` literal (`probes/host-results.md`).
 - **Example:** `cd "$CLAUDE_PROJECT_DIR" && "airsl" "run" "--fail-open" "--policy" "confined" "--allow-read" ".claude/agentstacks/core" "--allow-write" "$TMPDIR" "--allow-env" "HOME" ".claude/agentstacks/runtime.lua" "core.hooks.enforce" "0" "neutral" "--x" "a \"q\" \\b \`c\`" # agentstacks`.
 - Run under `sh -c` with a stub `airsl` that prints its arguments, this example ran in `$CLAUDE_PROJECT_DIR` and expanded `$TMPDIR`. The last argument arrived as `a "q" \b `c``, and `# agentstacks` was not passed as an argument (`probes/cli2-results.md`, T3).
-- **Limit:** a literal `$` in an argument is expanded by `sh`.
+- **Literal `$` (D27):** `sh` expands every `$` inside double quotes. So for each argv element, every rendered var form from the §9.1 table (the values present in `values.vars`) is removed, longest form first, so `${AIRSSTACK_HOME:-$HOME/.airsstack}` goes before `$HOME`. If a `$` remains, the hook is skipped (§9.6). The var forms themselves are meant to expand.
+  - Example: `"^a$"` is skipped; `"$TMPDIR/x"` is rendered.
 
 **Both kinds:**
 
@@ -514,7 +562,7 @@ Two packs that ship the same skill or agent name propose one path twice, which t
    - `claude/adapter.lua:<line>: json.edit: top level must be an object`;
    - `claude/adapter.lua:<line>: json.edit: "hooks" is not an object` (`hooks` is a number, a list, …; `probes/settings-results.md`, S5).
    Any of these refuses the whole plan, a removed tool's run included. Such a file is not valid Claude settings.
-4. **Decode:** `airsstack.json.decode(old)`. When `old` is empty or whitespace-only, the decoded value is `{}` and decode is not called: decode fails on such text (`EOF while parsing a value`, S1), while `json.edit` treats it as `{}` (core §5).
+4. **Decode:** `airsstack.json.decode(old)`. When `old` is `nil` (D23), empty or whitespace-only, the decoded value is `{}` and decode is not called. Decode fails on empty text (`EOF while parsing a value`, S1), while `json.edit` treats it as `{}` (core §5).
 5. **Events touched:** every event whose old array holds a marked handler, plus every event we add to.
 6. **Rewritable check** for each touched event `E`. The array is rewritable when:
    - it is a list of tables;
@@ -611,6 +659,9 @@ What the example shows:
 
 - A hook (message text or lua argv) that contains `${CLAUDE_SESSION_ID}` is skipped: `skip{ item = id, reason = "claude gives hooks the session id in the event (event.session_id), not as {{var session_id}}" }`. Hooks see `CLAUDE_CODE_SESSION_ID`, not `CLAUDE_SESSION_ID` (`probes/claude-env-results.md`).
 - A message hook on `session.end` is skipped (D18): `skip{ item = id, reason = "claude shows no hook output to the model at session end" }`.
+- A message hook on neutral `agent.stop`, or a native message hook on `Stop` or `SubagentStop`, is skipped (D25): `skip{ item = id, reason = "claude treats hook output at agent stop as feedback that keeps the agent running" }`.
+- A lua hook with a literal `$` in its argv is skipped (D27): `skip{ item = id, reason = "claude runs hook commands through sh, which would expand the literal $ in argument \"<arg>\"" }`, where `<arg>` is the argv element as rendered, e.g. `claude runs hook commands through sh, which would expand the literal $ in argument "^a$"`.
+- A native message hook whose `event` is not in the D24 list is skipped: `skip{ item = id, reason = "claude passes no hook message to the model on <Event>" }`, where `<Event>` is the event as written, e.g. `claude passes no hook message to the model on Notification`.
 - A hook whose Claude event array is not rewritable is skipped (§9.5 step 6): `skip{ item = id, reason = ".claude/settings.json: hooks.<E> holds entries the claude extension cannot rewrite (a null, an empty list, or a value that is not a list of hook groups)" }`.
 - A skill or agent with a native key that is not a plain word is skipped (§9.2): `skip{ item = id, reason = "native.claude key \"<key>\" cannot be written as frontmatter" }`. For a skill, the item is the skill group.
 - Every other neutral field and event has a Claude form (§9.2, §9.4), so nothing else is skipped.
@@ -635,24 +686,27 @@ Always: `session_id`, `cwd`, and `agent` = `p.agent_type` when it is a non-empty
 | `E` | Output (`airsstack.json.encode(out) .. "\n"`) | Proof |
 |---|---|---|
 | `PreToolUse` | `hookSpecificOutput = { hookEventName = E, permissionDecision = "deny", permissionDecisionReason = blk }` when `blk`, plus `additionalContext = ctx` when `ctx` | the deny blocked the Read (`probes/claude-results.md:287`); hooks.md:2013-2020 |
-| `UserPromptSubmit`, `PostToolUse`, `SubagentStop` | `decision = "block", reason = blk` when `blk`; `hookSpecificOutput = { hookEventName = E, additionalContext = ctx }` when `ctx` | PostToolUse block reached the model (`probes/claude-results.md:499`); hooks.md:1580, :2330, :2931, :1179-1185 |
+| `UserPromptSubmit`, `PostToolUse` | `decision = "block", reason = blk` when `blk`; `hookSpecificOutput = { hookEventName = E, additionalContext = ctx }` when `ctx` | PostToolUse block reached the model (`probes/claude-results.md:499`); hooks.md:1580, :2330, :1179-1185 |
+| `SubagentStop` | `decision = "block", reason = blk` when `blk`; `ctx` is dropped (D25), so a context-only result gives `nil` | hooks.md:2736, :2931, :2944 |
 | `SessionStart` | `hookSpecificOutput = { hookEventName = E, additionalContext = <ctx and blk joined by "\n", whichever are present> }` | `PLUM` (`probes/claude-results.md:350`) |
 | `SessionEnd` | `nil`: it cannot block, and no output reaches the model (hooks.md:1034-1068, :837-840) | — |
 | any other event (a native hook on, e.g., `Stop`) | `nil`. The translator maps the six events above; a native hook on another event gets no output. Documented limit (§15) | — |
 
 When `ctx` and `blk` are both absent, the result is `nil`.
 
-D13 follows from this table: a block on `PostToolUse` is feedback, since the write stays (`probes/claude-results.md:535`); on `SessionStart` it is context; on `SessionEnd` it is nothing.
+D13 follows from this table: a block on `PostToolUse` is feedback, since the write stays (`probes/claude-results.md:535`); on `SessionStart` it is context; on `SessionEnd` it is nothing. On `SubagentStop` only a `may_block` hook's block continues the subagent (D25).
 
 ## 10. Errors: locations and owners
 
 | Location | Used for | Owner | Example |
 |---|---|---|---|
 | `--pack "<arg>"` / `--tool "<arg>"` | `init` argument refusals | `types/shorthand`, `app/init` | §4.3 |
-| `agentstacks.toml` | exists, I/O, a missing tag at retag | `app/init`, `fs`, `types/project/retag` | `agentstacks.toml: already exists (edit it and run apply)` |
+| `agentstacks.toml` | exists, I/O, a missing or changed tag at retag, a re-read that no longer parses | `app/init`, `fs`, `app/update::retag`, `types/project/retag` | `agentstacks.toml: already exists (edit it and run apply)` |
 | `<path as written>` | `init` path-argument I/O | `app/init` | `./packs/x: <io::Error Display>` |
 | the loader label (path as written, D15) | a pack or extension refused by its loader | existing loaders | `packs/x: not a pack (no pack.toml)` |
 | `<dir>` | `-C` open failure | CLI `wire` | `<dir>: <io::Error Display>` |
+| `init` | git missing from `PATH` for official arguments (D19) | `app/init` | `init: git not found on PATH (needed by --tool "claude", --pack "core")` |
+| `agentstacks.lock` | the lock read in `confirm` (D21) | CLI `command/confirm` | `agentstacks.lock: <io::Error Display>` |
 | none (plain line) | `stdin is not a terminal; pass --yes to apply`, `nothing applied`, the `agentstacks.toml written; …` / `updated; …` follow-ups | CLI `command/confirm` | §4.5, §5.3, §7 |
 | core and formats locations | everything the library already refuses | as core §13 | unchanged |
 | `claude/adapter.lua:<line>` | `json.edit` refusals on settings | core host | §9.5 |
@@ -674,6 +728,16 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | `settings.json` absent and no hooks | no write | `lib/settings` |
 | a user handler that ends with ` # agentstacks` | treated as ours and removed | `lib/settings` (documented) |
 | a prompt answered `Y`, ` yes `, `YES` | yes | `prompt` |
+| `init --tool claude --pack core --pack ./packs/team` with git missing | `init: git not found on PATH (needed by --tool "claude", --pack "core")`; the path argument resolves normally; nothing written | `app/init` |
+| the lock deleted or unreadable between plan and confirm | `agentstacks.lock: <io::Error Display>`, exit 1 | `command/confirm` |
+| `agentstacks.toml` edited into bad TOML between `update`'s list and its retag | the `ProjectFile::parse` refusal, exit 1, the file unchanged | `app/update::retag` |
+| `.claude/settings.json` absent and hooks present | decoded as `{}`; the result is `"{}\n"` plus our events | `lib/settings` |
+| a native message hook on `Notification` | skipped: `claude passes no hook message to the model on Notification` | `lib/hooks` |
+| a native message hook on `Stop` | skipped: `claude treats hook output at agent stop as feedback that keeps the agent running` (D25) | `lib/hooks` |
+| a native message hook on `PostToolUseFailure` | rendered (it takes `additionalContext`, D24) | `lib/hooks` |
+| a lua hook on `agent.stop` returning only `context` | no output; the subagent stops (D25) | `translate.lua` |
+| a lua argv element `^a$` / `$TMPDIR/x` | skipped (D27) / rendered | `lib/hooks` |
+| `agentstacks.toml` tag edited by hand between `update`'s list and its retag | `agentstacks.toml: packs.core: tag changed during update (run update again)`, exit 1, the file unchanged (D26) | `types/project/retag` |
 
 ## 12. Testing
 
@@ -683,7 +747,7 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | `app/init`, `app/update::retag` | library fakes (`FakeWorkspace`, `FakeGit`): exists, every §4.3 row, duplicate key, write | nothing |
 | `fs` `write_project`, the label | contract tests on a `tempfile` directory: mode kept; a refusal label reads `packs/core/…` | disk |
 | `runtime.lua` | the existing runtime test, updated for D17, adds a native case reading `p.hook_event_name` | airsl binary when present |
-| CLI `show/*`, `command/*`, `prompt`, `exit` | unit tests with `Plan::new` values, an injected terminal flag and line reader: every §5.2 row, every §5.3 branch, every exit code | nothing |
+| CLI `show/*`, `command/*`, `prompt`, `exit` | unit tests with `Plan::new` values, an injected terminal flag and line reader, and the library fakes through the `testing` feature (D20): every §5.2 row, every §5.3 branch including D21, every §7 outcome including D22, every exit code | nothing |
 | CLI end to end | `crates/agentstacks-cli/tests/`: run the binary on a temp project with path sources and a copy of `extensions/claude`: `init` (plus `--yes`), `plan`, `apply --yes`, `doctor` healthy then changed, the no-terminal refusal | disk, airsl |
 | `extensions/claude/lib/*.lua` | `*_test.lua` beside each module, run by `airsl test extensions/claude`: values, frontmatter (every mapping row, native override), hooks (every §9.4 row, quoting, marker, session_id), settings (every §9.5 row) | airsl binary |
 | the whole extension | `crates/agentstacks/tests/claude.rs`: the real `plan` with `StdWorkspace` and `AirslAdapter` on fixtures in `crates/agentstacks/tests/fixtures/claude/`. Cases: a full pack with every item kind; an existing settings file with user keys, a user hook and an old marked hook; a removed tool. Every proposed file and skip is compared with checked-in expected files | airsl library |
@@ -694,6 +758,7 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 - CI already installs the airsl binary before `cargo make dod` (`.github/workflows/ci.yml:59-72`).
 - Config examples parsed with the real crate: the §9.1 `extension.toml` loads through `Extension::load` with `reads = [.claude/settings.json]`, and a path-source project file parses through `ProjectFile::parse` (`probes/settings-results.md`, S7).
 - No logic is tested only end to end. `cargo make dod` is the gate.
+- The gate runs clippy and rustdoc with `--all-features` (`Makefile.toml`), which turns on `testing`. So the gated fakes must pass `missing_docs`, `unreachable_pub` and clippy outside `cfg(test)`.
 
 ## 13. Dependencies, policy and docs
 
@@ -703,6 +768,7 @@ CLI messages are not `Diagnostic`s and are not sorted; they print in the order t
 | `similar = "3"` (workspace; used by `agentstacks-cli`), `Apache-2.0` | R3, R5 |
 | `deny.toml` | unchanged (R5) |
 | `agentstacks-cli` depends on `agentstacks` (workspace path dependency) | composition root (docs/architecture.md) |
+| `agentstacks` gains `[features] testing = []`; `[workspace.dependencies]` gains `agentstacks = { path = "crates/agentstacks" }`; `agentstacks-cli` has `agentstacks = { workspace = true }` and `[dev-dependencies] agentstacks = { workspace = true, features = ["testing"] }` (D20) | `probes/redesign-results.md`, G2 (resolver 3: on in `cargo test`, off in `cargo run` and `--release`) |
 | docs | `docs/hooks.md`: the translator contract gains `payload`, where `M.result` is documented (`docs/hooks.md:101`, `:153`). New `docs/cli.md`: the commands, output, prompt and exit codes. `docs/README.md` table updated. `CLAUDE.md` Status: CLI commands and the claude extension built |
 
 ## 14. Handed to other chains
