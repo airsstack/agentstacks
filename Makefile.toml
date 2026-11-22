@@ -95,9 +95,9 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua extension tests: every *_test.lua under extensions/claude"
+description = "Lua extension tests: every *_test.lua under extensions/"
 command = "airsl"
-args = ["test", "extensions/claude"]
+args = ["test", "extensions"]
 
 # ---------------------------------------------------------------------------
 # Supply chain
