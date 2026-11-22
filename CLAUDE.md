@@ -2,22 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: core built, CLI commands not yet
+## Status: core, CLI commands and claude extension built
 
-The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host and
-the hook runtime are built and tested. The CLI commands are not.
+The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
+hook runtime, the five CLI commands and the claude extension are built and tested.
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built
-crates/agentstacks-cli/   the `agentstacks` binary; answers --version and --help only
+crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doctor · update
+extensions/claude/        the official claude tool extension (adapter.lua under airsl)
 docs/                     contributor docs; docs/architecture.md is the layering contract
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
 .github/workflows/ci.yml  CI: `cargo make dod` and `cargo deny check`
 ```
 
 Everything below the Status section except Commands describes the agreed design. Treat it as the
-contract to build toward, not a description of existing files. `extensions/`, `packs/`, `book/` and the claudevs move
-have not landed, and the code that will move here still lives in
+contract to build toward, not a description of existing files. `packs/`, `book/` and the claudevs
+move have not landed, and the code that will move here still lives in
 [claudestacks](https://github.com/airsstack/claudestacks) (`../claudestacks` in the org workspace).
 `/claudestacks-sdlc:status` shows progress.
 

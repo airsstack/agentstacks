@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [03, 06, 08]
 built-on: 7b4a3a8f175f
@@ -111,3 +111,16 @@ CLAUDE.md                                               — modify: Status secti
 - `cargo make dod` green.
 - `cargo deny check` passes.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test --workspace` green.
+
+## Review findings
+
+- 🔵 `commands.rs` docs said "stdin closed"; the code passes `Stdio::null()`. Fixed inline to "stdin null".
+- 🔵 `apply_without_terminal_or_yes_refuses` checked only the skill file. Fixed inline: it also asserts `agentstacks.lock` is byte-for-byte unchanged. `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks-cli --test commands` → `10 passed; 0 failed`.
+- 🔵 `CLAUDE.md:20` one 167-column line. Fixed inline: rewrapped at 100.
+- 🔵 open: `init_with_unknown_name_is_refused` uses `contains` because stderr also carries a second line for the missing `./ext/claude`; the full pack message is still checked.
+- 🔵 the `CLAUDE.md` layout block gained an accurate `extensions/claude/` line the task did not ask for. Kept.
+
+## Deviations
+
+- 2026-11-22: `path_pack_refusal_names_the_path_as_written` writes `path = "packs/bad"` by hand. The location is the path as written, so a toml entry `./packs/bad` prints `./packs/bad/pack.toml:1: …` and `packs/bad` prints `packs/bad/pack.toml:…`, which is the form the plan states. Real output for `./packs/bad`: `./packs/bad/pack.toml:1: key with no value, expected `=``.
+- 2026-11-22 (process): run directly from `approved` to `done`; built in parallel with plan 08's review because the file sets are disjoint.
