@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 built-on: 7b4a3a8f175f
 ---
@@ -305,3 +305,16 @@ a case.
 
 - `airsl test extensions/claude` reports 0 failed.
 - `cargo make dod` green, with `lua` in its step list.
+
+## Review findings
+
+- 🔵 `hooks_test.lua` constant `D25` and `settings_test.lua` fixture `SPEC_OLD` carried design vocabulary. Fixed inline: renamed `AGENT_STOP_REASON`, `OLD_SETTINGS`. `airsl test extensions/claude` → `63 passed, 0 failed (5 files)`.
+- ❓ `lua_command_matches_the_spec_example`: checked by the orchestrator, the argv and command match spec §9.4 (`spec.md:596`) byte for byte. No change.
+- ❓ `translate.lua:44` returns `nil` for the whole event on a tool other than Read/Edit/Write: matches spec §9.7 ("any other tool returns `nil`", `spec.md:728`). No change.
+- 🟡 `settings.lua:144` treats a non-object top-level `hooks` as empty: open, non-blocking. The host's `json.edit` refuses that case (spec §9.5, `spec.md:613`); plan 08 golden cases cover it.
+- 🔵 open: `hooks.lua:48` `match = {}` gives matcher `""`; `translate.lua:112` `---` comment style; `values.lua:8` comment wording.
+
+## Deviations
+
+- 2026-11-22 (process): coders read their task sections straight from this plan file; the ledger came from `grep '^### Task'`. The five tasks were built in one parallel batch and land in one commit instead of one per task.
+- 2026-11-22: `Makefile.toml` header and `[tasks.deny]` comments were reworded to name `lua` as the project's extra step.

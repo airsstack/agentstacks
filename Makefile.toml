@@ -8,12 +8,14 @@
 #   cargo make deny                # cargo-deny; deliberately not part of dod
 #   cargo make --list-all-steps
 #
-# The five gate steps mirror the canonical command set in the
+# The five cargo gate steps mirror the canonical command set in the
 # `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
-# file follows. CI is meant to run `cargo make dod`, so the pipeline and a
-# local run are the same command.
+# file follows. The `lua` step is the project's own addition: it runs the Lua
+# extension tests with `airsl test`. CI is meant to run `cargo make dod`, so the
+# pipeline and a local run are the same command.
 #
 # Install: cargo install --locked cargo-make cargo-deny
+#          plus the `airsl` binary on PATH for the `lua` step
 #
 
 [config]
@@ -43,7 +45,7 @@ alias = "dod"
 [tasks.dod]
 category = "Gate"
 description = "Definition of Done — every step must exit 0 with zero warnings"
-dependencies = ["fmt-check", "clippy", "doc", "test", "test-doc"]
+dependencies = ["fmt-check", "clippy", "doc", "test", "test-doc", "lua"]
 
 [tasks.fmt-check]
 category = "Gate"
@@ -91,6 +93,12 @@ description = "Doctests — excluded by --all-targets, so they need their own ru
 command = "cargo"
 args = ["test", "--workspace", "--all-features", "--doc"]
 
+[tasks.lua]
+category = "Gate"
+description = "Lua extension tests: every *_test.lua under extensions/claude"
+command = "airsl"
+args = ["test", "extensions/claude"]
+
 # ---------------------------------------------------------------------------
 # Supply chain
 # ---------------------------------------------------------------------------
@@ -99,10 +107,10 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 category = "Supply chain"
 description = "cargo-deny: security advisories, licenses, duplicate versions, sources"
 # Deliberately not a dependency of `dod`. The Definition of Done is the five
-# commands the guideline skill owns; adding a sixth here would make this file
-# disagree with its source of truth. This check also answers to a moving
-# advisory database rather than to the working tree, so it can fail on a commit
-# that changed nothing.
+# commands the guideline skill owns plus the project's `lua` step; adding
+# another here would make this file disagree with its source of truth. This
+# check also answers to a moving advisory database rather than to the working
+# tree, so it can fail on a commit that changed nothing.
 command = "cargo"
 args = ["deny", "check"]
 
