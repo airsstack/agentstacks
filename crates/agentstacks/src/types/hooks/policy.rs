@@ -5,8 +5,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Policy`] is `confined` or `pure`; `confined` is the default. The airsl policy `trusted` is
-//!   deliberately not representable, because a pack hook may not run with it.
+//! - [`Policy`] is `confined`, the only policy api 0 allows, and the default. The airsl policy
+//!   `trusted` is deliberately not representable, because a pack hook may not run with it, and
+//!   `pure` is refused because airsl has no `require` under it.
 //!
 //! # Non-responsibilities
 //!
@@ -24,7 +25,7 @@ use crate::types::hooks::InvalidPolicy;
 /// ```
 /// use agentstacks::types::Policy;
 ///
-/// assert_eq!(Policy::new("pure")?, Policy::Pure);
+/// assert_eq!(Policy::new("confined")?, Policy::Confined);
 /// assert_eq!(Policy::default(), Policy::Confined);
 ///
 /// let refused = Policy::new("trusted").err().ok_or("expected a refusal")?;
@@ -36,8 +37,6 @@ pub enum Policy {
     /// Reads and writes only what the grants name.
     #[default]
     Confined,
-    /// No access beyond the script itself.
-    Pure,
 }
 
 impl Policy {
@@ -45,13 +44,13 @@ impl Policy {
     ///
     /// # Errors
     ///
-    /// Returns [`InvalidPolicy::NotAllowed`] for `trusted`, and [`InvalidPolicy::Unknown`] for any
-    /// other value but `confined` and `pure`.
+    /// Returns [`InvalidPolicy::PureUnsupported`] for `pure`, [`InvalidPolicy::NotAllowed`] for
+    /// `trusted`, and [`InvalidPolicy::Unknown`] for any other value but `confined`.
     pub fn new(text: &str) -> Result<Self, InvalidPolicy> {
         let text = text.to_owned();
         match text.as_str() {
             "confined" => Ok(Self::Confined),
-            "pure" => Ok(Self::Pure),
+            "pure" => Err(InvalidPolicy::PureUnsupported),
             "trusted" => Err(InvalidPolicy::NotAllowed { text }),
             _ => Err(InvalidPolicy::Unknown { text }),
         }
@@ -62,7 +61,6 @@ impl Policy {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Confined => "confined",
-            Self::Pure => "pure",
         }
     }
 }
@@ -97,12 +95,21 @@ mod tests {
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     #[test]
-    fn policy_parses_confined_and_pure() -> TestResult {
+    fn policy_parses_confined() -> TestResult {
         assert_eq!(Policy::new("confined")?, Policy::Confined);
-        assert_eq!(Policy::new("pure")?, Policy::Pure);
         assert_eq!(Policy::default(), Policy::Confined);
         assert_eq!(Policy::Confined.to_string(), "confined");
-        assert_eq!(Policy::Pure.to_string(), "pure");
+        Ok(())
+    }
+
+    #[test]
+    fn policy_refuses_pure_in_api_0() -> TestResult {
+        let error = Policy::new("pure").err().ok_or("expected a refusal")?;
+        let location = Location::at_key("packs/core/pack.toml", "hooks[1].grants.policy");
+        assert_eq!(
+            Diagnostic::new(location, ManifestError::from(error)).to_string(),
+            "packs/core/pack.toml: hooks[1].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)"
+        );
         Ok(())
     }
 
@@ -125,7 +132,7 @@ mod tests {
             assert_eq!(
                 Diagnostic::new(location, ManifestError::from(error)).to_string(),
                 format!(
-                    "packs/core/pack.toml: hooks[1].grants.policy: \"{text}\" (expected confined, pure)"
+                    "packs/core/pack.toml: hooks[1].grants.policy: \"{text}\" (expected confined)"
                 )
             );
         }
@@ -139,12 +146,13 @@ mod tests {
                 .map(|value| value.to_string())
                 .map_err(|error| error.to_string())
         }
-        for text in ["pure", "trusted"] {
+        for text in ["confined", "pure", "trusted"] {
             let expected = shown(Policy::new(text));
             assert_eq!(shown(text.parse::<Policy>()), expected);
             assert_eq!(shown(Policy::try_from(text)), expected);
         }
-        assert!(Policy::new("pure").is_ok());
+        assert!(Policy::new("confined").is_ok());
+        assert!(Policy::new("pure").is_err());
         assert!(Policy::new("trusted").is_err());
     }
 }

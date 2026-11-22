@@ -12,17 +12,19 @@
 //!   only diagnostic.
 //! - [`Lockfile::new`] builds a lock from typed [`LockContents`] and applies the same whole-file
 //!   rules. Every path in an entry is a [`SubPath`] or a
-//!   [`LocalPath`](crate::types::LocalPath), which hold the per-field rules from construction, so a
-//!   lock built in memory is held to what a lock read from disk is held to and what it writes
-//!   reads back.
-//! - It reads `api`, `[airsl]`, `[[tool]]`, `[[pack]]`, `[[file]]` and `[[merge]]`. Empty text is
-//!   an empty table, so the fields it lacks are refused one by one.
-//! - It refuses a repeated tool, pack, file path or merge, located at the repeated entry
+//!   [`LocalPath`](crate::types::LocalPath), which hold the climbing and emptiness rules from
+//!   construction. `new` does not apply the rules the parse adds for a file path: a `\` and
+//!   agentstacks' own files (`agentstacks.lock`, `agentstacks.toml`). The operation path rule keeps
+//!   such a path out before a lock is built, so a lock built from accepted operations writes text
+//!   that reads back.
+//! - It reads `api`, `[airsl]`, `[[tool]]`, `[[pack]]` and `[[file]]`. Empty text is an empty
+//!   table, so the fields it lacks are refused one by one; any other top-level key is an
+//!   unknown key.
+//! - It refuses a repeated tool, pack or file path, located at the repeated entry
 //!   (`pack[2]`), and a `by` that names no locked pack or tool. File paths are compared lexically with empty and `.` segments removed, so `./a` and `a`
 //!   are one path. An entry whose identifying field is valid still counts for these checks when another of
 //!   its fields is refused, so a broken entry produces no follow-on refusals.
-//! - It keeps every list sorted by byte order (tools and packs by name, files by path, merges by
-//!   file then key), so the text written back never needs sorting.
+//! - It keeps every list sorted by byte order (tools and packs by name, files by path), so the text written back never needs sorting.
 //!
 //! # Non-responsibilities
 //!
@@ -42,9 +44,8 @@ use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
 use crate::types::lock::entry::key::EntryKey;
 use crate::types::lock::entry::locked::LockedEntry;
-use crate::types::lock::entry::written::{FileEntry, MergeEntry};
+use crate::types::lock::entry::written::FileEntry;
 use crate::types::lock::error::LockError;
-use crate::types::lock::merge::{MergeFile, MergeKey};
 use crate::types::lock::owner::Owner;
 use crate::types::manifest::PackVersion;
 use crate::types::name::PackName;
@@ -59,7 +60,7 @@ use crate::types::report::TypeWord;
 use crate::types::report::UnsupportedApi;
 
 /// The keys `agentstacks.lock` may hold at its top level.
-const TOP_LEVEL_KEYS: [&str; 6] = ["api", "airsl", "tool", "pack", "file", "merge"];
+const TOP_LEVEL_KEYS: [&str; 5] = ["api", "airsl", "tool", "pack", "file"];
 
 /// The typed entries a lock is built from, in any order.
 ///
@@ -72,7 +73,7 @@ const TOP_LEVEL_KEYS: [&str; 6] = ["api", "airsl", "tool", "pack", "file", "merg
 /// let contents = LockContents::default();
 /// assert!(contents.airsl.is_none());
 /// assert!(contents.tools.is_empty() && contents.packs.is_empty());
-/// assert!(contents.files.is_empty() && contents.merges.is_empty());
+/// assert!(contents.files.is_empty());
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LockContents {
@@ -84,8 +85,6 @@ pub struct LockContents {
     pub packs: Vec<LockedEntry<PackName>>,
     /// The files an install wrote.
     pub files: Vec<FileEntry>,
-    /// The merges an install made.
-    pub merges: Vec<MergeEntry>,
 }
 
 /// A parsed `agentstacks.lock`.
@@ -109,7 +108,6 @@ pub struct Lockfile {
     tools: Vec<LockedEntry<ToolName>>,
     packs: Vec<LockedEntry<PackName>>,
     files: Vec<FileEntry>,
-    merges: Vec<MergeEntry>,
 }
 
 impl Lockfile {
@@ -172,7 +170,6 @@ impl Lockfile {
             LockedEntry::read(entry, path, PackName::new)
         });
         let files = read_array(&mut root, file, "file", |entry, _| FileEntry::read(entry));
-        let merges = read_array(&mut root, file, "merge", |entry, _| MergeEntry::read(entry));
 
         let mut diagnostics = root.into_diagnostics();
         Identities {
@@ -188,21 +185,9 @@ impl Lockfile {
                 .iter()
                 .filter_map(|(path, read)| Some((path.clone(), read.path.as_ref()?)))
                 .collect(),
-            merges: merges
-                .iter()
-                .filter_map(|(path, read)| {
-                    let (file, key) = read.target.as_ref()?;
-                    Some((path.clone(), (file, key)))
-                })
-                .collect(),
             owners: files
                 .iter()
                 .filter_map(|(path, read)| Some((by_path(path), read.by.as_ref()?)))
-                .chain(
-                    merges
-                        .iter()
-                        .filter_map(|(path, read)| Some((by_path(path), read.by.as_ref()?))),
-                )
                 .collect(),
         }
         .check(file, &mut diagnostics);
@@ -226,10 +211,6 @@ impl Lockfile {
                 .into_iter()
                 .filter_map(|(_, read)| read.entry)
                 .collect(),
-            merges: merges
-                .into_iter()
-                .filter_map(|(_, read)| read.entry)
-                .collect(),
         };
         lock.sort();
         Ok(lock)
@@ -239,9 +220,9 @@ impl Lockfile {
     ///
     /// # Errors
     ///
-    /// Returns every whole-file refusal, located in `file`: a repeated tool, pack, file path or
-    /// merge (located at the repeated entry, `pack[i]`), and a `by` that names no locked pack or
-    /// tool (located at `file[i].by` or `merge[i].by`). Each index is the entry's position in the
+    /// Returns every whole-file refusal, located in `file`: a repeated tool, pack or file path
+    /// (located at the repeated entry, `pack[i]`), and a `by` that names no locked pack or tool
+    /// (located at `file[i].by`). Each index is the entry's position in the
     /// sorted list the lock keeps and writes.
     ///
     /// # Examples
@@ -286,14 +267,12 @@ impl Lockfile {
             tools,
             packs,
             files,
-            merges,
         } = contents;
         let mut lock = Self {
             airsl,
             tools,
             packs,
             files,
-            merges,
         };
         lock.sort();
         let mut diagnostics = Diagnostics::new();
@@ -301,18 +280,11 @@ impl Lockfile {
             tools: indexed("tool", lock.tools.iter().map(LockedEntry::name)),
             packs: indexed("pack", lock.packs.iter().map(LockedEntry::name)),
             files: indexed("file", lock.files.iter().map(FileEntry::path)),
-            merges: indexed("merge", lock.merges.iter().map(|m| (m.file(), m.key()))),
             owners: lock
                 .files
                 .iter()
                 .enumerate()
                 .map(|(index, entry)| (format!("file[{index}].by"), entry.by()))
-                .chain(
-                    lock.merges
-                        .iter()
-                        .enumerate()
-                        .map(|(index, entry)| (format!("merge[{index}].by"), entry.by())),
-                )
                 .collect(),
         }
         .check(file, &mut diagnostics);
@@ -347,18 +319,10 @@ impl Lockfile {
         &self.files
     }
 
-    /// The merges an install made, sorted by file then key.
-    #[must_use]
-    pub fn merges(&self) -> &[MergeEntry] {
-        &self.merges
-    }
-
     fn sort(&mut self) {
         self.tools.sort_by(|a, b| a.name().cmp(b.name()));
         self.packs.sort_by(|a, b| a.name().cmp(b.name()));
         self.files.sort_by(|a, b| a.path().cmp(b.path()));
-        self.merges
-            .sort_by(|a, b| (a.file(), a.key()).cmp(&(b.file(), b.key())));
     }
 }
 
@@ -370,8 +334,6 @@ struct Identities<'a> {
     packs: Vec<(String, &'a PackName)>,
     /// Each file path with the key path of its entry.
     files: Vec<(String, &'a SubPath)>,
-    /// Each merge target with the key path of its entry.
-    merges: Vec<(String, (&'a MergeFile, &'a MergeKey))>,
     /// Each `by` with the key path it was read at.
     owners: Vec<(String, &'a Owner)>,
 }
@@ -394,15 +356,6 @@ impl Identities<'_> {
         }
         for (path, written) in repeated(&self.files, SubPath::normalized) {
             diagnostics.push(at_entry(path, EntryKey::File(written.clone())));
-        }
-        for (path, (merge_file, key)) in repeated(&self.merges, |target| target) {
-            diagnostics.push(at_entry(
-                path,
-                EntryKey::Merge {
-                    file: merge_file.clone(),
-                    key: key.clone(),
-                },
-            ));
         }
 
         let locked: BTreeSet<&str> = self
@@ -564,12 +517,6 @@ mod tests {
         format!("[[file]]\npath = \"{path}\"\nhash = \"sha256:{HEX64}\"\nby = \"{by}\"\n")
     }
 
-    fn merge(file: &str, key: &str, by: &str) -> String {
-        format!(
-            "[[merge]]\nfile = \"{file}\"\nkey = \"{key}\"\nhash = \"sha256:{HEX64}\"\nby = \"{by}\"\n"
-        )
-    }
-
     #[test]
     fn lockfile_parses_the_documented_example() -> TestResult {
         let lock = parsed(&example_lock())?;
@@ -581,13 +528,18 @@ mod tests {
         let files: Vec<&str> = lock.files().iter().map(|f| f.path().as_str()).collect();
         assert_eq!(files, [".claude/skills/discuss/SKILL.md"]);
         assert_eq!(lock.files().first().map(|f| f.by().as_str()), Some("core"));
-        let merges: Vec<(&str, &str, &str)> = lock
-            .merges()
-            .iter()
-            .map(|m| (m.file().as_str(), m.key().as_str(), m.by().as_str()))
-            .collect();
-        assert_eq!(merges, [(".claude/settings.json", "<locator>", "core")]);
         Ok(())
+    }
+
+    #[test]
+    fn lockfile_refuses_a_merge_table_as_an_unknown_key() -> TestResult {
+        refused_once(
+            &format!(
+                "api = 0\n[[merge]]\nfile = \".claude/settings.json\"\nkey = \"hooks\"\n\
+                 hash = \"sha256:{HEX64}\"\nby = \"core\"\n"
+            ),
+            "agentstacks.lock: merge: unknown key",
+        )
     }
 
     #[test]
@@ -675,15 +627,6 @@ mod tests {
                 ),
                 "agentstacks.lock: file[1]: file \".claude/x\" listed twice",
             ),
-            (
-                format!(
-                    "{head}{}{}{}",
-                    pack("core"),
-                    merge(".claude/settings.json", "hooks", "core"),
-                    merge(".claude/settings.json", "hooks", "core")
-                ),
-                "agentstacks.lock: merge[1]: merge \".claude/settings.json\" \"hooks\" listed twice",
-            ),
         ];
         for (text, message) in &cases {
             refused_once(text, message)?;
@@ -714,21 +657,7 @@ mod tests {
     #[test]
     fn lockfile_accepts_distinct_namespaces() -> TestResult {
         let head = "api = 0\n";
-        let texts = [
-            format!("{head}{}{}", tool("claude"), pack("claude")),
-            format!(
-                "{head}{}{}{}",
-                pack("core"),
-                merge(".claude/settings.json", "hooks", "core"),
-                merge(".claude/settings.json", "permissions", "core")
-            ),
-            format!(
-                "{head}{}{}{}",
-                pack("core"),
-                file_entry(".claude/settings.json", "core"),
-                merge(".claude/settings.json", "hooks", "core")
-            ),
-        ];
+        let texts = [format!("{head}{}{}", tool("claude"), pack("claude"))];
         for text in &texts {
             parsed(text)?;
         }
@@ -751,12 +680,8 @@ mod tests {
         )?;
 
         refused_once(
-            &format!(
-                "{head}{}{}",
-                pack("core"),
-                merge(".claude/settings.json", "hooks", "kore")
-            ),
-            "agentstacks.lock: merge[0].by: \"kore\" is not a locked pack or tool",
+            &format!("{head}{}{}", pack("core"), file_entry(".claude/x", "kore")),
+            "agentstacks.lock: file[0].by: \"kore\" is not a locked pack or tool",
         )
     }
 
@@ -782,13 +707,11 @@ mod tests {
     #[test]
     fn lockfile_sorts_parsed_entries() -> TestResult {
         let text = format!(
-            "api = 0\n{}{}{}{}{}{}{}{}",
+            "api = 0\n{}{}{}{}{}{}",
             pack("team-lint"),
             pack("core"),
             file_entry("b", "core"),
             file_entry("a", "core"),
-            merge("f", "z", "core"),
-            merge("f", "a", "core"),
             tool("codex"),
             tool("claude"),
         );
@@ -799,12 +722,6 @@ mod tests {
         assert_eq!(tools, ["claude", "codex"]);
         let files: Vec<&str> = lock.files().iter().map(|f| f.path().as_str()).collect();
         assert_eq!(files, ["a", "b"]);
-        let merges: Vec<(&str, &str)> = lock
-            .merges()
-            .iter()
-            .map(|m| (m.file().as_str(), m.key().as_str()))
-            .collect();
-        assert_eq!(merges, [("f", "a"), ("f", "z")]);
         Ok(())
     }
 

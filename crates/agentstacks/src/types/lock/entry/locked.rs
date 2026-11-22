@@ -1,8 +1,8 @@
 //! One locked tool or pack: what an install resolved it to.
 //!
-//! It is separate from [`FileEntry`](crate::types::FileEntry) and
-//! [`MergeEntry`](crate::types::MergeEntry) because it records what was resolved (a source and its
-//! tree), where those two record what was written, and one generic entry serves tools and packs.
+//! It is separate from [`FileEntry`](crate::types::FileEntry) because it records what was resolved
+//! (a source and its tree), where a file entry records what was written, and one generic entry
+//! serves tools and packs.
 //!
 //! # Responsibilities
 //!

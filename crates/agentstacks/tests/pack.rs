@@ -498,7 +498,7 @@ const SPEC_ROW_CASES: &[(&str, &str)] = &[
     ),
     (
         "hook-grants-policy-unknown",
-        "/pack.toml: hooks[0].grants.policy: \"foo\" (expected confined, pure)",
+        "/pack.toml: hooks[0].grants.policy: \"foo\" (expected confined)",
     ),
     (
         "hook-grants-write-relative",

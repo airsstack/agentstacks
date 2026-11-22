@@ -5,7 +5,7 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Pack`]: the loaded and checked pack, built by [`Pack::load`] from a [`FileTree`](crate::types::FileTree).
+//! - [`Pack`]: the loaded and checked pack, built by [`Pack::load`] from a [`FileTree`](crate::port::FileTree).
 //! - [`PackSkill`]: a skill's checked frontmatter with the files installed from its directory.
 //! - [`PackAgent`]: an agent's checked frontmatter with the pack-relative path of its file.
 //! - [`NativeDir`]: one `native/<tool>/` directory, its installed files and its parsed hooks.

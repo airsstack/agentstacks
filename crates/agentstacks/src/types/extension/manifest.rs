@@ -10,8 +10,11 @@
 //!   of the file at once: a field's refusal never hides the others.
 //! - A syntax error stops only this file and is its only diagnostic; empty text is an empty table,
 //!   so each missing field is refused by name.
-//! - It reads `[extension]` (`name`, `version`, `api`, `description`, `entry`) and refuses any
-//!   other key at either level.
+//! - It reads `[extension]` (`name`, `version`, `api`, `description`, `entry`, and the optional
+//!   `reads`) and refuses any other key at either level.
+//! - `reads` lists the project files the extension may read. Each entry is a project-relative path
+//!   with no `..` segment and no `\`, kept as written; a path that repeats an earlier entry after
+//!   normalising is refused. agentstacks' own files are allowed there.
 //! - An `api` other than [`API`] is refused here and nowhere else: a refused manifest yields no
 //!   extension, so no later check sees it.
 //!
@@ -28,7 +31,14 @@ use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
 use crate::types::manifest::PackVersion;
 use crate::types::name::ToolName;
+use crate::types::project::InvalidSubPath;
+use crate::types::project::SubPath;
 use crate::types::report::Diagnostics;
+use crate::types::report::FieldError;
+use crate::types::report::FormatError;
+use crate::types::report::ListedTwice;
+use crate::types::report::MustBeRelative;
+use crate::types::report::OutsideProject;
 use crate::types::report::UnsupportedApi;
 
 /// A parsed `extension.toml`.
@@ -60,6 +70,7 @@ pub struct ExtensionManifest {
     version: PackVersion,
     description: String,
     entry: EntryPath,
+    reads: Vec<SubPath>,
 }
 
 impl ExtensionManifest {
@@ -122,6 +133,7 @@ impl ExtensionManifest {
                     version: Some(version),
                     description: Some(description),
                     entry: Some(entry),
+                    reads,
                 },
                 true,
             ) => Ok(Self {
@@ -129,6 +141,7 @@ impl ExtensionManifest {
                 version,
                 description,
                 entry,
+                reads,
             }),
             _ => Err(diagnostics),
         };
@@ -158,6 +171,14 @@ impl ExtensionManifest {
     pub const fn entry(&self) -> &EntryPath {
         &self.entry
     }
+
+    /// The project files the extension may read, as written; empty when `reads` is absent.
+    ///
+    /// Compare entries by [`SubPath::normalized`], which makes `./a` and `a` one path.
+    #[must_use]
+    pub fn reads(&self) -> &[SubPath] {
+        &self.reads
+    }
 }
 
 /// The fields of `[extension]` that read cleanly; `api` is checked and not kept.
@@ -166,6 +187,7 @@ struct Section {
     version: Option<PackVersion>,
     description: Option<String>,
     entry: Option<EntryPath>,
+    reads: Vec<SubPath>,
 }
 
 /// Reads and checks every field of `[extension]`, refusing each failure and going on.
@@ -189,18 +211,62 @@ fn read_section(section: &mut TomlFields) -> Section {
             .map_err(|error| section.refuse("entry", error))
             .ok()
     });
-    section.refuse_unknown_keys(&["name", "version", "api", "description", "entry"]);
+    let reads = read_reads(section);
+    section.refuse_unknown_keys(&["name", "version", "api", "description", "entry", "reads"]);
     Section {
         name,
         version,
         description,
         entry,
+        reads,
     }
+}
+
+/// Reads `reads`: the entries that pass [`check_read`] and do not repeat an earlier one after
+/// normalising. Each refusal is located at its own index and the others are still reported.
+fn read_reads(section: &mut TomlFields) -> Vec<SubPath> {
+    let mut reads: Vec<SubPath> = Vec::new();
+    for (index, text) in section.optional_string_list("reads").unwrap_or_default() {
+        let at = section.item_path("reads", index);
+        match check_read(&text) {
+            Ok(path)
+                if reads
+                    .iter()
+                    .any(|seen| seen.normalized() == path.normalized()) =>
+            {
+                section.refuse_path(&at, ExtensionError::from(ListedTwice::text(text)));
+            }
+            Ok(path) => reads.push(path),
+            Err(error) => section.refuse_path(&at, error),
+        }
+    }
+    reads
+}
+
+/// Checks one `reads` entry: relative, inside the project, and written with `/` only.
+fn check_read(text: &str) -> Result<SubPath, FormatError> {
+    if text.starts_with('/') {
+        return Err(ExtensionError::from(MustBeRelative::new(text)).into());
+    }
+    let path = SubPath::new(text).map_err(|error| match error {
+        InvalidSubPath::OutsideRepository => {
+            FormatError::from(ExtensionError::from(OutsideProject::new(text)))
+        }
+        InvalidSubPath::Empty => FormatError::from(FieldError::Empty),
+    })?;
+    if text.contains('\\') {
+        return Err(ExtensionError::Separator {
+            text: text.to_owned(),
+        }
+        .into());
+    }
+    Ok(path)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::project::SubPath;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -262,6 +328,123 @@ mod tests {
         );
         assert_eq!(manifest.entry().as_str(), "adapter.lua");
         Ok(())
+    }
+
+    /// The example with a `reads` line added to `[extension]`.
+    fn with_reads(line: &str) -> String {
+        with_line("entry", &format!("entry       = \"adapter.lua\"\n{line}"))
+    }
+
+    #[test]
+    fn extension_manifest_reads_default_to_empty() -> TestResult {
+        let manifest =
+            ExtensionManifest::parse(Path::new(FILE), EXAMPLE).map_err(|d| format!("{d:?}"))?;
+        assert!(manifest.reads().is_empty());
+        let manifest = ExtensionManifest::parse(Path::new(FILE), &with_reads("reads = []"))
+            .map_err(|d| format!("{d:?}"))?;
+        assert!(manifest.reads().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn extension_manifest_parses_reads() -> TestResult {
+        let text = with_reads("reads = [\".claude/settings.json\", \"./opencode.json\"]");
+        let manifest =
+            ExtensionManifest::parse(Path::new(FILE), &text).map_err(|d| format!("{d:?}"))?;
+        let written: Vec<&str> = manifest.reads().iter().map(SubPath::as_str).collect();
+        assert_eq!(written, [".claude/settings.json", "./opencode.json"]);
+        let normalized: Vec<String> = manifest.reads().iter().map(SubPath::normalized).collect();
+        assert_eq!(normalized, [".claude/settings.json", "opencode.json"]);
+        Ok(())
+    }
+
+    #[test]
+    fn extension_manifest_refuses_reads_that_is_not_an_array() {
+        assert_eq!(
+            parse(&with_reads("reads = \"x\"")),
+            ["extension.toml: extension.reads: expected array, got string"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_refuses_a_reads_item_that_is_not_a_string() {
+        assert_eq!(
+            parse(&with_reads("reads = [1]")),
+            ["extension.toml: extension.reads[0]: expected string, got integer"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_refuses_an_absolute_reads_entry() {
+        assert_eq!(
+            parse(&with_reads("reads = [\"/x\"]")),
+            ["extension.toml: extension.reads[0]: \"/x\" must be relative"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_refuses_a_reads_entry_outside_the_project() {
+        assert_eq!(
+            parse(&with_reads("reads = [\"../x\"]")),
+            ["extension.toml: extension.reads[0]: \"../x\" must stay inside the project"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_refuses_a_blank_reads_entry() {
+        for entry in ["", "  "] {
+            assert_eq!(
+                parse(&with_reads(&format!("reads = [\"{entry}\"]"))),
+                ["extension.toml: extension.reads[0]: empty"],
+                "{entry:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn extension_manifest_refuses_a_reads_entry_with_a_backslash() {
+        assert_eq!(
+            parse(&with_reads("reads = ['a\\b']")),
+            ["extension.toml: extension.reads[0]: \"a\\b\" must use / as the separator"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_allows_agentstacks_own_files_in_reads() -> TestResult {
+        let text = with_reads("reads = [\"agentstacks.toml\", \"agentstacks.lock\"]");
+        let manifest =
+            ExtensionManifest::parse(Path::new(FILE), &text).map_err(|d| format!("{d:?}"))?;
+        let written: Vec<&str> = manifest.reads().iter().map(SubPath::as_str).collect();
+        assert_eq!(written, ["agentstacks.toml", "agentstacks.lock"]);
+        Ok(())
+    }
+
+    #[test]
+    fn extension_manifest_refuses_a_reads_entry_listed_twice() {
+        assert_eq!(
+            parse(&with_reads(
+                "reads = [\".claude/settings.json\", \".claude/settings.json\"]"
+            )),
+            ["extension.toml: extension.reads[1]: \".claude/settings.json\" listed twice"]
+        );
+    }
+
+    #[test]
+    fn extension_manifest_refuses_one_reads_path_written_two_ways() {
+        let cases = [
+            ("[\".claude/x\", \"./.claude/x\"]", "\"./.claude/x\""),
+            ("[\"./a\", \"a\"]", "\"a\""),
+            ("[\"a//b\", \"a/b\"]", "\"a/b\""),
+        ];
+        for (list, repeated) in cases {
+            assert_eq!(
+                parse(&with_reads(&format!("reads = {list}"))),
+                [format!(
+                    "extension.toml: extension.reads[1]: {repeated} listed twice"
+                )],
+                "{list}"
+            );
+        }
     }
 
     #[test]

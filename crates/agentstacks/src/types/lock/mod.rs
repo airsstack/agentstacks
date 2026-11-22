@@ -10,11 +10,8 @@
 //! - [`LockedEntry`]: one locked tool or pack, with its version, origin and tree hash.
 //! - [`LockedSource`]: where a locked entry came from, a git commit or a project directory.
 //! - [`FileEntry`]: one file an install wrote, with its path, hash and owner.
-//! - [`MergeEntry`]: one merge an install made into a file it does not own.
 //! - [`EntryKey`]: what identifies one entry, so the duplicate refusal can name it.
-//! - [`Owner`]: the name of the pack or tool that wrote a file or merge.
-//! - [`MergeFile`]: the file a merge changed, as the lock records it.
-//! - [`MergeKey`]: the locator of the key a merge changed inside its file.
+//! - [`Owner`]: the name of the pack or tool that wrote a file.
 //! - [`LockError`]: the refusals of the lock with a wording of their own.
 //! - [`write_lock()`]: the lock's text, with a fixed field order and one newline at the end.
 //! - [`check_airsl_presence()`]: refuses a lock whose `[airsl]` section disagrees with what the locked packs need.
@@ -31,7 +28,6 @@ pub mod airsl;
 pub mod entry;
 pub mod error;
 pub mod file;
-pub mod merge;
 pub mod owner;
 pub mod write;
 
@@ -49,17 +45,11 @@ pub use entry::LockedEntry;
 #[doc(inline)]
 pub use entry::LockedSource;
 #[doc(inline)]
-pub use entry::MergeEntry;
-#[doc(inline)]
 pub use error::LockError;
 #[doc(inline)]
 pub use file::LockContents;
 #[doc(inline)]
 pub use file::Lockfile;
-#[doc(inline)]
-pub use merge::MergeFile;
-#[doc(inline)]
-pub use merge::MergeKey;
 #[doc(inline)]
 pub use owner::Owner;
 #[doc(inline)]

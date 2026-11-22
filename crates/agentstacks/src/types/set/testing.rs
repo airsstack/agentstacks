@@ -15,11 +15,11 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 
+use crate::port::FakeFileTree;
 use crate::types::extension::Extension;
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
 use crate::types::pack::Pack;
-use crate::types::port::FakeFileTree;
 use crate::types::project::ProjectFile;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;

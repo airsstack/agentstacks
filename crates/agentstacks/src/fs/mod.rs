@@ -1,6 +1,6 @@
-//! The adapter that reads the real disk for the ports the `types` module declares.
+//! The adapter that reads the real disk for the ports the `port` module declares.
 //!
-//! `types` reaches the disk only through its ports, so one adapter module answers them with
+//! The inside reaches the disk only through those ports, so one adapter module answers them with
 //! `std::fs`.
 //!
 //! # Responsibilities

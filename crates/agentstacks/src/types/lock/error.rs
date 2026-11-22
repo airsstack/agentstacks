@@ -11,7 +11,9 @@
 //!
 //! - [`LockError`] has a variant per lock refusal, each displaying exactly the message the author
 //!   reads after the location. A name refusal wraps [`InvalidName`], a version refusal wraps
-//!   [`InvalidVersion`] and a hash refusal wraps [`ContentHashError`], all transparently.
+//!   [`InvalidVersion`] and a hash refusal wraps [`ContentHashError`], all transparently. A file
+//!   path written with a backslash, or naming `agentstacks.toml` or `agentstacks.lock`, has a
+//!   variant of its own.
 //!
 //! # Non-responsibilities
 //!
@@ -69,13 +71,25 @@ pub enum LockError {
     /// A file path that climbs out of the project.
     #[error(transparent)]
     OutsideProject(#[from] OutsideProject),
+    /// A file path written with `\` instead of `/`.
+    #[error("\"{text}\" must use / as the separator")]
+    Separator {
+        /// The refused path, as written.
+        text: String,
+    },
+    /// A file path that names one of agentstacks' own files.
+    #[error("\"{text}\" is managed by agentstacks")]
+    Managed {
+        /// The refused path, as written.
+        text: String,
+    },
     /// A `by` that names no locked pack or tool.
     #[error("\"{text}\" is not a locked pack or tool")]
     UnknownOwner {
         /// The refused text.
         text: String,
     },
-    /// A tool, pack, file or merge locked twice, named by its [`EntryKey`].
+    /// A tool, pack or file locked twice, named by its [`EntryKey`].
     #[error(transparent)]
     ListedTwice(#[from] ListedTwice<EntryKey>),
     /// Locked packs need airsl and the lock records none.
@@ -89,7 +103,6 @@ pub enum LockError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::lock::merge::{MergeFile, MergeKey};
     use crate::types::name::PackName;
     use crate::types::name::ToolName;
     use crate::types::project::SubPath;
@@ -156,11 +169,16 @@ mod tests {
                 "file \".claude/x\" listed twice",
             ),
             (
-                LockError::from(ListedTwice::new(EntryKey::Merge {
-                    file: MergeFile::new(".claude/settings.json")?,
-                    key: MergeKey::new("hooks")?,
-                })),
-                "merge \".claude/settings.json\" \"hooks\" listed twice",
+                LockError::Separator {
+                    text: "a\\b".to_owned(),
+                },
+                "\"a\\b\" must use / as the separator",
+            ),
+            (
+                LockError::Managed {
+                    text: "agentstacks.lock".to_owned(),
+                },
+                "\"agentstacks.lock\" is managed by agentstacks",
             ),
             (
                 LockError::AirslMissing,

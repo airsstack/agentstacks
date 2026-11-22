@@ -28,10 +28,10 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::port::FileTree;
 use crate::types::extension::error::ExtensionError;
 use crate::types::extension::manifest::ExtensionManifest;
-use crate::types::port::FileTree;
-use crate::types::port::utf8_text;
+use crate::types::project::SubPath;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
 use crate::types::report::DoesNotExist;
@@ -40,6 +40,7 @@ use crate::types::report::Location;
 use crate::types::tree::ContentHash;
 use crate::types::tree::WalkError;
 use crate::types::tree::hash_walked;
+use crate::types::tree::utf8_text;
 use crate::types::tree::walk;
 
 /// The manifest every extension directory holds at its root.
@@ -174,6 +175,12 @@ impl Extension {
         &self.manifest
     }
 
+    /// The project files the extension may read, as its manifest lists them.
+    #[must_use]
+    pub fn reads(&self) -> &[SubPath] {
+        self.manifest.reads()
+    }
+
     /// The hash of the whole directory.
     #[must_use]
     pub const fn tree(&self) -> &ContentHash {
@@ -202,7 +209,7 @@ mod tests {
     use std::io;
 
     use super::*;
-    use crate::types::port::FakeFileTree;
+    use crate::port::FakeFileTree;
     use crate::types::tree::tree_hash;
 
     type TestResult = Result<(), Box<dyn Error>>;
@@ -248,6 +255,20 @@ mod tests {
         assert_eq!(extension.manifest().entry().as_str(), "adapter.lua");
         assert_eq!(extension.dir(), Path::new(ROOT));
         assert!(extension.ignored().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn extension_reads_are_the_manifests() -> TestResult {
+        let manifest = manifest_with(
+            "entry       = \"adapter.lua\"\n",
+            "entry       = \"adapter.lua\"\nreads = [\".claude/settings.json\"]\n",
+        );
+        let tree = minimal().file("extension.toml", manifest.as_bytes());
+        let extension = Extension::load(&tree).map_err(|d| format!("{d:?}"))?;
+        assert_eq!(extension.reads(), extension.manifest().reads());
+        assert_eq!(extension.reads().len(), 1);
+        assert_eq!(extension.reads()[0].as_str(), ".claude/settings.json");
         Ok(())
     }
 

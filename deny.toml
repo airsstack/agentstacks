@@ -49,6 +49,7 @@ allow = [
     "MIT-0",
     "Unicode-3.0",
     "Unlicense",
+    "Zlib",
 ]
 confidence-threshold = 0.8
 exceptions = []
@@ -65,7 +66,8 @@ ignore = false
 [bans]
 # Duplicates are denied rather than warned, so a second copy of a crate has to
 # be acknowledged here. The `skip` list below is empty, so any duplicate fails
-# until it is added with a reason.
+# until it is added with a reason. The one exemption is the `skip-tree` entry for `airsl`, whose
+# own dependency tree pins older `sha2` and `toml` than the ones agentstacks uses.
 multiple-versions = "deny"
 # No `version = "*"` dependencies. The root manifest declares every direct one once, in
 # `[workspace.dependencies]`.
@@ -76,7 +78,7 @@ external-default-features = "allow"
 allow = []
 deny = []
 skip = []
-skip-tree = []
+skip-tree = [{ crate = "airsl@0.1.4", reason = "airsl 0.1.4 pins sha2 0.10 and toml 0.8; agentstacks uses sha2 0.11 and toml 1" }]
 
 # ---------------------------------------------------------------------------
 # Sources

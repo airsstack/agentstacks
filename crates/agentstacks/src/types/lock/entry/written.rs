@@ -1,40 +1,38 @@
-//! The entries that record what an install wrote into the project: files and merges.
+//! The entry that records a file an install wrote into the project.
 //!
-//! They are separate from [`LockedEntry`](crate::types::LockedEntry) because they record what was
+//! It is separate from [`LockedEntry`](crate::types::LockedEntry) because it records what was
 //! written, with a hash of the bytes and an owner, not what was resolved.
 //!
 //! # Responsibilities
 //!
 //! - [`FileEntry`] is a `[[file]]`: a project-relative [`SubPath`], the hash
 //!   of the written bytes and the [`Owner`] that wrote it.
-//! - [`MergeEntry`] is a `[[merge]]`: the file and key a merge touched, the hash of what it
-//!   wrote there and its [`Owner`].
+//! - Reading refuses a path that is absolute, climbs out of the project, contains a `\`, or names
+//!   `agentstacks.toml` or `agentstacks.lock`: agentstacks never records its own files.
 //! - Reading checks every key of one raw entry table in a single pass, so one bad field does not
 //!   hide another; the whole-file reader in [`Lockfile`](crate::types::Lockfile) drives it.
 //!
 //! # Non-responsibilities
 //!
-//! Whether an owner is a locked pack or tool, and whether a path or merge repeats, belong to
+//! Whether an owner is a locked pack or tool, and whether a path repeats, belong to
 //! [`Lockfile`](crate::types::Lockfile), which holds the whole list. A `by` that is not even a
 //! name can never be locked, so it is refused here.
 
 use crate::types::format::TomlFields;
 use crate::types::lock::entry::locked::read_hash;
 use crate::types::lock::error::LockError;
-use crate::types::lock::merge::{MergeFile, MergeKey};
 use crate::types::lock::owner::Owner;
 use crate::types::project::InvalidSubPath;
 use crate::types::project::SourceError;
 use crate::types::project::SubPath;
-use crate::types::report::FieldError;
 use crate::types::report::MustBeRelative;
 use crate::types::report::OutsideProject;
 use crate::types::tree::ContentHash;
 
+/// The files agentstacks writes itself, which no entry may record.
+const OWN_FILES: [&str; 2] = ["agentstacks.lock", "agentstacks.toml"];
 /// The keys a `[[file]]` entry may hold.
 const FILE_KEYS: [&str; 3] = ["path", "hash", "by"];
-/// The keys a `[[merge]]` entry may hold.
-const MERGE_KEYS: [&str; 4] = ["file", "key", "hash", "by"];
 
 /// One file an install wrote.
 ///
@@ -126,154 +124,34 @@ impl FileEntry {
     }
 }
 
-/// One merge an install made into a file it does not own.
-///
-/// # Examples
-///
-/// ```
-/// use agentstacks::types::{ContentHash, MergeEntry, MergeFile, MergeKey, Owner};
-///
-/// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
-/// let entry = MergeEntry::new(
-///     MergeFile::new(".claude/settings.json")?,
-///     MergeKey::new("hooks")?,
-///     hash.clone(),
-///     Owner::new("core")?,
-/// );
-/// assert_eq!(entry.file().as_str(), ".claude/settings.json");
-/// assert_eq!(entry.key().as_str(), "hooks");
-/// assert_eq!(entry.hash(), &hash);
-/// assert_eq!(entry.by().as_str(), "core");
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MergeEntry {
-    file: MergeFile,
-    key: MergeKey,
-    hash: ContentHash,
-    by: Owner,
-}
-
-impl MergeEntry {
-    /// An entry for the merge at `key` of `file` with the hash of what was written, made by `by`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use agentstacks::types::{ContentHash, MergeEntry, MergeFile, MergeKey, Owner};
-    ///
-    /// let hash = ContentHash::new(&format!("sha256:{}", "0123456789abcdef".repeat(4)))?;
-    /// let entry = MergeEntry::new(
-    ///     MergeFile::new("opencode.json")?,
-    ///     MergeKey::new("plugin")?,
-    ///     hash,
-    ///     Owner::new("claude")?,
-    /// );
-    /// assert_eq!(entry.by().to_string(), "claude");
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    #[must_use]
-    pub const fn new(file: MergeFile, key: MergeKey, hash: ContentHash, by: Owner) -> Self {
-        Self {
-            file,
-            key,
-            hash,
-            by,
-        }
-    }
-
-    /// The file the merge touched.
-    #[must_use]
-    pub const fn file(&self) -> &MergeFile {
-        &self.file
-    }
-
-    /// The key the merge touched.
-    #[must_use]
-    pub const fn key(&self) -> &MergeKey {
-        &self.key
-    }
-
-    /// The hash of what the merge wrote.
-    #[must_use]
-    pub const fn hash(&self) -> &ContentHash {
-        &self.hash
-    }
-
-    /// The pack or tool that made the merge.
-    #[must_use]
-    pub const fn by(&self) -> &Owner {
-        &self.by
-    }
-}
-
-/// What reading one raw `[[merge]]` found.
-pub(in crate::types::lock) struct ReadMerge {
-    /// The file and key, when both were valid, even if another field was refused.
-    pub(in crate::types::lock) target: Option<(MergeFile, MergeKey)>,
-    /// The owner, when it was a valid name, even if another field was refused.
-    pub(in crate::types::lock) by: Option<Owner>,
-    /// The whole entry, when no field was refused.
-    pub(in crate::types::lock) entry: Option<MergeEntry>,
-}
-
-impl MergeEntry {
-    /// Reads the entry behind `fields`, refusing what is wrong in it.
-    pub(in crate::types::lock) fn read(fields: &mut TomlFields) -> ReadMerge {
-        let file = read_text(fields, "file", MergeFile::new);
-        let key = read_text(fields, "key", MergeKey::new);
-        let hash = read_hash(fields, "hash");
-        let by = read_owner(fields);
-        fields.refuse_unknown_keys(&MERGE_KEYS);
-
-        let target = file.zip(key);
-        let entry = match (target.clone(), hash, by.clone()) {
-            (Some((file, key)), Some(hash), Some(by)) => Some(Self {
-                file,
-                key,
-                hash,
-                by,
-            }),
-            _ => None,
-        };
-        ReadMerge { target, by, entry }
-    }
-}
-
-/// Reads `path`: a relative path with no `..` segment, so it stays inside the project.
+/// Reads `path`: a relative path with no `..` segment, so it stays inside the project, written
+/// with `/` only and naming neither of agentstacks' own files.
 fn read_path(fields: &mut TomlFields) -> Option<SubPath> {
     let text = fields.required_string("path")?;
     if text.starts_with('/') {
         fields.refuse("path", LockError::from(MustBeRelative::new(text)));
         return None;
     }
-    match SubPath::new(&text) {
-        Ok(path) => Some(path),
+    let path = match SubPath::new(&text) {
+        Ok(path) => path,
         Err(InvalidSubPath::OutsideRepository) => {
             fields.refuse("path", LockError::from(OutsideProject::new(text)));
-            None
+            return None;
         }
         Err(error) => {
             fields.refuse("path", SourceError::from(error));
-            None
+            return None;
         }
+    };
+    if text.contains('\\') {
+        fields.refuse("path", LockError::Separator { text });
+        return None;
     }
-}
-
-/// Reads the string at `key` and builds its value with `build`, refusing what it refuses.
-fn read_text<T>(
-    fields: &mut TomlFields,
-    key: &str,
-    build: impl FnOnce(&str) -> Result<T, FieldError>,
-) -> Option<T> {
-    let text = fields.required_string(key)?;
-    match build(&text) {
-        Ok(value) => Some(value),
-        Err(error) => {
-            fields.refuse(key, error);
-            None
-        }
+    if OWN_FILES.contains(&path.normalized().as_str()) {
+        fields.refuse("path", LockError::Managed { text });
+        return None;
     }
+    Some(path)
 }
 
 /// Reads `by`: a name, refused as an unknown owner when it cannot be one.
@@ -324,28 +202,9 @@ mod tests {
         })
     }
 
-    /// Reads a `[[merge]]` at `merge[0]`.
-    fn read_merge(
-        text: &str,
-    ) -> Result<Result<MergeEntry, Vec<String>>, Box<dyn std::error::Error>> {
-        let mut fields = reader("merge[0]", text)?;
-        let read = MergeEntry::read(&mut fields);
-        let shown = shown(fields);
-        Ok(match read.entry {
-            Some(entry) if shown.is_empty() => Ok(entry),
-            _ => Err(shown),
-        })
-    }
-
     fn file_text() -> String {
         format!(
             "path = \".claude/skills/discuss/SKILL.md\"\nhash = \"sha256:{HEX64}\"\nby = \"core\"\n"
-        )
-    }
-
-    fn merge_text() -> String {
-        format!(
-            "file = \".claude/settings.json\"\nkey = \"<locator>\"\nhash = \"sha256:{HEX64}\"\nby = \"core\"\n"
         )
     }
 
@@ -391,6 +250,30 @@ mod tests {
                 "agentstacks.lock: file[0].path: empty".to_owned(),
             ),
             (
+                file_text().replace(".claude/skills/discuss/SKILL.md", "a\\\\b"),
+                "agentstacks.lock: file[0].path: \"a\\b\" must use / as the separator".to_owned(),
+            ),
+            (
+                file_text().replace(".claude/skills/discuss/SKILL.md", "agentstacks.lock"),
+                "agentstacks.lock: file[0].path: \"agentstacks.lock\" is managed by agentstacks"
+                    .to_owned(),
+            ),
+            (
+                file_text().replace(".claude/skills/discuss/SKILL.md", "agentstacks.toml"),
+                "agentstacks.lock: file[0].path: \"agentstacks.toml\" is managed by agentstacks"
+                    .to_owned(),
+            ),
+            (
+                file_text().replace(".claude/skills/discuss/SKILL.md", "./agentstacks.toml"),
+                "agentstacks.lock: file[0].path: \"./agentstacks.toml\" is managed by agentstacks"
+                    .to_owned(),
+            ),
+            (
+                file_text().replace(".claude/skills/discuss/SKILL.md", "./agentstacks.lock"),
+                "agentstacks.lock: file[0].path: \"./agentstacks.lock\" is managed by agentstacks"
+                    .to_owned(),
+            ),
+            (
                 file_text().replace(HEX64, "XYZ"),
                 format!("agentstacks.lock: file[0].hash: {HASH_MESSAGE}"),
             ),
@@ -422,77 +305,6 @@ mod tests {
             Owner::new("core")?,
         );
         assert_eq!(entry.path().as_str(), ".claude/x");
-        assert_eq!(entry.by().as_str(), "core");
-        Ok(())
-    }
-
-    #[test]
-    fn merge_entry_parses_a_merge_entry() -> TestResult {
-        let entry = read_merge(&merge_text())?.map_err(|shown| shown.join("; "))?;
-        assert_eq!(entry.file().as_str(), ".claude/settings.json");
-        assert_eq!(entry.key().as_str(), "<locator>");
-        assert_eq!(entry.hash().hex(), HEX64);
-        assert_eq!(entry.by(), &Owner::new("core")?);
-        Ok(())
-    }
-
-    #[test]
-    fn merge_entry_refuses_each_rule() -> TestResult {
-        let mut cases: Vec<(String, String)> = Vec::new();
-        for (line, field) in [
-            ("file = \".claude/settings.json\"\n".to_owned(), "file"),
-            ("key = \"<locator>\"\n".to_owned(), "key"),
-            (format!("hash = \"sha256:{HEX64}\"\n"), "hash"),
-            ("by = \"core\"\n".to_owned(), "by"),
-        ] {
-            cases.push((
-                merge_text().replace(&line, ""),
-                format!("agentstacks.lock: merge[0].{field}: required"),
-            ));
-        }
-        for blank in ["", "  "] {
-            cases.push((
-                merge_text().replace("<locator>", blank),
-                "agentstacks.lock: merge[0].key: empty".to_owned(),
-            ));
-            cases.push((
-                merge_text().replace(".claude/settings.json", blank),
-                "agentstacks.lock: merge[0].file: empty".to_owned(),
-            ));
-        }
-        cases.push((
-            merge_text().replace("file = \".claude/settings.json\"", "file = 3"),
-            "agentstacks.lock: merge[0].file: expected string, got integer".to_owned(),
-        ));
-        cases.push((
-            merge_text().replace(HEX64, "XYZ"),
-            format!("agentstacks.lock: merge[0].hash: {HASH_MESSAGE}"),
-        ));
-        cases.push((
-            merge_text().replace("by = \"core\"", "by = \"Core\""),
-            "agentstacks.lock: merge[0].by: \"Core\" is not a locked pack or tool".to_owned(),
-        ));
-        cases.push((
-            format!("{}path = \"x\"\n", merge_text()),
-            "agentstacks.lock: merge[0].path: unknown key".to_owned(),
-        ));
-        for (text, expected) in cases {
-            let shown = read_merge(&text)?.err().ok_or("expected a refusal")?;
-            assert_eq!(shown, [expected], "{text}");
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn merge_entry_new_keeps_its_parts() -> TestResult {
-        let entry = MergeEntry::new(
-            MergeFile::new(".claude/settings.json")?,
-            MergeKey::new("hooks")?,
-            ContentHash::new(&format!("sha256:{HEX64}"))?,
-            Owner::new("core")?,
-        );
-        assert_eq!(entry.file().as_str(), ".claude/settings.json");
-        assert_eq!(entry.key().as_str(), "hooks");
         assert_eq!(entry.by().as_str(), "core");
         Ok(())
     }

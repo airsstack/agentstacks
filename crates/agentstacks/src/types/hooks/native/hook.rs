@@ -185,6 +185,14 @@ mod tests {
                 "hooks[0].grants.policy: \"trusted\" is not allowed for pack hooks",
             ),
             (
+                "kind = \"lua\"\nevent = \"E\"\nrun = \"hooks/x.lua\"\n[grants]\npolicy = \"pure\"\n",
+                "hooks[0].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
+            ),
+            (
+                "kind = \"lua\"\nevent = \"E\"\nrun = \"hooks/my.hook.lua\"\n",
+                "hooks[0].run: \"hooks/my.hook.lua\" segment \"my.hook\" may use only letters, digits, _ and -",
+            ),
+            (
                 "kind = \"lua\"\nevent = \"E\"\nrun = \"hooks/x.lua\"\n[grants]\nexec = [\"git\"]\n",
                 "hooks[0].grants.exec[0]: \"git\" is not in requires.binaries",
             ),

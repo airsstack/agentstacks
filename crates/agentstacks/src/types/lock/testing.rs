@@ -52,12 +52,6 @@ pub(super) fn example_lock() -> String {
          [[file]]\n\
          path = \".claude/skills/discuss/SKILL.md\"\n\
          hash = \"sha256:{HEX64}\"\n\
-         by   = \"core\"\n\
-         \n\
-         [[merge]]\n\
-         file = \".claude/settings.json\"\n\
-         key  = \"<locator>\"\n\
-         hash = \"sha256:{HEX64}\"\n\
          by   = \"core\"\n"
     )
 }

@@ -1,0 +1,33 @@
+//! The traits the flows and the rules read the outside through, each with a fake for tests.
+//!
+//! Logic in `types` and `app` never calls `std::fs`, so it takes a port as a generic bound and a
+//! rule runs the same over the real disk and over an in-memory tree in a test.
+//!
+//! # Responsibilities
+//!
+//! - [`FileTree`]: a directory root with three reads below it, what an entry is, the names a
+//!   directory holds and a file's bytes.
+//! - [`EntryKind`]: what an entry is, a file, a directory, a symlink or anything else, read without
+//!   following a link.
+//!
+//! # Non-responsibilities
+//!
+//! No logic and no adapter: reading the real disk belongs to the `fs` module, and a rule over a
+//! port belongs to `types`. The in-memory tree that tests build lives here but is compiled for
+//! tests only.
+//!
+//! This file is an export-only module with no executable logic, so it carries no inline tests.
+
+#[cfg(test)]
+pub mod fake;
+pub mod kind;
+pub mod tree;
+
+#[doc(inline)]
+pub use kind::EntryKind;
+#[doc(inline)]
+pub use tree::FileTree;
+
+#[cfg(test)]
+#[doc(inline)]
+pub use fake::FakeFileTree;

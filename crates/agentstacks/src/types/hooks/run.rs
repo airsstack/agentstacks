@@ -12,6 +12,10 @@
 //!   one of three forms: pack-relative (`hooks/x.lua`), `{{root}}/hooks/x.lua`, or
 //!   `{{root core}}/hooks/x.lua`. Absolute paths, `..`, `{{skill_dir ...}}`, `{{var ...}}` and a
 //!   token anywhere but the start are refused.
+//! - Every `/` segment of the pack-relative path, with `.lua` removed from the last, may use only
+//!   letters, digits, `_` and `-`: the hook runtime requires the script as a dotted module name
+//!   (`core.hooks.enforce`), so a `.` or any other character in a segment cannot be named. The
+//!   first bad segment is refused, quoting the `run` as written; only a `.lua` run is checked.
 //! - The field is scanned once; its tokens are kept located at the field's key path, and a token
 //!   refusal is reported without a second, form refusal on top of it.
 //!
@@ -130,7 +134,20 @@ impl HookRun {
             fields.refuse("run", ManifestError::RunForm);
             return None;
         };
-        is_lua.then_some(Self {
+        if !is_lua {
+            return None;
+        }
+        if let Some(segment) = first_unrequirable_segment(&path) {
+            fields.refuse(
+                "run",
+                ManifestError::RunSegment {
+                    run: written,
+                    segment,
+                },
+            );
+            return None;
+        }
+        Some(Self {
             written,
             pack,
             path,
@@ -154,6 +171,22 @@ impl HookRun {
     pub const fn path(&self) -> &PackPath {
         &self.path
     }
+}
+
+/// The first segment of the Lua script at `path`, with `.lua` removed from the last, that is not
+/// made of ASCII letters, digits, `_` and `-` alone.
+fn first_unrequirable_segment(path: &PackPath) -> Option<String> {
+    let text = path.as_str();
+    let module = text.strip_suffix(".lua").unwrap_or(text);
+    module
+        .split('/')
+        .find(|segment| {
+            segment.is_empty()
+                || !segment
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+        })
+        .map(str::to_owned)
 }
 
 /// Splits `text` into the pack it names and its pack-relative path, when it is written in one of
@@ -282,6 +315,62 @@ mod tests {
             shown,
             ["packs/core/pack.toml: hooks[1].run: \"Core\" is not a valid name"]
         );
+        Ok(())
+    }
+
+    fn segment_refusal(run: &str, segment: &str) -> String {
+        format!(
+            "packs/core/pack.toml: hooks[1].run: \"{run}\" segment \"{segment}\" may use only letters, digits, _ and -"
+        )
+    }
+
+    #[test]
+    fn hook_run_refuses_a_segment_that_cannot_be_required() -> TestResult {
+        let (run, _, shown) = read(&run_of("hooks/my.hook.lua"))?;
+        assert!(run.is_none());
+        assert_eq!(shown, [segment_refusal("hooks/my.hook.lua", "my.hook")]);
+        Ok(())
+    }
+
+    #[test]
+    fn hook_run_quotes_a_token_form_as_written() -> TestResult {
+        let run_text = "{{root core}}/hooks/my.hook.lua";
+        let (run, _, shown) = read(&run_of(run_text))?;
+        assert!(run.is_none());
+        assert_eq!(shown, [segment_refusal(run_text, "my.hook")]);
+        Ok(())
+    }
+
+    #[test]
+    fn hook_run_reports_only_the_first_bad_segment() -> TestResult {
+        let (run, _, shown) = read(&run_of("a.b/c.d.lua"))?;
+        assert!(run.is_none());
+        assert_eq!(shown, [segment_refusal("a.b/c.d.lua", "a.b")]);
+        Ok(())
+    }
+
+    #[test]
+    fn hook_run_checks_segments_of_lua_runs_only() -> TestResult {
+        let (run, _, shown) = read(&run_of("hooks/my.hook.sh"))?;
+        assert!(run.is_none());
+        assert_eq!(
+            shown,
+            ["packs/core/pack.toml: hooks[1].run: \"hooks/my.hook.sh\" is not a .lua file"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hook_run_accepts_letters_digits_underscore_and_hyphen() -> TestResult {
+        for value in [
+            "hooks/handoff-check_2.lua",
+            "Hooks/A9.lua",
+            "{{root core}}/hooks/enforce.lua",
+        ] {
+            let (run, _, shown) = read(&run_of(value))?;
+            assert!(shown.is_empty(), "{value}: {shown:?}");
+            assert!(run.is_some(), "{value}");
+        }
         Ok(())
     }
 }

@@ -7,8 +7,9 @@
 //! # Responsibilities
 //!
 //! - [`SubPath::new`] parses the text: relative, with no `..` segment. It is the only constructor,
-//!   so a value that exists already holds the rule, and a lock built in memory can never hold a
-//!   path that the next run refuses.
+//!   so a value that exists already holds that rule. It does not refuse a `\` or agentstacks' own
+//!   files, which the lock parse refuses for a file path; the operation path rule keeps those out
+//!   before a lock is built.
 //! - [`SubPath::normalized`] is the text with every empty and `.` segment removed, so `./a`, `a//`
 //!   and `a` compare as one path. The decision is lexical; the file system is never read.
 //!

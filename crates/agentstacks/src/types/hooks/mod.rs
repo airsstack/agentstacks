@@ -13,7 +13,7 @@
 //! - [`LuaHook`]: a Lua action: script, arguments, `may_block` and grants.
 //! - [`HookRun`]: a Lua hook's `run`: as written, the pack it names and its pack-relative path.
 //! - [`Grants`]: what a Lua hook may touch: paths, environment variables and binaries.
-//! - [`Policy`]: the sandbox policy, `confined` or `pure`.
+//! - [`Policy`]: the sandbox policy, `confined`.
 //! - [`InvalidHookEvent`], [`InvalidMatchValue`], [`InvalidPolicy`]: the refusals [`HookEvent`],
 //!   [`MatchValue`] and [`Policy`] return.
 //! - [`NativeHook`]: a hook of a tool's own event vocabulary, kept opaque.

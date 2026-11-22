@@ -5,7 +5,7 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Extension`]: the loaded and checked extension, built by [`Extension::load`] from a [`FileTree`](crate::types::FileTree).
+//! - [`Extension`]: the loaded and checked extension, built by [`Extension::load`] from a [`FileTree`](crate::port::FileTree).
 //! - [`ExtensionManifest`]: the parsed `extension.toml`, checked field by field.
 //! - [`EntryPath`]: the relative `.lua` path of the adapter, which stays inside the extension.
 //! - [`ExtensionError`]: the refusals of an extension's directory and manifest with a wording of their own.

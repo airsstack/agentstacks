@@ -1,19 +1,42 @@
-//! Guards the rule that `types` reaches the disk, processes and the network only through its ports.
+//! Guards the rule that the inside, `types`, `port` and `app`, reaches the disk, processes, the
+//! network and the adapters only through ports, and that `types` reaches only the read-only tree
+//! port.
 //!
 //! Logic under `src/types` takes a `FileTree` instead of calling `std::fs`, so a rule runs the same
 //! over the real disk and over an in-memory tree. Nothing else enforces that: a stray `std::fs::read`
-//! compiles, passes clippy and passes every test. This test reads every `.rs` file under
-//! `src/types` and fails when code, as opposed to a comment, names one of the forbidden paths,
-//! whether written whole (`std::fs::read`, `::std::fs::read`), in a single `use`, or in a grouped
-//! `use std::{..}` that lists `fs`, `process` or `net` as a member.
+//! compiles, passes clippy and passes every test. These tests read every `.rs` file under
+//! `src/types`, `src/port` and `src/app` and fail when code, as opposed to a comment, names one of
+//! the forbidden paths, whether written whole (`std::fs::read`, `::std::fs::read`), in a single
+//! `use`, or in a grouped `use std::{..}` that lists `fs`, `process` or `net` as a member. They
+//! also fail when the inside names an adapter module (`crate::fs`, `crate::process`,
+//! `crate::host`), and when `src/types` names a `crate::port` path other than `FileTree` and
+//! `EntryKind`, or `FakeFileTree` in test code. The scans are lexical: a relative path such as
+//! `super::super::fs` is not seen, so the crate writes `crate::` paths.
 
 use std::error::Error;
 use std::fs;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// The paths `types` must never name in code.
+/// The directories of the inside, relative to the crate root.
+const INSIDE: [&str; 3] = ["src/types", "src/port", "src/app"];
+
+/// The adapter modules the inside must never name, each with the path it is refused as.
+const ADAPTERS: [(&str, &str); 3] = [
+    ("fs", "crate::fs"),
+    ("process", "crate::process"),
+    ("host", "crate::host"),
+];
+
+/// The items of `crate::port` that `types` may name anywhere.
+const TREE_PORT: [&str; 2] = ["FileTree", "EntryKind"];
+
+/// The in-memory tree, which `types` may name in test code only.
+const TEST_FAKE: &str = "FakeFileTree";
+
+/// The paths the inside must never name in code.
 const FORBIDDEN: [&str; 4] = ["std::fs", "std::process", "std::net", "File::open"];
 
 /// The `std` modules `types` must never reach through a grouped `use std::{..}`, each with the
@@ -159,18 +182,18 @@ const fn is_ident(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
-/// Every forbidden module that a grouped `use std::{..}` in `stripped` (comments already removed)
-/// lists as one of its direct members, with the 1-based line of the member.
+/// Every direct member of a grouped `use <root>::{..}` in `stripped` (comments already removed),
+/// as the byte index and the leading identifier of the member.
 ///
 /// A member is the first identifier after the opening brace or after a comma of the group's own
-/// level, so `std::{io, fs::File}` is flagged for `fs` while `std::{io::{self, fs}}` is not: the
-/// latter is not `std::fs`.
-fn grouped_imports(stripped: &str) -> Vec<(usize, &'static str)> {
+/// level, so `std::{io, fs::File}` lists `io` and `fs` while `std::{io::{self, fs}}` lists only
+/// `io`: the latter is not `std::fs`.
+fn grouped_members<'a>(stripped: &'a str, root: &str) -> Vec<(usize, &'a str)> {
     let bytes = stripped.as_bytes();
     let mut found = Vec::new();
-    for (start, _) in stripped.match_indices("std") {
+    for (start, _) in stripped.match_indices(root) {
         let own_word = start == 0 || !is_ident(bytes[start - 1]);
-        let Some(group) = stripped[start + 3..]
+        let Some(group) = stripped[start + root.len()..]
             .trim_start()
             .strip_prefix("::")
             .map(str::trim_start)
@@ -192,13 +215,7 @@ fn grouped_imports(stripped: &str) -> Vec<(usize, &'static str)> {
                 let end = (index..bytes.len())
                     .find(|at| !is_ident(bytes[*at]))
                     .unwrap_or(bytes.len());
-                let word = &stripped[index..end];
-                found.extend(
-                    FORBIDDEN_IN_GROUP
-                        .iter()
-                        .filter(|(module, _)| *module == word)
-                        .map(|(_, path)| (line_of(stripped, index), *path)),
-                );
+                found.push((index, &stripped[index..end]));
                 member_start = false;
                 index = end;
             } else {
@@ -213,6 +230,219 @@ fn grouped_imports(stripped: &str) -> Vec<(usize, &'static str)> {
         }
     }
     found
+}
+
+/// Every forbidden module that a grouped `use std::{..}` in `stripped` lists as a direct member,
+/// with the 1-based line of the member.
+fn grouped_imports(stripped: &str) -> Vec<(usize, &'static str)> {
+    grouped_members(stripped, "std")
+        .into_iter()
+        .flat_map(|(index, word)| {
+            FORBIDDEN_IN_GROUP
+                .iter()
+                .filter(move |(module, _)| *module == word)
+                .map(move |(_, path)| (line_of(stripped, index), *path))
+        })
+        .collect()
+}
+
+/// Every path into an adapter module that `source` names in code, with its 1-based line.
+///
+/// A path counts whole (`crate::fs::StdFileTree`) or as a direct member of a grouped
+/// `use crate::{..}`. It must end at a word boundary, so `crate::fsx` is not `crate::fs`.
+fn adapter_violations(source: &str) -> Vec<(usize, &'static str)> {
+    let stripped = without_comments(source);
+    let bytes = stripped.as_bytes();
+    let mut found = Vec::new();
+    for (module, path) in ADAPTERS {
+        for (start, _) in stripped.match_indices(path) {
+            let own_word = start == 0 || !is_ident(bytes[start - 1]);
+            let ends = bytes
+                .get(start + path.len())
+                .is_none_or(|byte| !is_ident(*byte));
+            if own_word && ends {
+                found.push((line_of(&stripped, start), path));
+            }
+        }
+        found.extend(
+            grouped_members(&stripped, "crate")
+                .into_iter()
+                .filter(|(_, word)| *word == module)
+                .map(|(index, _)| (line_of(&stripped, index), path)),
+        );
+    }
+    found.sort_unstable();
+    found
+}
+
+/// `code` with the contents of every string, raw string and character literal replaced by spaces,
+/// each character by as many spaces as it has bytes, so a byte index means the same in both texts.
+fn without_literals(code: &str) -> String {
+    let chars: Vec<char> = code.chars().collect();
+    let mut sink = String::new();
+    let mut out = String::with_capacity(code.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let end = if chars[i] == '"' {
+            copy_string(&chars, i, &mut sink)
+        } else if let Some(hashes) = raw_string_hashes(&chars, i) {
+            copy_raw_string(&chars, i, hashes, &mut sink)
+        } else if chars[i] == '\'' {
+            copy_char_literal(&chars, i, &mut sink)
+        } else {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        };
+        for c in &chars[i..end.min(chars.len())] {
+            if *c == '\n' {
+                out.push('\n');
+            } else {
+                out.extend(std::iter::repeat_n(' ', c.len_utf8()));
+            }
+        }
+        i = end;
+    }
+    out
+}
+
+/// The byte ranges of `code` (comments already removed) that are test code: the text from each
+/// `#[cfg(test)]` to the end of the item it marks, a brace-matched body or the closing `;`.
+fn test_ranges(code: &str) -> Vec<Range<usize>> {
+    let blanked = without_literals(code);
+    let bytes = blanked.as_bytes();
+    let mut ranges = Vec::new();
+    for (at, marker) in blanked.match_indices("#[cfg(test)]") {
+        let start = at + marker.len();
+        let Some(open) = blanked[start..]
+            .find(['{', ';'])
+            .map(|offset| start + offset)
+        else {
+            continue;
+        };
+        if bytes[open] == b';' {
+            ranges.push(start..open + 1);
+            continue;
+        }
+        let mut depth = 0_usize;
+        let mut end = bytes.len();
+        for (offset, byte) in bytes[open..].iter().enumerate() {
+            match byte {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = open + offset + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        ranges.push(start..end);
+    }
+    ranges
+}
+
+/// Every `crate::port` path `source` names in code that is not the read-only tree port, with its
+/// 1-based line and the path that is refused.
+///
+/// `crate::port::FileTree` and `crate::port::EntryKind` are allowed anywhere, whole or as members
+/// of a grouped `use crate::port::{..}`; `crate::port::FakeFileTree` is allowed in test code only,
+/// which is `whole_file_is_test` or the body of an item marked `#[cfg(test)]`. A bare
+/// `crate::port`, whole or as a member of a grouped `use crate::{..}`, is refused.
+fn port_violations(source: &str, whole_file_is_test: bool) -> Vec<(usize, String)> {
+    let stripped = without_comments(source);
+    let bytes = stripped.as_bytes();
+    let tests = test_ranges(&stripped);
+    let in_test = |at: usize| whole_file_is_test || tests.iter().any(|range| range.contains(&at));
+    let mut named: Vec<(usize, &str)> = Vec::new();
+    for (start, _) in stripped.match_indices("crate::port") {
+        let end = start + "crate::port".len();
+        let own_word = start == 0 || !is_ident(bytes[start - 1]);
+        if !own_word || bytes.get(end).is_some_and(|byte| is_ident(*byte)) {
+            continue;
+        }
+        match stripped[end..].trim_start().strip_prefix("::") {
+            Some(after) => {
+                let after = after.trim_start();
+                if !after.starts_with('{') {
+                    let word_end = after.find(|c: char| !(c.is_alphanumeric() || c == '_'));
+                    named.push((start, &after[..word_end.unwrap_or(after.len())]));
+                }
+            }
+            None => named.push((start, "")),
+        }
+    }
+    named.extend(grouped_members(&stripped, "crate::port"));
+    named.extend(
+        grouped_members(&stripped, "crate")
+            .into_iter()
+            .filter(|(_, word)| *word == "port")
+            .map(|(index, _)| (index, "")),
+    );
+    let mut found: Vec<(usize, String)> = named
+        .into_iter()
+        .filter(|(index, word)| {
+            !(TREE_PORT.contains(word) || (*word == TEST_FAKE && in_test(*index)))
+        })
+        .map(|(index, word)| {
+            let path = if word.is_empty() {
+                "crate::port".to_owned()
+            } else {
+                format!("crate::port::{word}")
+            };
+            (line_of(&stripped, index), path)
+        })
+        .collect();
+    found.sort_unstable();
+    found
+}
+
+/// Whether `parent_source`, the text of a module file, declares the module `name` under
+/// `#[cfg(test)]`, as `#[cfg(test)] mod testing;` does.
+fn declares_test_module(parent_source: &str, name: &str) -> bool {
+    let stripped = without_comments(parent_source);
+    stripped.match_indices("#[cfg(test)]").any(|(at, marker)| {
+        let after = stripped[at + marker.len()..].trim_start();
+        let after = after.strip_prefix("pub").map_or(after, |rest| {
+            let rest = rest.trim_start();
+            if rest.starts_with('(') {
+                rest.split_once(')')
+                    .map_or(rest, |(_, tail)| tail.trim_start())
+            } else {
+                rest
+            }
+        });
+        after
+            .strip_prefix("mod")
+            .map(str::trim_start)
+            .and_then(|rest| rest.strip_prefix(name))
+            .is_some_and(|rest| rest.trim_start().starts_with(';'))
+    })
+}
+
+/// Whether the whole of `file` is test code because its parent declares it under `#[cfg(test)]`,
+/// as `set/mod.rs` does for `set/testing.rs`.
+fn is_test_file(file: &Path) -> Result<bool, Box<dyn Error>> {
+    let (Some(dir), Some(stem)) = (
+        file.parent(),
+        file.file_stem().and_then(|stem| stem.to_str()),
+    ) else {
+        return Ok(false);
+    };
+    let (declarer, name) = if stem == "mod" {
+        let name = dir.file_name().and_then(|name| name.to_str());
+        (dir.parent().map(|grand| grand.join("mod.rs")), name)
+    } else {
+        (Some(dir.join("mod.rs")), Some(stem))
+    };
+    match (declarer, name) {
+        (Some(declarer), Some(name)) if declarer.is_file() => {
+            Ok(declares_test_module(&fs::read_to_string(declarer)?, name))
+        }
+        _ => Ok(false),
+    }
 }
 
 /// Every forbidden path `source` names in code, with its 1-based line.
@@ -246,18 +476,31 @@ fn rust_files(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     Ok(files)
 }
 
-#[test]
-fn types_never_names_the_disk_a_process_or_the_network() -> TestResult {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/types");
-    let files = rust_files(&root)?;
-    assert!(files.len() > 50, "found only {} files", files.len());
+/// Runs `scan` over every `.rs` file under `dir` (relative to the crate root), which must hold at
+/// least `min_files` of them, and returns one `file:line: path` offence for each hit.
+fn scan_dir<F>(dir: &str, min_files: usize, scan: F) -> Result<Vec<String>, Box<dyn Error>>
+where
+    F: Fn(&Path, &str) -> Result<Vec<(usize, String)>, Box<dyn Error>>,
+{
+    let files = rust_files(&Path::new(env!("CARGO_MANIFEST_DIR")).join(dir))?;
+    assert!(
+        files.len() >= min_files,
+        "found only {} files under {dir}",
+        files.len()
+    );
     let mut offences = Vec::new();
     for file in &files {
         let source = fs::read_to_string(file)?;
-        for (line, forbidden) in violations(&source) {
-            offences.push(format!("{}:{line}: {forbidden}", file.display()));
+        for (line, path) in scan(file, &source)? {
+            offences.push(format!("{}:{line}: {path}", file.display()));
         }
     }
+    Ok(offences)
+}
+
+#[test]
+fn types_never_names_the_disk_a_process_or_the_network() -> TestResult {
+    let offences = scan_dir("src/types", 51, |_, source| Ok(owned(violations(source))))?;
     assert!(
         offences.is_empty(),
         "types must reach the outside only through its ports:\n{}",
@@ -349,4 +592,174 @@ fn the_scan_flags_fully_qualified_paths() {
         violations("let _ = std::process::id();\n"),
         [(1, "std::process")]
     );
+}
+
+/// The scan results as `(line, path)` pairs, so a test compares plain text.
+fn paths(found: &[(usize, String)]) -> Vec<(usize, &str)> {
+    found
+        .iter()
+        .map(|(line, path)| (*line, path.as_str()))
+        .collect()
+}
+
+/// Owned `(line, path)` pairs from a scan whose paths are fixed words.
+fn owned(found: Vec<(usize, &'static str)>) -> Vec<(usize, String)> {
+    found
+        .into_iter()
+        .map(|(line, path)| (line, path.to_owned()))
+        .collect()
+}
+
+#[test]
+fn port_never_names_the_disk_a_process_or_the_network() -> TestResult {
+    let offences = scan_dir("src/port", 1, |_, source| Ok(owned(violations(source))))?;
+    assert!(
+        offences.is_empty(),
+        "port must reach the outside only through adapters:\n{}",
+        offences.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn app_never_names_the_disk_a_process_or_the_network() -> TestResult {
+    let offences = scan_dir("src/app", 1, |_, source| Ok(owned(violations(source))))?;
+    assert!(
+        offences.is_empty(),
+        "app must reach the outside only through ports:\n{}",
+        offences.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn inside_never_names_an_adapter_module() -> TestResult {
+    let mut offences = Vec::new();
+    for dir in INSIDE {
+        offences.extend(scan_dir(dir, 1, |_, source| {
+            Ok(owned(adapter_violations(source)))
+        })?);
+    }
+    assert!(
+        offences.is_empty(),
+        "types, port and app must not name an adapter module:\n{}",
+        offences.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn types_names_only_the_tree_port() -> TestResult {
+    let offences = scan_dir("src/types", 50, |file, source| {
+        Ok(port_violations(source, is_test_file(file)?))
+    })?;
+    assert!(
+        offences.is_empty(),
+        "types may name only the read-only tree port:\n{}",
+        offences.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn the_scan_flags_a_path_into_an_adapter_module() {
+    assert_eq!(
+        adapter_violations("use crate::fs::StdFileTree;\n"),
+        [(1, "crate::fs")]
+    );
+    assert_eq!(
+        adapter_violations("fn f() {}\ncrate::process::GitCli::new();\n"),
+        [(2, "crate::process")]
+    );
+    assert_eq!(
+        adapter_violations("use crate::host::AirslAdapter;\n"),
+        [(1, "crate::host")]
+    );
+}
+
+#[test]
+fn the_scan_flags_grouped_imports_of_an_adapter_module() {
+    assert_eq!(
+        adapter_violations("use crate::{fs, types::Location};\n"),
+        [(1, "crate::fs")]
+    );
+    assert_eq!(
+        adapter_violations("use crate::{\n    types,\n    host::AirslAdapter,\n};\n"),
+        [(3, "crate::host")]
+    );
+}
+
+#[test]
+fn the_scan_does_not_flag_other_crate_paths() {
+    assert!(adapter_violations("use crate::types::fs_like;\n").is_empty());
+    assert!(adapter_violations("crate::fsx::a();\n").is_empty());
+    assert!(adapter_violations("crate::hosts::b();\n").is_empty());
+    assert!(adapter_violations("// use crate::fs\n").is_empty());
+}
+
+#[test]
+fn the_port_scan_allows_only_the_tree_port() {
+    for source in [
+        "use crate::port::FileTree;\n",
+        "use crate::port::EntryKind;\n",
+        "use crate::port::{EntryKind, FileTree};\n",
+    ] {
+        assert!(port_violations(source, false).is_empty(), "{source}");
+    }
+    assert_eq!(
+        paths(&port_violations("use crate::port::FakeFileTree;\n", false)),
+        [(1, "crate::port::FakeFileTree")]
+    );
+    assert_eq!(
+        paths(&port_violations(
+            "use crate::port::{FileTree, Workspace};\n",
+            false
+        )),
+        [(1, "crate::port::Workspace")]
+    );
+    assert_eq!(
+        paths(&port_violations("crate::port::tree::FileTree\n", false)),
+        [(1, "crate::port::tree")]
+    );
+    assert_eq!(
+        paths(&port_violations("use crate::{port, types};\n", false)),
+        [(1, "crate::port")]
+    );
+}
+
+#[test]
+fn the_port_scan_allows_the_fake_in_test_code_only() {
+    let in_tests = "#[cfg(test)]\nmod tests {\n    use crate::port::FakeFileTree;\n    fn f() -> &'static str { \"{\" }\n}\n";
+    assert!(port_violations(in_tests, false).is_empty());
+    assert_eq!(
+        paths(&port_violations("use crate::port::FakeFileTree;\n", false)),
+        [(1, "crate::port::FakeFileTree")]
+    );
+    let after_tests = "#[cfg(test)]\nmod tests {}\nuse crate::port::FakeFileTree;\n";
+    assert_eq!(
+        paths(&port_violations(after_tests, false)),
+        [(3, "crate::port::FakeFileTree")]
+    );
+    assert!(port_violations("use crate::port::FakeFileTree;\n", true).is_empty());
+}
+
+#[test]
+fn a_parent_marks_a_module_file_as_test_code() {
+    assert!(declares_test_module(
+        "#[cfg(test)]\nmod testing;\n",
+        "testing"
+    ));
+    assert!(declares_test_module(
+        "#[cfg(test)]\npub(crate) mod testing;\n",
+        "testing"
+    ));
+    assert!(!declares_test_module("mod testing;\n", "testing"));
+    assert!(!declares_test_module(
+        "#[cfg(test)]\nmod testing;\n",
+        "other"
+    ));
+    assert!(!declares_test_module(
+        "// #[cfg(test)]\nmod testing;\n",
+        "testing"
+    ));
 }

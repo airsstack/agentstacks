@@ -14,6 +14,8 @@
 //! - It wraps the name and version errors transparently, so a bad extension name or version reads
 //!   the same as a bad one anywhere else.
 //! - It words the symlink refusal for an extension, which the directory walker words for a pack.
+//! - It words the refusals of a `reads` entry: absolute, outside the project, repeated, or written
+//!   with a backslash; the shared phrases are wrapped transparently.
 //!
 //! # Non-responsibilities
 //!
@@ -25,7 +27,11 @@
 use crate::types::manifest::InvalidVersion;
 use crate::types::name::InvalidName;
 use crate::types::report::DoesNotExist;
+use crate::types::report::ListedTwice;
+use crate::types::report::MustBeRelative;
 use crate::types::report::NotLuaFile;
+use crate::types::report::OutsideProject;
+use crate::types::report::Quoted;
 use crate::types::report::UnsupportedApi;
 
 /// A refusal of an extension directory or its `extension.toml`.
@@ -77,6 +83,21 @@ pub enum ExtensionError {
     /// A symlink inside the extension directory.
     #[error("symlinks are not allowed in an extension")]
     Symlink,
+    /// A `reads` entry that is absolute.
+    #[error(transparent)]
+    MustBeRelative(#[from] MustBeRelative),
+    /// A `reads` entry that climbs out of the project.
+    #[error(transparent)]
+    OutsideProject(#[from] OutsideProject),
+    /// A `reads` entry that repeats an earlier one after normalising.
+    #[error(transparent)]
+    ListedTwice(#[from] ListedTwice<Quoted>),
+    /// A `reads` entry written with `\` instead of `/`.
+    #[error("\"{text}\" must use / as the separator")]
+    Separator {
+        /// The refused path, as written.
+        text: String,
+    },
 }
 
 #[cfg(test)]
@@ -118,6 +139,24 @@ mod tests {
             (
                 ExtensionError::Symlink,
                 "symlinks are not allowed in an extension",
+            ),
+            (
+                ExtensionError::from(MustBeRelative::new("/x")),
+                "\"/x\" must be relative",
+            ),
+            (
+                ExtensionError::from(OutsideProject::new("../x")),
+                "\"../x\" must stay inside the project",
+            ),
+            (
+                ExtensionError::from(ListedTwice::text(".claude/settings.json")),
+                "\".claude/settings.json\" listed twice",
+            ),
+            (
+                ExtensionError::Separator {
+                    text: "a\\b".to_owned(),
+                },
+                "\"a\\b\" must use / as the separator",
             ),
         ];
         for (error, expected) in cases {

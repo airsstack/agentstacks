@@ -13,6 +13,8 @@
 //! - [`ContentHashError`]: the refusal for text that is not a content hash.
 //! - [`tree_hash()`]: the deterministic hash of every file path and content under a tree.
 //! - `hash_walked`: the same hash over a walk the caller already holds, each file read once.
+//! - `utf8_text`: a file's bytes as text, refused with the one `not valid UTF-8` wording every
+//!   reader of a tree uses.
 //!
 //! # Non-responsibilities
 //!
@@ -24,6 +26,7 @@
 
 pub mod hash;
 pub mod path;
+pub mod text;
 pub mod walk;
 
 #[doc(inline)]
@@ -42,3 +45,4 @@ pub use walk::Walked;
 pub use walk::walk;
 
 pub(crate) use hash::hash_walked;
+pub(crate) use text::utf8_text;

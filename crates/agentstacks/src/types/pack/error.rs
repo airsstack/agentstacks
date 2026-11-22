@@ -98,7 +98,7 @@ pub enum PackError {
     #[error("pack declares nothing to install")]
     NothingToInstall,
     /// A file that is rendered but is not UTF-8. A file that is read and never rendered gets the
-    /// plain wording of [`FileTree::read_text`](crate::types::FileTree::read_text) instead.
+    /// plain wording of [`FileTree::read_text`](crate::port::FileTree::read_text) instead.
     #[error("not valid UTF-8, cannot render")]
     NotUtf8,
     /// A `root` token in neutral content that reaches into `native/`.
