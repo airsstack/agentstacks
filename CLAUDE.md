@@ -2,13 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: formats built, product not yet
+## Status: core built, CLI commands not yet
 
-The pack, extension, project and lock formats are built and tested. Plan, apply, the extension host
-and the CLI commands are not.
+The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host and
+the hook runtime are built and tested. The CLI commands are not.
 
 ```text
-crates/agentstacks/       library; types/ (formats) and fs/ (disk FileTree) built; the rest planned
+crates/agentstacks/       library; types · port · app · fs · process · host, all built
 crates/agentstacks-cli/   the `agentstacks` binary; answers --version and --help only
 docs/                     contributor docs; docs/architecture.md is the layering contract
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
