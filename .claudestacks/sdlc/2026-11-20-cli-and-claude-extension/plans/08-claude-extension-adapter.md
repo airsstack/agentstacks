@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [04, 07]
 built-on: 7b4a3a8f175f
@@ -209,3 +209,19 @@ Commit `feat(repo): claude extension plan handler`.
 
 - `cargo make dod` green, including `lua`.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test claude` green.
+
+## Review findings
+
+- 🔵 `tests/claude.rs:6` said expected files are "never copied from its output", but the expected `translate.lua` is the translator text itself. Fixed inline: the doc names that exception and says the translator runs prove it. `cargo make dod` → exit 0.
+- 🔵 `tests/claude.rs:43` `skip_without_airsl` doc did not cover the translator-run caller. Fixed inline. `cargo fmt --all -- --check` and `cargo clippy -p agentstacks --test claude -- -D warnings` → clean.
+- 🔵 `adapter.lua:13` `plan` relies on `values` having run first. Fixed inline with a comment on the host's dispatch order.
+- 🟡 open: translator branches with no run test (PreToolUse context only / context + block, PostToolUse and UserPromptSubmit with context, SessionStart block only). The plan's test list does not name them.
+- 🔵 open: `airsl_version`, `REQUIRE_AIRSL`, `copy_tree`, `module` repeat helpers of `tests/runtime.rs`; a shared `tests/common/mod.rs` would remove them.
+- 🔵 open: the `removed` fixture drops `claude` from the toml (tool only in the lock) rather than listing it with zero packs; see Deviations.
+
+## Deviations
+
+- 2026-11-22 (process): Tasks 1-3 share `adapter.lua` and `tests/claude.rs`, so one coder built them in order; they land in one commit.
+- 2026-11-22: added fixture `emptied/` for `hooks_left_empty_stays_an_empty_object`, which the file list does not name.
+- 2026-11-22: the `removed` fixture lists a second tool `other` (a path extension that installs nothing) and a pack `team`, because a project must list at least one tool and one pack; `claude` exists only in `agentstacks.lock`. The test asserts the locked file gets a Delete step and only `settings.json` is written.
+- 2026-11-22: plan tests on fixtures with lua (`full`, `settings`, `nullevent`) skip without the airsl binary, because a pack holding lua needs `[requires] airsl`; they fail instead when `AGENTSTACKS_REQUIRE_AIRSL` is set.

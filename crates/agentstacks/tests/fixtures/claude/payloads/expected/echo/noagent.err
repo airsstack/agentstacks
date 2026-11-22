@@ -1,0 +1,1 @@
+event=tool.before source=nil prompt=nil tool=read path=/p/hello.txt last_message=nil agent=nil session_id=s1 cwd=/p

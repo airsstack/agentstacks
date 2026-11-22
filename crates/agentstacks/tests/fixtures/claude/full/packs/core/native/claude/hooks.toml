@@ -1,0 +1,19 @@
+# 0: a native lua hook on an event the neutral set has no name for
+[[hooks]]
+kind = "lua"
+event = "SubagentStop"
+match = ["coder"]
+run = "hooks/enforce.lua"
+may_block = true
+
+# 1: a native message on an event that takes no message
+[[hooks]]
+kind = "message"
+event = "Notification"
+text = "Heads up"
+
+# 2: a native message on an event that does
+[[hooks]]
+kind = "message"
+event = "PostToolUseFailure"
+text = "failed"

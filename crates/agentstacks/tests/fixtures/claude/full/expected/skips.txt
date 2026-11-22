@@ -1,0 +1,6 @@
+core/hook/1: claude shows no hook output to the model at session end
+core/hook/3: claude gives hooks the session id in the event (event.session_id), not as {{var session_id}}
+core/hook/4: claude treats hook output at agent stop as feedback that keeps the agent running
+core/hook/6: claude runs hook commands through sh, which would expand the literal $ in argument "^a$"
+core/native-hook/1: claude passes no hook message to the model on Notification
+core/skill/odd: native.claude key "bad key" cannot be written as frontmatter

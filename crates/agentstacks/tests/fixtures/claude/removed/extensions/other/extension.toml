@@ -1,0 +1,6 @@
+[extension]
+name = "other"
+version = "0.1.0"
+api = 0
+description = "A tool that installs nothing"
+entry = "adapter.lua"
