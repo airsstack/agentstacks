@@ -3,8 +3,10 @@
 **Set up any agentic coding tool from one CLI: write the content once, and agentstacks renders it in
 each tool's own format.**
 
-> **Status: early development.** Nothing here is usable yet. The commands and formats below are
-> the design, and they will change. Today's Claude Code plugins live in
+> **Status: early development, no release yet.** The CLI (`init`, `plan`, `apply`, `doctor`,
+> `update`) and the Claude Code extension are built and tested, and work from a local checkout with
+> local extensions and packs. Official packs, a tagged release and OpenCode are not here yet. The
+> extension API is `api = 0` and will change. Today's Claude Code plugins live in
 > [claudestacks](https://github.com/airsstack/claudestacks) until they move here.
 
 Every agentic coding tool wants its setup in its own shape: Claude Code reads `.claude/`, OpenCode
@@ -34,7 +36,18 @@ into each tool you use. Before anything is written, you see exactly what will ch
 | **Plan** | The list of operations an apply would perform: write, copy or delete a file, require a binary, or skip an item the tool can't support, with the reason. A config file you share with a tool (such as `.claude/settings.json`) is rewritten by its extension, and the plan shows the diff. |
 | **Lock** | `agentstacks.lock`: pinned pack and extension versions plus a hash of every written file, so `doctor` detects drift and `apply` never silently overwrites your edits. |
 
-## Usage (planned)
+## Usage
+
+Works today, with an extension and a pack from local paths:
+
+```sh
+cd my-project
+agentstacks init --tool ./ext/claude --pack ./packs/mine   # writes agentstacks.toml, shows the plan, asks to apply
+agentstacks plan                                            # what apply would change now
+agentstacks doctor                                          # healthy, or what changed since apply
+```
+
+Planned, once the official packs are released:
 
 ```sh
 cd my-project
@@ -68,7 +81,7 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 
 | Tool | Status |
 |---|---|
-| Claude Code | In development |
+| Claude Code | Built (`extensions/claude`), not released |
 | OpenCode | Planned |
 | Your own | Write a tool extension against the public API: [`docs/authoring.md`](docs/authoring.md) |
 
@@ -118,19 +131,19 @@ Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authori
 - **Unsupported is visible.** An item a tool can't express is reported as skipped, never dropped
   silently.
 
-## Layout (planned)
+## Layout
 
 ```text
 agentstacks/
 ├─ crates/
-│  ├─ agentstacks/       core library: types · port · app · fs · process · host (ports and adapters)
-│  ├─ agentstacks-cli/   init · plan · apply · doctor · update
-│  ├─ claudevs/          deterministic test engine for Claude Code setups (moving from claudestacks)
-│  └─ claudevs-cli/
-├─ extensions/           official tool extensions: claude/ · opencode/
-├─ packs/                official packs
-├─ docs/                 contributor docs, until the book exists
-└─ book/
+│  ├─ agentstacks/       core library: types · port · app · fs · process · host     built
+│  ├─ agentstacks-cli/   init · plan · apply · doctor · update                       built
+│  ├─ claudevs/          deterministic test engine for Claude Code setups            planned (moving from claudestacks)
+│  └─ claudevs-cli/                                                                  planned
+├─ extensions/           official tool extensions: claude/ built · opencode/ planned
+├─ packs/                official packs                                              planned
+├─ docs/                 contributor docs, until the book exists                     built
+└─ book/                                                                             planned
 ```
 
 ## Documentation
@@ -142,7 +155,7 @@ and how it is tested.
 ## Roadmap
 
 ```text
-M1  claude extension (api = 0); the claudestacks plugins become packs
+M1  claude extension (api = 0) ✓ built; the claudestacks plugins become packs
 M2  opencode extension on the same API
 M3  freeze api = 1; docs for writing packs and extensions; ext add / ext test
 ```
