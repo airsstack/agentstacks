@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 built-on: 7b4a3a8f175f
 ---
@@ -75,3 +75,13 @@ crates/agentstacks/src/fs/workspace/swap.rs    — modify: write_project and wri
 
 - `cargo make dod` green.
 - `cargo deny check` passes.
+
+## Review findings
+
+- 🟡 no test pins `create_new` (a relaxed `create`+`truncate` keeps every test green, since the removal already cleared the entry). Fixed inline with a `//` comment at the open saying why `create_new` must stay. `cargo make dod-crate agentstacks` → exit 0.
+- 🔵 `stage.rs:1` module doc said "apply writes"; widened. `swap.rs` `# Errors` on `write_project`/`write_lock` now name the staging step; the redundant test-module `use` of `stage_bytes, temp_of` was dropped. `cargo make dod-crate agentstacks` → exit 0.
+- 🔵 open: `symlink_tests` repeats the `TestResult` alias of `tests`.
+
+## Deviations
+
+- 2026-11-22 (process): Tasks 1 and 2 were built by one coder in one pass and land in one commit instead of two. The three directory tests passed before the change (`std::fs::write` on a directory already errors); the six symlink tests failed first as planned.
