@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01]
 built-on: f39b2a814319
@@ -391,3 +391,21 @@ Definition of Done is green. Commit `feat(agentstacks): require-able hook run se
   duplicates, optional list, `reads` exposed, R28(n) separator and own files), §12 row 2 (Task 2),
   §16 R16 and R28(e) (Task 3), §12 row 3 and D14 first sentence (Task 4), §12 row 4, D14 second sentence and
   §16 R24 (run segment), incl. `native/<tool>/hooks.toml` (Task 5).
+
+## Review findings
+
+Reviewer (one round, shared batch with plan 02): plan 03 share was 0🔴 4🟡 2🔵 plus 1 plan-hygiene 🔵. Blocking: `lock/file.rs:13`. Batch `cargo make dod` exit 0 (804 unit, 31 integration, 233 doctests).
+
+- fixed 🟡 (blocking) `lock/file.rs:13`, `project/path/sub.rs:9-11`. The module doc claimed that a lock built with `Lockfile::new` is held to the parse rules, but `new` accepts `\` and agentstacks' own files. The docs were narrowed to say that the operation path rule keeps those paths out before a lock is built. `cargo test -p agentstacks --lib types::lock` gave 43 passed, 0 failed. `cargo fmt --all -- --check` was clean.
+- fixed 🟡 `lock/entry/written.rs:150`: the own-file check was unguarded for other spellings. Added the `./agentstacks.toml` and `./agentstacks.lock` cases to `file_entry_refuses_each_rule`. Same run: 43 passed.
+- fixed 🟡 `lock/write.rs:342`: the `'\\'` arm of `quote` was unguarded. Added `quote_escapes_a_backslash`. Same run: 43 passed.
+- open 🟡 `extension/manifest.rs:247`: `reads = ["."]` / `["./"]` normalise to `""` (the project root) and are accepted. Lock `[[file]].path = "."` is the same. This is a plan gap, because only blank entries were listed.
+- open 🔵 `extension/manifest.rs:449`: a redundant `use` under `use super::*`.
+- open 🔵 `tests/fixtures/packs/hook-message-grants/pack.toml:11`: still `policy = "pure"`. The test passes only because the message-hook refusal comes first.
+- open 🔵 `tests/pack.rs` was edited but is not in this plan's file list. The edit is accepted; see Deviations.
+
+## Deviations
+
+- 2026-11-22: `tests/pack.rs` was not in the file list. Its `hook-grants-policy-unknown` row expected `(expected confined, pure)` and now expects `(expected confined)`, because Task 4 changed the Unknown text.
+- 2026-11-22: Task 2's expected text for `write_lock_escapes_strings` was garbled. It was built to the stated input: path `a"b<TAB>d<LF>e<U+0001>` is written as `path = "a\"b\td\ne\u0001"`.
+- 2026-11-22: The coder ran `cargo make fmt` once mid-task. It rewrites the whole tree, including plan 02's files in progress. The final fmt-check was clean.

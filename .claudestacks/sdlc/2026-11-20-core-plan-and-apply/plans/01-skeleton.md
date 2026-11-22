@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: []
 built-on: f39b2a814319
@@ -349,3 +349,29 @@ Commit `build(repo): add airsl and serde_json under the deny policy`.
   X3 as crate docs (Task 2), §2 isolation paragraph, §16 X2 and R28(k) (Task 3), §2 module table jobs as
   module docs (Task 2), §12 last row (Task 1), §15 rows 1-5 and §16 X1 (Task 4); the plan-set rule
   that no doc-comment example uses a fake (all tasks).
+
+## Review findings
+
+Reviewer (one round): 0🔴 1🟡 10🔵 1❓, blocking: none. `cargo make dod` exit 0 (lib 694, isolation 17, doctests 232); `cargo make deny` exit 0.
+
+- open 🟡 `tests/isolation.rs:323` — no test covers the `;` branch of `test_ranges` or the `stem == "mod"` branch of `is_test_file`.
+- open 🔵 `types/tree/mod.rs:29` — `pub mod text;` shows an empty public module in rustdoc (accepted; see Deviations).
+- open 🔵 `lib.rs:30` — the layering diagram omits the cfg(test) `FakeFileTree` allowance.
+- open 🔵 `types/{json,plan,resolve,protocol}/mod.rs:1` — the stubs have no "why it exists" sentence.
+- open 🔵 `process/mod.rs:5`, `host/mod.rs:4` — the docs name items that do not exist yet (the plan's text).
+- open 🔵 `tests/isolation.rs:42` — the `FORBIDDEN_IN_GROUP` doc still says only `types`.
+- open 🔵 `tests/isolation.rs:267` — hoist `grouped_members` out of the loop.
+- open 🔵 `tests/isolation.rs:378` — any grouped `port` member is refused (stricter than the plan), and the message names `crate::port`.
+- open 🔵 `tests/isolation.rs:503` — minimum file counts of 51 and 50 disagree; the assert message is stale.
+- open 🔵 `tests/isolation.rs:597` — helpers sit between `#[test]` functions.
+- open 🔵 `deny.toml:69` — a comment line is about 100 columns wide.
+- open 🔵 `docs/architecture.md:23` — still says `types/port/` (deferred to plan 17 by this plan's Risks).
+- open ❓ `Cargo.toml:20` — `preserve_order` also unifies into airsl's own serde_json (BTreeMap → IndexMap); nothing hashed or locked may rely on sorted airsl keys.
+
+## Deviations
+
+- 2026-11-22 — Board row was clean (`plans 01–17 approved → execute 01`). Briefer agents were skipped; one coder built the whole plan from the plan file. Reports went to the scratchpad handoff tier, not a session.
+- 2026-11-22 — Task 1 said `git mv`; staging was not allowed in this run, so plain `mv` was used. The old paths show as deleted and the new ones as untracked.
+- 2026-11-22 — Task 1 said `mod text;` (private). Clippy rejects every private form (`redundant_pub_crate` for `pub(crate) fn` in a private or `pub(crate)` module; `unreachable_pub` for `pub fn`). Built instead: `pub mod text;` with `pub(crate) fn utf8_text`, the same shape as `hash::hash_walked`. The reviewer reproduced the clippy failures.
+- 2026-11-22 — Task 1's table missed `use agentstacks::types::FileTree;` in a method doctest in `src/fs/disk.rs`; it was fixed.
+- 2026-11-22 — Task 3: the planned seen-failing case (`FakeFileTree` outside test) cannot compile in a non-test build, so the temporary proof used `crate::port::tree::FileTree`. The reviewer re-ran the plan's case with `#[cfg(any())]` and it failed as planned.

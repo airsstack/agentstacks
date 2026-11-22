@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02]
 built-on: f39b2a814319
@@ -350,3 +350,19 @@ Notation in the test lines:
 - Spec §16 R3 (`json.edit: text: not valid UTF-8`, `json.edit: path: expected a list`, the value
   refusals) and R5 (one refusal per call, located at the nearest Lua frame): plan 12. `edit` returns
   at most one refusal by its signature.
+
+## Review findings
+
+Reviewer: one round, batched with plans 04, 07 and 08. Blocking: none. The batch `cargo make dod` exited 0.
+
+- open 🔵 `print.rs:10`: the doc is stale or contradictory.
+- open 🔵 `edit.rs:180`: probe/spec vocabulary in test code.
+- open 🔵 The `print` tests depend on `Indent::detect`.
+
+## Deviations
+
+- 2026-11-22: `print` returns `Result<String, JsonEditError>`, not `String`. Its unreachable error arm goes to `JsonEditError::Parse` without `unwrap`/`expect`, which needs a `Result`.
+- 2026-11-22: `edit_first_failing_row_wins` asserts `Err(JsonEditError::Parse(_))` by variant, because the plan gives no message text for `{,`.
+- 2026-11-22: `Indent::as_bytes` is a `const fn`, as clippy's `missing_const_for_fn` requires.
+- 2026-11-22: Module doc links are written `edit()` / `print()`, because rustdoc found each name ambiguous (module/macro).
+- 2026-11-22: The red phase for `print`, `elem` and `edit` was seen only in a scratch crate, because plan 04's in-progress files kept the real crate from compiling. As a red check, `shift_remove` → `swap_remove` made `edit_removes_an_existing_key_and_keeps_the_others_in_order` fail. The real crate was green at the wave gate.

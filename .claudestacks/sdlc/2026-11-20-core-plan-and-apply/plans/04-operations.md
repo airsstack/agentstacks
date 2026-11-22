@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02]
 built-on: f39b2a814319
@@ -1043,3 +1043,25 @@ refusal builders here (§6.1 step 7).
     - R13 → Task 5;
     - R18 → plan 13 (noted in Task 8);
     - R25 → Task 1 (`op_path_refuses_empty`).
+
+## Review findings
+
+Reviewer: one round, batch with plans 05, 07 and 08. Blocking: none. The batch `cargo make dod` exited 0 (1034 unit, 275 doctests, runtime 8/8); the reviewer's `cargo test -p agentstacks --all-targets` exited 0.
+
+- open 🔵 `BinaryRequirement::Extension` accepts any `Origin`.
+- open 🔵 `propose` accepts non-extension origins, and its scans are O(n²).
+- open 🔵 `id.rs:214`: probe/spec vocabulary in test code.
+- open 🔵 `payloads_clone_equal` checks only `PlanInput`; Task 5 also names `ValuesInput` and `vars`.
+
+## Deviations
+
+- 2026-11-22: `SkipReason::new` and `require_binary` refusals carry plan 02's function prefix (`skip: reason: empty`, `require_binary: name: "Git" is not a valid name`), as pinned by `op/error.rs` tests. The plan's text omitted the prefix.
+- 2026-11-22: `Proposals::check_path` takes an `ApiFunction` argument, because the refusal must start with `write:` or `copy:` and nothing else supplies it.
+- 2026-11-22: `values.root` / `dir` path refusals are located at `Location::file(entry)`. At the key path the key would print twice and would not match the plan's expected text.
+- 2026-11-22: `ValuesResult.vars` is a `HashMap<Var, String>`, because `Var` derives `Hash` but not `Ord`.
+- 2026-11-22: `Origin::site()` returns `Option<Location>` (shown as `adapter.lua:9`), because `OpError::ProposedAt`, `SkipAfterCover` and `CoverAfterSkip` hold a `Location`.
+- 2026-11-22: The T9 uncovered-files test adds `references/x.md` to the shared fixture so it can use the plan's example id.
+- 2026-11-22: `Proposals` derives skip/cover state from its ordered records; the observable behaviour is the same.
+- 2026-11-22: Added a `#[cfg(test)]` helper `op/testing.rs`, the same pattern as `set/testing.rs`.
+- 2026-11-22: `PlanSkill`, `PlanAgent`, `PlanPack` and `PlanInput` derive `Debug + Clone` only, because `SkillMeta`/`AgentMeta` have no `PartialEq`.
+- 2026-11-22: Iteration ran in a scratch copy of the crate while plan 08 kept the tree red; the real `cargo make dod` ran once at the end and was green.

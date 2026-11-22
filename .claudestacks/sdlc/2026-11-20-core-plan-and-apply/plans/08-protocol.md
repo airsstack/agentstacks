@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01, 03]
 built-on: f39b2a814319
@@ -260,3 +260,21 @@ and a block.
   rows (Task 5); §14 `runtime.lua` row (Task 5). §11.4 and §11.5 are extension documentation (plan
   17).
 - `grep -rn "spec\|chain" crates/agentstacks/src/types/protocol` finds nothing in doc comments.
+
+## Review findings
+
+Reviewer: one round, batched with plans 04, 05 and 07. Blocking: none. The batch ran `cargo make dod` and it exited 0, with runtime 8/8 against real airsl 0.1.4. `cmp` matched the asset and fixtures to the probe files, and the sha256 and 905-byte length match the pin.
+
+- fixed 🟡 `protocol/command.rs:144`: a root `SubPath` of "." normalised to "", so `argv` held `/runtime.lua`.
+  - Fix: an empty normalised root gives `runtime.lua` alone. `HookCommand::new` still takes a `SubPath`, because plan 13 relies on that signature.
+  - New test `argv_dot_root_names_the_runtime_alone`. Red: `left: "/runtime.lua" right: "runtime.lua"`. Passes after the fix.
+- fixed 🟡 `protocol/runtime.rs:38`: the cfg(test) `include_str!` of the probe file under `.claudestacks/` is removed (`runtime_lua_equals_the_probed_text` dropped). `runtime_lua_hash_is_pinned` still guards the bytes.
+- fixed 🟡 `tests/runtime.rs:105`: each test passed without running when `airsl` was missing.
+  - Fix: with `AGENTSTACKS_REQUIRE_AIRSL` set, a missing airsl fails each test. CI downloads the prebuilt `airsl-cli 0.1.4` Linux release (sha256 pinned in `ci.yml`) and sets the variable on `cargo make dod`.
+  - Test binary run with `PATH=/usr/bin:/bin AGENTSTACKS_REQUIRE_AIRSL=1`: `FAILED. 0 passed; 8 failed`. Without the variable: `ok. 8 passed`.
+- All three fixes: `cargo make dod` exit 0, 1429 passed, 0 failed.
+
+## Deviations
+
+- 2026-11-22: Task 5's case names the hook file (`ctx`), not a dotted module (`core.hooks.ctx`). `HookModule` is built from a real `HookRun`, and the segment rule refuses a dotted `run`. The argv is the same.
+- 2026-11-22: The red phase and the test runs were done in a scratch copy, because plan 04's in-progress files kept the real crate from compiling. The real crate was green at the wave gate.

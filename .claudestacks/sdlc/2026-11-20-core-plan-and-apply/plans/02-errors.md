@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [01]
 built-on: f39b2a814319
@@ -470,3 +470,21 @@ Definition of Done is green. Commit `feat(agentstacks): source fetch refusals`.
   §9.1 row 2; §9.2 failure rows 1, 2, 4, 5 (row 3 is git's own refusal, row 6 reuses row 2); §9.3
   home; §10 rows 1-3 (out of range: built `SetError::AirslInstalled`); §13 every example; §16 R1,
   R2, R3, R4, R6, R12, R13, R14, R15, R19, R21, R23 (I/O form), R25, R28(b), R28(l), R28(m).
+
+## Review findings
+
+Reviewer (one round, batch with plan 03): plan 02 share 0🔴 2🟡 6🔵. The batch's `cargo make dod` passed with exit 0 (804 unit, 31 integration, 233 doctests).
+
+- open 🟡 `report/phrase.rs:42`: `Quoted`, `MustBeRelative` and `OutsideProject` have `pub(in crate::types)` constructors. As a result, `FetchError::SubdirNotFound`/`SubdirIsFile`, `PathShape` and the `Quoted`-carrying `OpError` variants cannot be built from `process/` or `host/`, although `resolve/error.rs:3` says the adapters build them. This is settled where the adapters are built (plans 11–12).
+- open 🟡 The `"<text>" must use / as the separator` wording now lives in four enums (`extension/error.rs`, `lock/error.rs`, `op/shape.rs`, `manifest/invalid.rs`). It is deferred to the cross-check.
+- open 🔵 `json/error.rs:63`: `PathItemType.index` is 1-based but typed `usize`.
+- open 🔵 `json/error.rs:259`, `op/error.rs` (`op_error_required_field`, `op_error_outside_plan_handler`): the expected text is built from the `Display` under test.
+- open 🔵 `op/error.rs:29`: `path_suffix` allocates on every `Display`.
+- open 🔵 `op/error.rs:531`: a redundant re-assert after the loop.
+- open 🔵 `resolve/error.rs:264`: `fetch_error_converts_and_displays_unchanged` is duplicated; the copy in `report/format.rs` is the planned one.
+- open 🔵 `types/mod.rs:226`: the new error enums are not re-exported at the `types` root. This is accepted, because `types/mod.rs` was not in this plan's files.
+
+## Deviations
+
+- 2026-11-22: One coder built the whole plan while plan 03 was built in parallel. Plan 03's files were red mid-run and green at the final gate.
+- 2026-11-22: The new types are reachable at `types::{op,json,plan,resolve}::…` and not at the `types` root, because `types/mod.rs` belonged to plan 03.

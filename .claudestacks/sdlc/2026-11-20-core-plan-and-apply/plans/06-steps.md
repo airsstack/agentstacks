@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02, 04]
 built-on: f39b2a814319
@@ -544,3 +544,28 @@ Commit `feat(agentstacks): apply race check`.
   and R27 are the flows' (plans 13, 14, 15).
 - `grep -rn "spec\|chain" crates/agentstacks/src/types/plan` finds nothing in doc comments.
 - `grep -rn "Fake" crates/agentstacks/src/types/plan` finds nothing (no doctest uses a fake).
+
+## Review findings
+
+Reviewer, one round: 0🔴, 3🟡 (code), 13🔵, 1❓, 1🟡 (plan). Blocking: `plan/built.rs:21` (skips). Reviewer `cargo test -p agentstacks types::plan`: 79 passed.
+
+- fixed 🟡 (blocking) `plan/built.rs:21`: `Plan.skips: Vec<CoreSkip>` dropped an extension skip's `Origin`, so with two tools the plan could not say which tool skipped an item.
+  - Fix: added the `Skipped` enum in `plan/skipped.rs`: `Extension { item, reason, origin }` or `Core(CoreSkip)`, with accessors `subject`, `reason`, `origin` and `tool`.
+  - `plan_keeps_every_part` now asserts that the tools read back as `[Some("opencode"), None]`. It failed to compile before the fix and passes after.
+  - Two tests were added: `an_extension_skip_keeps_its_origin` and `a_core_skip_has_no_origin`.
+  - `cargo make dod` exit 0: 1429 tests passed, 0 failed.
+- open 🟡 `decide/proposed.rs:33`: `ProposedPath.owner: Option<Owner>` lets an unshared write go unlocked when `None`.
+- open 🟡 `plan/disk.rs:40`: `DiskFile` mode is a bare `u32`.
+- open ❓ `plan/race.rs:39`: `race` ignores `link`, so a delete target that becomes an inside symlink after `plan` still passes the check and gets deleted.
+- open 🔵 `Finding` also derives `thiserror::Error`; the plan's Risks said it derives only `Debug`.
+- open 🔵 A core missing-value skip has no `Origin`, so `Skipped::tool()` is `None`; only its reason text names the tool. Structural attribution would need a tool field on `types::op::CoreSkip`.
+- open 🔵 There are 12 further nits in `/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/11b11407-be42-4105-93b0-46ffa5b55ffb/scratchpad/handoff/13-reviewer-plan06.md`.
+
+## Deviations
+
+- 2026-11-22: `lock_contents` lists all four fields instead of ending with `..LockContents::default()`. Plan 03 removed `merges`, so clippy's `needless_update` rejects the update under `-D warnings`.
+- 2026-11-22: `Plan.skips` is `Vec<Skipped>`, a new type. No plan 04 type carries both an extension skip with its `Origin` and a core `SkipSubject::RootFile` skip. Plan 13 builds `Skipped::Extension` from a `Skip` proposal and `Skipped::Core` from a `CoreSkip`.
+- 2026-11-22: `Plan` fields are private with accessors. `Plan::new` takes seven arguments and sorts steps by `OpPath`.
+- 2026-11-22: `AirslAnswer::spawn_refusal` rebuilds the `io::Error` from its kind and Display, because `io::Error` is not `Clone`. The text is `agentstacks.toml: airsl: <err>`.
+- 2026-11-22: `Reads::shared` returns a cloned `Option<ReadOutcome>`. `ProposedPath` has pub fields. `Exit` lives in `plan/airsl.rs`.
+- 2026-11-22: `step.rs` and `binary.rs` are plain data; each got one small test instead of citing an exemption.

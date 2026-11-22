@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [02]
 built-on: f39b2a814319
@@ -444,3 +444,21 @@ its refusal are `cli-commands`' (§9.4, §17), not built here.
   plan 10's.
 - `grep -rn "spec\|chain" crates/agentstacks/src/types/resolve` finds nothing in doc comments.
 - `grep -rn "Fake" crates/agentstacks/src/types/resolve` finds nothing (no doctest uses a fake).
+
+## Review findings
+
+Reviewer: one round, batch with plans 04, 05 and 08. Blocking: none. The batch's `cargo make dod` exited 0.
+
+- open 🟡 `reconcile.rs:69`: the private path normaliser copies `SubPath::normalized` line for line. Move it to `LocalPath::normalized`.
+- open ❓ `remote.rs:81`, `listing.rs:134`: when a later `ls-remote` line or `ls-tree` record is bad, the refusal still quotes the first line, which is valid. This follows the plan's "<first line>" wording but points at the wrong line.
+- open 🔵 `unread.rs:9`: the doc is stale.
+- open 🔵 `listing.rs:272`, `update.rs:276`: probe/spec vocabulary in test code.
+- open 🔵 `TreeRecord` has plain `String` fields.
+
+## Deviations
+
+- 2026-11-22: `first_line` cuts at the first `\n` or NUL, where the plan says only `\n`. A malformed `ls-tree -z` record is then quoted without a trailing NUL. Output without NULs is unchanged.
+- 2026-11-22: `UpdateQuery::for_source` takes the key by value. For a tag with no version, `UpdateEntry.current` is `Some(tag)`; the plan specifies `None` only for rev pins.
+- 2026-11-22: `same_source` normalises `path` with a private helper, because `LocalPath` has no `normalized()`. A subdir of `.` normalises to empty and is not treated as "none".
+- 2026-11-22: Four tests were added beyond the plan: `classes_follow_packs_then_tools_order`, `first_line_stops_at_the_first_record_of_nul_separated_output`, `ls_remote_one_bad_line_refuses_the_whole_output`, `ls_tree_empty_output_is_empty`.
+- 2026-11-22: The red phase was seen in a scratch copy, because others' in-progress files kept the real crate red. Task 1 was written test-and-code together. The real crate was green at the wave gate.
