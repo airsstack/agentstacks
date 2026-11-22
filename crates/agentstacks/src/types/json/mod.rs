@@ -8,7 +8,8 @@
 //! - [`edit()`]: sets or removes one key of a JSON text and prints the document back with the
 //!   indent, line endings and trailing newline of the text.
 //! - [`PathElem`]: one element of the key path, a key or the type word of a non-string.
-//! - [`JsonEditError`]: every refusal of a `json.edit` call.
+//! - [`JsonEditError`]: every refusal of a `json.edit` call, and [`MAX_DEPTH`], how deep a written
+//!   value may nest.
 //!
 //! # Non-responsibilities
 //!
@@ -28,4 +29,4 @@ pub use edit::edit;
 #[doc(inline)]
 pub use elem::PathElem;
 #[doc(inline)]
-pub use error::JsonEditError;
+pub use error::{JsonEditError, MAX_DEPTH};

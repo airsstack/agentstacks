@@ -15,6 +15,10 @@
 use crate::types::op::LuaType;
 use crate::types::report::{ParserMessage, Quoted};
 
+/// The most levels of tables a value written by `json.edit` may nest, the recursion limit of the
+/// JSON parser.
+pub const MAX_DEPTH: usize = 128;
+
 /// A `json.edit` call refused.
 ///
 /// # Examples
@@ -91,6 +95,9 @@ pub enum JsonEditError {
     /// The value is a table that contains itself.
     #[error("json.edit: value: table contains itself")]
     Cyclic,
+    /// The value nests tables more than [`MAX_DEPTH`] levels deep.
+    #[error("json.edit: value: nested more than {} levels deep", MAX_DEPTH)]
+    TooDeep,
     /// The value holds something that cannot be JSON: a function, userdata or a thread.
     #[error("json.edit: value: {got} cannot be JSON")]
     NotJson {
@@ -248,6 +255,14 @@ mod tests {
         assert_eq!(
             shown(JsonEditError::Cyclic),
             "claude/adapter.lua:5: json.edit: value: table contains itself"
+        );
+    }
+
+    #[test]
+    fn json_edit_error_nested_too_deep() {
+        assert_eq!(
+            shown(JsonEditError::TooDeep),
+            "claude/adapter.lua:5: json.edit: value: nested more than 128 levels deep"
         );
     }
 

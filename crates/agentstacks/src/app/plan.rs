@@ -1,5 +1,0 @@
-//! The home of the flow that builds a reviewable plan: every operation an apply would perform,
-//! shown in full before anything happens.
-//!
-//! This module currently holds no items. It is an export-only module with no executable logic,
-//! so it carries no inline tests.

@@ -307,6 +307,9 @@ pub enum OpError {
     /// The extension registered no `plan` handler.
     #[error("registers no plan handler")]
     NoPlanHandler,
+    /// An extension's call failed and gave no diagnostic to show.
+    #[error("extension failed without giving a reason")]
+    NoReason,
     /// A failure airsl reported, in its own first line.
     #[error("{first_line}")]
     Lua {
@@ -873,6 +876,14 @@ mod tests {
         assert_eq!(
             show(file(ADAPTER), OpError::NoPlanHandler),
             "claude/adapter.lua: registers no plan handler"
+        );
+    }
+
+    #[test]
+    fn op_error_no_reason() {
+        assert_eq!(
+            show(Location::file("claude"), OpError::NoReason),
+            "claude: extension failed without giving a reason"
         );
     }
 

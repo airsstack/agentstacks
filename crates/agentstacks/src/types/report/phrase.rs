@@ -39,7 +39,7 @@ pub struct Quoted {
 
 impl Quoted {
     /// Quotes `text`.
-    pub(in crate::types) fn new(text: impl Into<String>) -> Self {
+    pub(crate) fn new(text: impl Into<String>) -> Self {
         Self { text: text.into() }
     }
 
