@@ -87,6 +87,14 @@ fs/ process/ host/   ADAPTERS: translation only (disk, git, airsl binary, Lua) â
 - The core is tool-agnostic: no tool's file shapes (e.g. Claude's `settings.json`) in `types/`,
   `app/` or `host/`; that knowledge lives only in the tool's extension.
 
+## Writing a tool extension
+
+To build a new tool extension (OpenCode, or any other tool), follow
+[`docs/authoring.md`](docs/authoring.md) step by step. It is written for an agent to follow,
+links the API contract (`docs/extensions.md`, `docs/hooks.md`) and uses `extensions/claude/` as
+the worked example. Keep it in step with the API: when `extensions.md` or `hooks.md` changes, update
+`authoring.md` in the same change.
+
 ## Planned layout
 
 ```text

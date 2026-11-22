@@ -70,7 +70,7 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 |---|---|
 | Claude Code | In development |
 | OpenCode | Planned |
-| Your own | Planned: write a tool extension against the public API |
+| Your own | Write a tool extension against the public API: [`docs/authoring.md`](docs/authoring.md) |
 
 There is no plugin marketplace. Every tool is set up through the CLI, in that tool's native
 project configuration.
@@ -98,6 +98,14 @@ Extensions run under [airsl](https://github.com/airsstack/airsl) with no file, n
 access. An extension only *proposes* operations; the Rust core validates them, `plan` shows them,
 and the executor applies them. A third-party command never runs unannounced. The extension API is
 unstable (`api = 0`) until both official tools run on it.
+
+To write a tool extension, give your coding agent the guide
+[`docs/authoring.md`](docs/authoring.md), or its raw link:
+
+```text
+Build an agentstacks extension for <tool>.
+Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authoring.md
+```
 
 ## Design rules
 
