@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [09, 10]
 built-on: f39b2a814319
@@ -388,3 +388,36 @@ Commit `feat(agentstacks): binary lookup on PATH and the airsl version`.
   (Task 4, with plan 10's `Cache`); §10 `PATH` lookup rows 1-2 and the airsl answer row 3 (Task 5);
   §8 rows 6-8 input (Task 5); §14 `process::GitCli` (Task 4 contract tests, local bare repository)
   and `process::Binary` (Task 5, skipped with a printed reason when absent).
+
+## Review findings
+
+Reviewer, one round: code 0🔴 5🟡 8🔵 (one ❓), plan 1🟡 3🔵. Reviewer `cargo test -p agentstacks --lib process::`: 56 passed. Blocking: `git/command.rs:99`.
+
+- fixed 🟡 (blocking, security) `src/process/git/command.rs:99`: git commands kept `GIT_DIR` and the other variables git uses to find a repository. Under a git hook, the fetch wrote tags into the user's repository, and the cache would have installed an empty scratch repo.
+  - Fix: `command()` calls `env_remove` for each name in `REPOSITORY_VARIABLES` (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY, GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE).
+  - Test `run_clears_the_variables_that_point_git_at_a_repository`: red `GIT_DIR is not removed`, then green.
+- fixed 🟡 `src/process/binary.rs:115`: an airsl found on PATH whose interpreter is missing (`#!/nonexistent/interp`) was reported as not on PATH.
+  - Fix: after `find` succeeds, every spawn error is `SpawnFailed`.
+  - Test `a_found_airsl_with_a_missing_interpreter_is_a_spawn_failure_not_absent`: red (panicked on `NotFound`), then green.
+- fixed 🟡 `git/command.rs:268`: the stdin test would still pass without the writer thread.
+  - Fix: `STDIN_IDS = 20_000`. The reviewer's probe deadlocked at 5000 ids or more with the writer thread removed.
+- fixed 🟡 `src/fs/mod.rs:4` and `src/process/mod.rs:10` no longer claim something false about `std::fs`. `process` reads file metadata only for the PATH lookup.
+- fixed 🔵 Test names with spec ids were renamed: `..._is_a_git_spawn_refusal` and `an_unreadable_listing_is_a_failure`.
+- Fix verification: `cargo test -p agentstacks --lib process::`: 58 passed, 0 failed. `rustfmt --check`: clean.
+- open 🔵 Nits:
+  - `command.rs:29`: `subcommand: &'static str` repeats words `GitStep` owns.
+  - `blobs.rs:154`: the autocrlf test cannot tell its two layers apart.
+  - `cli.rs:88`: the closure parameter `name` should be `resolve`.
+  - `cli.rs:122`: `init` gets no `--` before the scratch path.
+  - `cli.rs:160`: no test asserts `--end-of-options`.
+  - `snapshot.rs:293`: the test name says "like the fake", but the fake's error kind differs.
+- open 🔵 The plan's Proof line "`std::fs` only in test code" contradicts Task 5, which prescribes `std::fs::metadata`. The code follows Task 5.
+
+## Deviations
+
+- 2026-11-22: The Task 5 spawn-failure fixture is a file whose first line is `#!<temp dir>`, because on macOS (Darwin 25.3.0) an empty executable runs and prints `""`.
+- 2026-11-22: `process/binary.rs` calls `std::fs::metadata` for the PATH lookup, as Task 5 prescribes. The module docs were reworded.
+- 2026-11-22: `GitRun` models `-- <operands>` generally. The argv matches the plan.
+- 2026-11-22: `list_tags_lists_matching_tags_in_git_order` asserts four tags, because the fixture's `packs-v0.9.0` also matches.
+- 2026-11-22: Empty PATH entries are tested through the pure helper `search_dirs`. The test repo is built with git plumbing. `Snapshot::from_listing` parses raw ls-tree bytes.
+- 2026-11-22: Git commands clear the repository-locating environment variables. The plan did not cover this; it was added from review.

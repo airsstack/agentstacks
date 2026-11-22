@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [07, 09]
 built-on: f39b2a814319
@@ -190,3 +190,17 @@ Definition of Done is green. Commit `feat(agentstacks): update passes git failur
   only inside `#[cfg(test)] mod tests`).
 - `cargo test -p agentstacks --test isolation` passes.
 - `cargo make dod` is green at the end of the plan.
+
+## Review findings
+
+Reviewer, one round, shared with plans 14 and 15: code 0🔴 1🟡 1🔵, plan 1🔵. Blocking: none, so there was no fix round. Reviewer `cargo test -p agentstacks --lib app::`: 92 passed, 0 failed. Coder: 18 update tests green (16 named plus 2 extra). The full `cargo make dod` gate is recorded at the end of the run.
+
+- open 🟡 `src/app/update.rs:89-95`: no test covers locating a `FetchError::CacheIo` at its carried path. The same choice is made in `app/plan/sources.rs:299`.
+- open 🔵 `update.rs:97-102`: `single` duplicates `Diagnostics::from`.
+- open 🔵 Locating `CacheIo` at its carried path is not written into the plan. It matches the `FetchError::CacheIo` docs.
+
+## Deviations
+
+- 2026-11-22: Tests configure `FakeGit::tags(url, vec![])`, because an unconfigured URL answers git-missing.
+- 2026-11-22: Two extra tests cover the git spawn and unreadable-output passthrough and the tool-key refusal.
+- 2026-11-22: A git `CacheIo` is located at its carried path; other `FetchError`s are located at the source key.

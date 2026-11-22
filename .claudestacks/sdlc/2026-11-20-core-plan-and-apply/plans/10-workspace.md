@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [09]
 built-on: f39b2a814319
@@ -338,3 +338,62 @@ Commit `feat(agentstacks): git cache directory with race-safe install`.
   outside at apply, `stage_refuses_a_path_that_now_resolves_outside` and
   `delete_refuses_a_path_that_now_resolves_outside`; leftover cache temp,
   `a_leftover_temp_is_removed_and_reused`), X3 (only `fs::cache` is used by `process`).
+
+## Review findings
+
+Reviewer, one round: code 2🔴 3🟡 10🔵, plan 1🔴 1🟡 4🔵. The reviewer probed with a throwaway crate on this worktree. Reviewer `cargo test -p agentstacks fs::`: 70 passed. Blocking: `resolve.rs:66`, `project.rs:110`, `project.rs:87`, plan Task 2. The fix coder also took `project.rs:162`.
+
+- fixed 🔴 (blocking, security) `src/fs/workspace/resolve.rs:66`: `..` in the existing prefix was resolved by name, so with `d -> <outside>/sub`, `source_tree("d/../packs")` read `<outside>/packs`.
+  - Fix: the existing prefix is canonicalised through the filesystem. Only the missing suffix is applied by name, and a suffix that climbs above the root is Outside. `source_tree` hands `StdFileTree` the checked canonical target.
+  - A second hole of the same kind was closed: a link reached as `d/../ghost` is now Outside, via `link_location` and `Located::Dangling { at }`.
+  - Tests:
+    - `a_parent_component_is_resolved_through_the_real_directory`
+    - `a_missing_suffix_that_climbs_above_the_root_is_outside`
+    - `source_tree_refuses_a_parent_component_that_climbs_out_through_a_link`
+    - `a_symlink_reached_through_an_outside_directory_is_outside`
+- fixed 🔴 (blocking) `project.rs:110`: a missing `agentstacks.toml` printed `entity not found`.
+  - Fix: `project_text` passes the error from `std::fs::read` through.
+  - The test now asserts the Display `No such file or directory (os error 2)`.
+- fixed 🟡 (blocking) `project.rs:87`: a link to the project root staged a temp file beside the root, which is outside the project.
+  - Fix: `target_of` refuses with InvalidInput "resolves to the project directory", and `discard` touches nothing.
+  - Test: `a_link_to_the_project_root_is_never_staged_swapped_or_discarded`.
+- fixed 🟡 `project.rs:162`: `delete` followed a final symlink and removed the user's target file.
+  - Fix: the link itself is removed, matching `FakeWorkspace::delete`.
+  - Tests:
+    - `delete_removes_a_link_and_never_its_target`
+    - `delete_removes_a_dangling_link`
+    - `delete_refuses_a_link_that_now_resolves_outside_by_its_directory`
+- fixed 🟡 `project.rs:85-93`: the dangling-link NotFound branch was untested. Test: `a_dangling_link_is_refused_by_stage_and_swap_with_not_found`.
+- fixed 🔵 The symlink test modules are now gated `#[cfg(all(test, unix))]`.
+- Fix verification:
+  - `cargo test -p agentstacks --lib fs::`: 81 passed, 0 failed. `fs::` doctests: 4 passed.
+  - clippy `--all-targets -D warnings`: clean. rustfmt: clean.
+  - All of this ran in a scratch copy, because the live crate was red in `src/host`, which was mid-edit.
+  - With the fixes reverted, 7 tests failed.
+- open 🔵 Nits:
+  - `state.rs:45-48`: the non-unix `mode_of` invents 0o644.
+  - `swap.rs:28`: `if let Ok(..)` hides a non-NotFound metadata error.
+  - `cache.rs:142-147`: untested branches. `cache.rs:184`: a wrong helper doc.
+  - `lib.rs:19`: still says fs only reads.
+  - `stage.rs:22`: `unwrap_or_default` on `file_name`.
+  - `a_symlinked_root_is_canonicalised_once` repeats the plain-file case.
+  - Task 1's `resolve_target` is named `locate`.
+  - `StdWorkspace::root()` is public without a plan basis.
+- open 🔵 Cross-plan: `fs/mod.rs:4` says fs is the only module calling `std::fs`, but `process/binary.rs:79` (plan 11) calls `std::fs::metadata`.
+
+## Deviations
+
+- 2026-11-22: A dangling symlink at stage or swap returns io `NotFound` "symlink leads nowhere". `discard` of a dangling or outside path is `Ok`.
+- 2026-11-22: Crate-private items use `pub(super)`, because clippy `redundant_pub_crate` rejects `pub(crate)` inside private modules.
+- 2026-11-22: The coder's "`..` resolved lexically" was rejected by review, and the fix replaced it with filesystem canonicalisation of the existing prefix.
+- 2026-11-22: A link to the project root is refused at stage and swap with InvalidInput "resolves to the project directory". The plan is silent on this.
+- 2026-11-22: `delete` removes a final-component symlink itself, dangling or not.
+
+### Crate-wide cross-check (after plans 09-17)
+
+- fixed 🟡 (security) `src/fs/cache.rs`: the public `Cache::discard(&Path)` let any library caller delete any directory recursively.
+  - Fix: `Cache` and its methods are `pub(crate)`, with no public re-export. The dead `Cache::from_env` was removed.
+  - `discard` is now an associated function, because clippy `unused_self` fires once the type is crate-private. Its doctest was dropped, since unit tests cover it.
+  - `cargo make dod`: green.
+- open ❓ `fs/workspace/project.rs:135-143`: a path source's tree is rooted at the canonical absolute path, so its load messages show absolute paths, where `FakeWorkspace` shows relative ones.
+- open ❓ `port/workspace/seam.rs:24-26`: paths compare by bytes, so on case-insensitive APFS two proposals that differ only in case share one target.

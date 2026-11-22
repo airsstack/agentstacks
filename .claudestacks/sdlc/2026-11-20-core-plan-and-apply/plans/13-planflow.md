@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [03, 06, 07, 08, 09]
 built-on: f39b2a814319
@@ -554,3 +554,52 @@ example through `plan` with fakes only (spec §14 app row).
 
 - Every test uses only `FakeWorkspace`, `FakeGit`, `FakeBinary`, `FakeAdapter` and `FakeFileTree`. `tests/isolation.rs` (plan 01) keeps `src/app` free of `std::fs`, `std::process` and adapter imports.
 - `cargo make dod` is green at the end of Task 8.
+
+## Review findings
+
+Reviewer, one round: code 1🔴 8🔵 1❓, plan 3🔵. Reviewer `cargo test -p agentstacks --lib app::plan`: 85 passed. `RUSTDOCFLAGS="-D warnings" cargo doc`: passed. The core stays tool-agnostic. Blocking: `tools.rs:127`.
+
+- fixed 🔴 (blocking) `src/app/plan/tools.rs:127`: `Ran.files` was keyed by `ItemId` alone, so with two tools the later tool's rendered skill bytes overwrote the earlier tool's. Claude's copy step got opencode's rendering, `dir=.agents/skills/status`.
+  - Fix: `Ran.files` is now `BTreeMap<(ToolName, ItemId), Vec<u8>>`, and `steps.rs` looks up a copy by its origin tool.
+  - Fix: `render.rs` moves a skill's bytes into the map only after every file renders, so a skill skipped partway leaves nothing.
+  - New tests:
+    - `run_tools_keeps_each_tools_rendered_bytes_for_the_files_it_copies`
+    - `render_packs_keeps_no_bytes_of_a_skill_skipped_partway`
+  - Red before the fix: `left: Some("...dir=.agents/skills/status $TMPDIR\n") right: Some("...dir=.claude/skills/status $TMPDIR\n")`, `FAILED. 85 passed; 2 failed`.
+  - Green after: `cargo test -p agentstacks --lib app::plan`: `ok. 87 passed; 0 failed`.
+- open ❓ `load.rs:177`: `Note::UnusedNative` is emitted once per (dir, listed tool), so two tools give two lines.
+- open 🔵 `load.rs:111-125`: when a removed tool's extension fails to load, `run_tools` never runs, so the listed tools' refusals stay hidden until the next run.
+- open 🔵 `render.rs:185-190`: an option token with no value is skipped with `continue`, leaving the literal text. The set check makes this unreachable.
+- open 🔵 `steps.rs:50-53,90-92`: a copy with no bytes, or a lock path that is not an `OpPath`, is skipped silently. Unreachable by construction.
+- open 🔵 `tools.rs:233-239`: `declared_reads` drops a declared read that is not a valid `OpPath` (`"./"`, `\`) without a refusal. The refusal belongs in `Extension::load`.
+- open 🔵 Style:
+  - `render.rs:128,133`: the names `Read` and `Out` are vague.
+  - `render.rs`, `steps.rs` and `flow.rs` use inline fully qualified paths.
+  - `testing.rs:19` has an import out of order.
+- open 🔵 `plan_with_any_refusal_returns_no_plan` duplicates another test without checking the message. The return type already enforces it.
+- open 🔵 `plan_skips_deciding_after_an_earlier_refusal` locks a `core`-owned file where the plan says claude-written.
+
+## Deviations
+
+- 2026-11-22: `check_binaries` also takes `&Inputs`, because `AirslPin { locked, installed }` needs the lock's `[airsl]`.
+- 2026-11-22: `Rendered` carries an extra `refusals` field: unreadable files, a bad root conversion, and rendered frontmatter that no longer parses.
+- 2026-11-22: Loading, fetching, `run_tools` and `check_binaries` are generic over the tree type, through `enum Tree<A, B> { Git(A), Local(B) }` in `sources.rs`, which implements `FileTree`.
+- 2026-11-22: Task 4's example `claude gave no value for {{skill core/status}}` cannot arise for the skipped skill itself, which gets "no install location" first. The test uses `{{agent core/coder}}`.
+- 2026-11-22: `Entry.hash` is an `Option`, `None` when `tree_hash` fails. The lock step recomputes it.
+- 2026-11-22: `Note::UnusedNative` is emitted once per (unused `native/` dir, listed tool).
+- 2026-11-22: Rendered bytes are kept per (tool, item) (review fix). The plan's `Ran.files` keyed by item alone loses one tool's bytes when two tools render the same skill file differently.
+
+### Crate-wide cross-check (after plans 09-17)
+
+- fixed 🟡 `src/app/plan/tools.rs`: an adapter `Err` with an empty `Diagnostics` (from open, values or plan) skipped the tool with no refusal, so the tool's locked files could be planned for deletion.
+  - Fix: `with_reason` turns it into `<tool>: extension failed without giving a reason`, from a new variant `OpError::NoReason` in `types/op/error.rs`.
+  - Six tests were added. The four behaviour tests were red first: the refusals were `[]` and `plan` returned Ok.
+  - `cargo make dod`: green, lib 1627, integration 37, doctests 286.
+- open 🟡 `app/plan/sources.rs:278-310` and `app/update.rs:76-95`: the rule for where a `FetchError` is reported is written twice, and the two copies treat `HomeUnset` differently.
+- open 🟡 `app/plan/steps.rs:96-99` and `app/doctor.rs:66-70`: a lock path of `"."` is dropped silently by plan but reported `NotRegular` by doctor.
+- open 🟡 `render.rs`: the token-value rule and the pack layout paths are built inline in `app/`.
+- open 🟡 No contract test runs plan then apply over the real adapters. Only `StdWorkspace` has an adapter contract test.
+
+## Deviations (cross-check)
+
+- 2026-11-22: New refusal `<tool>: extension failed without giving a reason` (`OpError::NoReason`), added from the crate-wide cross-check. The plan and spec are silent on an empty adapter error.

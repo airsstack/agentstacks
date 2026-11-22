@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [06, 09]
 built-on: f39b2a814319
@@ -199,3 +199,16 @@ Definition of Done is green. Commit `feat(agentstacks): doctor checks the airsl 
   only inside `#[cfg(test)] mod tests`).
 - `cargo test -p agentstacks --test isolation` passes (no adapter import in `src/app`).
 - `cargo make dod` is green at the end of the plan.
+
+## Review findings
+
+Reviewer, one round, shared with plans 14 and 16: code 0🔴 1🟡 1🔵, plan 1🔵. Blocking: none, so there was no fix round. Reviewer `cargo test -p agentstacks --lib app::`: 92 passed, 0 failed. `cargo test -p agentstacks --test isolation`: 17 passed. Coder: 22 doctor tests green. The full `cargo make dod` gate is recorded at the end of the run.
+
+- open 🟡 `src/app/doctor.rs:67-72`: a locked path that cannot become an `OpPath` (the lock accepts `"."` and `"./"`, which `OpPath::new` refuses as empty) is reported as `Finding::NotRegular`. That choice is made in `app/` and no test covers it.
+- open 🔵 `doctor.rs:48-52`: `into_sorted().into_iter()` is redundant.
+- open 🔵 The plan's premise that every locked path forms an `OpPath` is wrong for `"."`.
+
+## Deviations
+
+- 2026-11-22: A locked path that cannot form an `OpPath` reports `NotRegular` (the project directory). The plan is silent on this.
+- 2026-11-22: This plan and plan 16 were built by one coder. Task briefs were read from the plan directly.

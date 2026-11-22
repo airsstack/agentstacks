@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [04, 06, 07]
 built-on: f39b2a814319
@@ -429,3 +429,33 @@ Commit `feat(agentstacks): adapter port and its fake`.
   not "changed" (Task 1 contract, R28(i)); §4.3 `read` record and §4.4 values/plan dispatch with
   cross-tool duplicates (Task 4); §14 app row (fakes for every flow). The real adapters' behaviour
   is proven by plans 10, 11 and 12. §16 rows: R1 (io and spawn outcomes, Tasks 1-3), R2 (unreadable git output, non-zero airsl exit, Tasks 2-3), R10 (HOME, "on PATH", Tasks 2-3), R21 (temps beside the canonical target, lock temp and mode, outside at apply, Task 1).
+
+## Review findings
+
+Reviewer, one round: code 0🔴 0🟡 12🔵, plan 0🔴 1🟡 2🔵. Blocking: none, so there was no fix round. Reviewer `cargo test -p agentstacks port::`: 113 passed, 0 failed. Coder `cargo make dod`: exit 0.
+
+- open 🟡 The deviations were not written into this plan before downstream plans read it. They are recorded under Deviations below. Plan 13 still names `FakeGit::tree`; the builder is `files`.
+- open 🔵 `port/workspace/fake.rs:78`: `canonical` follows a symlink one hop only, so a link→link→file chain is keyed at the middle link.
+- open 🔵 `port/workspace/fake.rs:99`: `outside(path)` always gives `Outside { link: Symlink }`, so `Outside { Direct }` cannot be scripted.
+- open 🔵 Fake fidelity, untested edges:
+  - `set_file` on a symlink replaces the link.
+  - `swap` onto a NotRegular entry replaces it.
+  - `delete` removes a NotRegular entry.
+- open 🔵 `port/binary/fake.rs`:
+  - `with(name)` takes the name by value.
+  - `denied()` duplicates `FakeFileTree::denied()`.
+  - The airsl failure test checks only `Failed(text)`.
+- open 🔵 `port/adapter/fake.rs:186,194`: the branches for a `Read` error and an origin with no location are untested.
+- open 🔵 `port/git/fake.rs:187`: the order in which errors take precedence is documented but untested.
+- open 🔵 `docs/architecture.md:50,60`: these lines still name `Workspace::hash`. Plan 17 Task 4 brings this file up to the built code.
+- open 🔵 The plan's proof line "`grep -rn "dyn " src/port` finds nothing" cannot pass: test modules use `Box<dyn Error>`, as `port/fake.rs` already did. No port or fake uses a trait object.
+
+## Deviations
+
+- 2026-11-22: The `FakeGit` builder is `files(url, rev, subdir, tree)`, not `tree`. An inherent `tree(self, ..)` shadows `Git::tree(&self, ..)`, giving `error[E0308]: mismatched types ... expected FakeFileTree, found &Pin`.
+- 2026-11-22: `FakeWorkspace::outside` returns `Resolution::Outside { link: Link::Symlink }`, because the built type carries `link`. `FakeWorkspace::new()` takes no root path, since nothing reads one.
+- 2026-11-22: `Adapter::values` and `Adapter::plan` take `&mut Self::Session`. Fake builders take `&OpPath`, `&LocalPath`, `&GitUrl`, `&GitTag` and `&CommitId`. `FakeBinary::with` takes a `BinaryName`.
+- 2026-11-22: `FakeAdapter` scripts are consumed once, because `Diagnostics` is not `Clone`.
+- 2026-11-22: `FakeWorkspace` keys temps by the canonical target. A delete of an absent path returns `NotFound`.
+- 2026-11-22: The coder also updated `docs/architecture.md`'s port row to "built", although that file is not in Files that change.
+- 2026-11-22: The execute run used one coder per plan instead of one per task, because the tasks share `port/mod.rs`. Task briefs were read from the plan directly.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [03, 04, 05, 09]
 built-on: f39b2a814319
@@ -900,3 +900,58 @@ the whole run (§4.6 "Any extension error refuses the whole plan"). The host nev
     - R24, plan-level: no fake in a doc example (Task 12);
     - R25, via `OpPath::proposed` (Task 8);
     - R28(a) phase first, R28(b) reads I/O, R28(d) native `match`, R28(l) cover-after-skip, R28(m) covers prefix (Tasks 8, 9, 11).
+
+## Review findings
+
+Reviewer, one round, interrupted once by an API error and resumed: code 2🔴 6🟡 12🔵 1❓, plan 4🟡 3🔵. The reviewer probed with a throwaway crate on this worktree (airsl 0.1.4, mlua 0.12.2). Reviewer `cargo test -p agentstacks --lib host::`: 192 passed. Blocking: `read.rs:76`, `convert.rs:76`, `session.rs:165`.
+
+- fixed 🔴 (blocking) `src/host/read.rs:76`: an extension could hang agentstacks for good. `serve` created a Lua string while holding the state lock. GC then ran a `__gc` finalizer that called `agentstacks.read`, which tried to take the same lock again.
+  - Fix: the answer is decided under the lock with no Lua call, and the string is created after unlock. `ArgTable::read` in `ops.rs:91` was also moved out of the lock. An audit found no other `state.with` closure that calls Lua.
+  - Test `a_finalizer_that_reads_during_a_read_loop_completes`: hung past its 20 s guard before the fix, green after.
+  - `a_finalizer_that_proposes_during_an_op_loop_completes` passed before the fix too, so it only guards.
+- fixed 🔴 (blocking) `src/host/convert.rs:76`: a deeply nested table passed to `agentstacks.json.edit` overflowed the Rust stack, an abort that cannot be caught.
+  - Fix: new `JsonEditError::TooDeep`, `types::json::MAX_DEPTH = 128`, message `json.edit: value: nested more than 128 levels deep`.
+  - Tests:
+    - `json::a_table_nested_ten_thousand_deep_is_refused` (SIGABRT before the fix, refused after)
+    - `convert::nesting_up_to_the_limit_converts_and_one_more_is_refused` (128 ok, 129 refused)
+- fixed 🟡 (blocking) `src/host/session.rs:165` and `failure.rs:83`: a failed dispatch whose refusal had already been handed out yielded no diagnostics, so `plan` returned Ok.
+  - Fix: `Session::refusals` falls back to `failure::lua_failure` when the call failed and nothing was recorded.
+  - Test `a_refusal_already_handed_out_still_refuses_the_next_plan`: red on plan 1, then green.
+- fixed 🟡 `src/host/phrases.rs`: the host rebuilt the text of seven `OpError` variants.
+  - Fix: `Quoted::new` is `pub(crate)`, the real variants are used, and `phrases.rs` is deleted. The existing text tests stayed green unchanged.
+- fixed 🟡 `src/host/ops.rs:71`: the no-Lua-frame check ran before the phase check.
+  - Test `the_phase_check_comes_before_the_no_lua_frame_check`: red (got `claude: write must be called from the extension's Lua code`), then green (`claude: write: only allowed inside the plan handler`).
+- fixed 🔵 `src/host/require.rs:61`: modules are loaded with `ChunkMode::Text`. There is no test, because `LuaFiles` refuses non-UTF-8 first.
+- fixed 🔵 The `§` citations were removed from test docs. `payload.rs` uses `types::api::API`.
+- Fix verification: `cargo make dod` exit 0, lib tests 1621 passed, 0 failed (`host::` 192 → 197). `cargo test -p agentstacks types::json`: 57 passed.
+- open 🟡 `src/host/json.rs:66`: a non-UTF-8 path element renders `path[i]: expected string, got string`.
+- open 🟡 `ops.rs:71`: the no-Lua-frame refusal text is written by the host through `OpError::Lua`, with no typed variant behind it.
+- open ❓ Payload `meta` shape (see Deviations): chosen by the coder, and the author should confirm it.
+- open 🔵 Nits:
+  - `args.rs:46`: `required: bool`, and accessors give empty values for an unknown field name.
+  - `ops.rs:104`: a match arm that groups Read and Require.
+  - `payload.rs:200`: `yaml_json` turns a NaN or infinite float into null.
+  - `read.rs:107` and `require.rs:88`: lossy conversion of non-UTF-8 names.
+  - `session.rs:87`: `filter_map(.ok())` drops a `reads` entry silently.
+  - `files.rs:101`: the missing-entry text is written by the host.
+  - `failure.rs:97`: `&dyn Error`.
+  - `port/adapter/seam.rs`: says "in the order found", but `Diagnostics` comes back sorted.
+
+## Deviations
+
+- 2026-11-22: The plan was built by two coders in sequence (tasks 1-6, then 7-12). Task briefs were read from the plan directly.
+- 2026-11-22: The runtime error text carries mlua's `runtime error: ` prefix: `claude/adapter.lua: lua error in plan: runtime error: adapter.lua:3: path must be relative`.
+- 2026-11-22: The host decides `text: not valid UTF-8` and `path: expected a list`, because `types::json::edit` takes `&str` and `&[PathElem]`.
+- 2026-11-22: `LuaFiles` refusals are located at `<tool>/<file>`.
+- 2026-11-22: `args.rs` is declarative: `ArgTable::read(function, &Value, &[Field])`, not a per-field builder. The required-before-type rule runs across all fields. List entries are UTF-8 checked.
+- 2026-11-22: `Diagnostics` come back in sorted output order, not the order found.
+- 2026-11-22: Payload `meta` was chosen by the coder.
+  - Skill: description, invocation, argument_hint (if set) and native.
+  - Agent: description, model, effort and tools (each if set) and native.
+  - `native` holds only this tool's entry, converted from YAML to JSON.
+  - Hooks put `kind` first; `match` and `agents` are lists, left out when empty.
+- 2026-11-22: `Session::values` and `Session::plan` take `&self` (clippy `needless_pass_by_ref_mut`).
+- 2026-11-22: An op called with no Lua frame is refused as `<tool>: <op> must be called from the extension's Lua code`, after the phase check.
+- 2026-11-22: A `read` that breaches the 16 MiB memory limit while making its string propagates airsl's error.
+- 2026-11-22: New `JsonEditError::TooDeep` (`json.edit: value: nested more than 128 levels deep`) with `MAX_DEPTH = 128`, added from review. The spec is silent on a depth refusal. The cap matches serde_json's default recursion limit.
+- 2026-11-22: `types::report::Quoted::new` is now `pub(crate)` (was `pub(in crate::types)`), so the host builds the real `OpError` variants.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [06, 09]
 built-on: f39b2a814319
@@ -232,3 +232,35 @@ The doc comment states the order in prose and carries no example, because `FakeW
 
 - Every test uses only `FakeWorkspace`. `apply` takes no `Git`, `Binary` or `Adapter`, so it cannot re-plan.
 - `cargo make dod` is green at the end of Task 4.
+
+## Review findings
+
+Reviewer, one round, shared with plans 15 and 16: code 0🔴 2🟡 9🔵, plan 1🟡 2🔵. Blocking: none. The reviewer recommended fixing A1 and A3, and both were sent to one fix coder. Reviewer `cargo test -p agentstacks --lib app::`: 92 passed, 0 failed.
+
+- fixed 🟡 A1 `src/app/apply/stage.rs`: a failed stage write left its partial temp file.
+  - Fix: `write_temps` returns the path whose `stage` failed, and `stage()` discards it along with every staged path. The doc was corrected.
+  - New test `stage_discards_the_temp_of_the_write_that_failed`.
+  - Red before the fix: `left: [".claude/a"] right: [".claude/a", ".claude/b"] ... FAILED. 10 passed; 1 failed`.
+  - Green after: `cargo test -p agentstacks --lib app::apply`: `ok. 28 passed; 0 failed`.
+- fixed 🟡 A3 `stage.rs`: the "resolves outside" test never reached the race check.
+  - Fix: it was replaced by `stage_refuses_a_delete_that_now_resolves_outside`, a delete step resolving outside. It asserts the exact `[".claude/e: resolves outside the project"]` with `assert_eq` and that `resolve` ran.
+  - With Outside removed from `check`, the test went `FAILED. 10 passed; 1 failed`. The mutation was made in a shadow copy only.
+- open 🟡 A2 `stage.rs:66-75`: the refusal `<path>: has no content to write` for a write step with no bytes has no basis in the plan. It guards a broken invariant.
+- open 🔵 Nits:
+  - The discard-failure branch is untested.
+  - A failed cleanup is reported the same way as a failed swap.
+  - `InvalidSubPath` is wrapped as an io `InvalidData` error.
+  - The step numbers in the module docs disagree with `apply`'s doc.
+  - `r17` appears in a test name.
+  - `flow.rs:143` has a redundant `sort()`.
+  - The forget test stops before the lock is written.
+  - `--document-private-items` warnings at `lock.rs:5,11,12` and `stage.rs:11`.
+
+## Deviations
+
+- 2026-11-22: `Resolve` is called only for create, update, restore and delete, following Task 1 and plan 06's `race`. Task 4's test text, "every step except forget", contradicts Task 1. The test asserts Resolve a,b,c,e.
+- 2026-11-22: Added the refusal `<path>: has no content to write` (io `InvalidData`) for a write step with `new: None`.
+- 2026-11-22: `swap` returns `Swapped` (the landed paths plus failures, including discard errors). `stage` stops at the first temp-write failure; the check phase collects every refusal.
+- 2026-11-22: An `InvalidSubPath` from `lock_contents` is reported as `agentstacks.lock: <error>` through an io `InvalidData` error. A valid plan cannot reach it.
+- 2026-11-22: `Staged::into_paths()` lets `swap` take `Staged` by value.
+- 2026-11-22: Task 1's named test `stage_refuses_a_target_that_now_resolves_outside` became `stage_refuses_a_delete_that_now_resolves_outside` (review A3). The write variant could never reach the check, because the port's `stage` refuses an outside path first.

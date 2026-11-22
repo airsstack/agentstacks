@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-22
 depends-on: [10, 11, 12, 13, 14, 15, 16]
 built-on: f39b2a814319
@@ -406,3 +406,39 @@ Commit `docs(repo): mark the core built in the contributor docs`.
   R26, R27, R28 (b), (c), (e), (f), (g), (i), (j)) Task 3, R28 (k) Task 4; §18 Tasks 1, 3.
 - The runtime.lua `diff` in Task 2 prints nothing.
 - `cargo make dod` is green after every task and at the end of the plan.
+
+## Review findings
+
+Reviewer, one round: docs vs code 0🔴 7🟡 9🔵, plan 0🔴 2🟡 1🔵. Reviewer `cargo make dod`: exit 0. Blocking: `extensions.md:227`, `:304`, `:417`, `:470`, `plan-and-apply.md:72`, and the missing Deviations section.
+
+- fixed 🟡 (blocking) `docs/extensions.md:227`: the native-hook example lacked `kind` and gave `match` as a string. The spec block is kept, with a note and the built shape under it. The bullets now say `match` and `agents` are lists, left out when empty.
+- fixed 🟡 (blocking) `extensions.md:304`: added the refusal `<tool>: <function> must be called from the extension's Lua code`, and noted that a refusal with no Lua frame is located at `<tool>` alone.
+- fixed 🟡 (blocking) `extensions.md:417`: added `json.edit: value: nested more than 128 levels deep`.
+- fixed 🟡 (blocking) `extensions.md:470`: the runtime-error example now carries the code's `runtime error: ` prefix and is labelled "example: claude extension".
+- fixed 🟡 (blocking) `plan-and-apply.md:72` and `extensions.md:252`: `runtime.lua` is written for a native `lua` hook whether or not the extension later skips it.
+- fixed 🟡 `plan-and-apply.md:173`: cites `types::lock::write_lock` instead of a wrong line number.
+- fixed 🔵 Nits:
+  - `architecture.md:72`: the traced example uses names that exist: `decide_locked`, `StepError::Changed`, `Workspace::resolve`, `StdWorkspace::resolve`.
+  - `architecture.md:16`: gained the types → port edge.
+  - The reads table gained `extension.reads[0]: empty`.
+  - The notes list now has its third kind.
+  - The apply failures gained `has no content to write`.
+  - Added the doctor row for a locked path that cannot form an `OpPath`.
+  - `hooks.md:111` is labelled "example: claude extension".
+- Fix verification: `cargo make dod` exit 0 (287 doctests). The plan's greps (`§`, `probes/`, `plans/`, `spec`, `[DRX][0-9]+`) print nothing. Every added message was found with `grep -rF` in `crates/agentstacks/src`.
+
+## Deviations
+
+- 2026-11-22: The docs describe the built code where it differs from the spec. They carry these texts, which are not in spec.md, each from source:
+  - `<tool>: <function> must be called from the extension's Lua code` (host/ops.rs)
+  - the `<tool>`-alone location of a refusal with no Lua frame (host/ops.rs)
+  - `json.edit: value: nested more than 128 levels deep` (types/json/error.rs)
+  - `… lua error in plan: runtime error: …` (host/events.rs)
+  - `extension.toml: extension.reads[0]: empty` (types/extension/manifest.rs)
+  - `<path>: has no content to write` (app/apply/stage.rs)
+  - `symlink leads nowhere` and `resolves to the project directory` (fs/workspace)
+  - doctor's `not a regular file: <path>` for a locked path that cannot form an `OpPath` (app/doctor.rs)
+- 2026-11-22: The spec's native-hook payload example is kept byte for byte, with a note giving the built shape under it.
+- 2026-11-22: Spec §4.6 quotes `declared events: spin, values`, a probe artifact. The docs use `plan, values`, which matches `src/host/events.rs`.
+- 2026-11-22: Git commands removing `GIT_DIR` and its kin is documented, from the plan 11 review fix.
+- 2026-11-22: The docs were written while the plan 12 fix coder was still at work, then reconciled with the final host code in the review fix round.
