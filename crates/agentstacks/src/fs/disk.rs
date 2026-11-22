@@ -11,7 +11,9 @@
 //!   `symlink_metadata` just before reading, and refuse a symlink. A path swapped for a symlink
 //!   after a walk checked it is therefore refused, not read. The check and the read are two
 //!   system calls, so a swap in the instant between them is not prevented.
-//! - It reads only below its root: a path that is absolute, or that holds a `..` or a root
+//! - [`FileTree::root`] reports a label, not the directory it reads: `StdFileTree::new` labels
+//!   the tree with its directory, `StdFileTree::labelled` with a path as the author wrote it.
+//! - It reads only below its directory: a path that is absolute, or that holds a `..` or a root
 //!   component, is refused with [`io::ErrorKind::InvalidInput`] before any disk access.
 //!
 //! # Non-responsibilities
@@ -51,11 +53,15 @@ const SYMLINK_REFUSED: &str = "symlinks are not followed";
 /// ```
 #[derive(Debug, Clone)]
 pub struct StdFileTree {
-    root: PathBuf,
+    /// The directory every read resolves under.
+    dir: PathBuf,
+    /// The path [`FileTree::root`] reports, the one shown in messages.
+    label: PathBuf,
 }
 
 impl StdFileTree {
-    /// A tree rooted at `root`. The directory is not touched until a read.
+    /// A tree rooted at `root`, which is also the path it reports in messages. The directory is
+    /// not touched until a read.
     ///
     /// # Examples
     ///
@@ -67,10 +73,39 @@ impl StdFileTree {
     /// assert_eq!(tree.root(), std::path::Path::new("packs/core"));
     /// ```
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        let dir = root.into();
+        Self {
+            label: dir.clone(),
+            dir,
+        }
     }
 
-    /// `rel` under the root, or the root itself when `rel` is empty.
+    /// A tree that reads the directory `dir` and names itself `label` in messages, so a refusal
+    /// can show a path as the author wrote it rather than the directory it resolved to. The
+    /// directory is not touched until a read.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::fs::StdFileTree;
+    /// use agentstacks::port::FileTree;
+    ///
+    /// let dir = tempfile::tempdir()?;
+    /// std::fs::write(dir.path().join("pack.toml"), "name = \"core\"\n")?;
+    ///
+    /// let tree = StdFileTree::labelled(dir.path(), "packs/core");
+    /// assert_eq!(tree.root(), std::path::Path::new("packs/core"));
+    /// assert_eq!(tree.read_text(std::path::Path::new("pack.toml"))?, "name = \"core\"\n");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn labelled(dir: impl Into<PathBuf>, label: impl Into<PathBuf>) -> Self {
+        Self {
+            dir: dir.into(),
+            label: label.into(),
+        }
+    }
+
+    /// `rel` under the directory, or the directory itself when `rel` is empty.
     ///
     /// # Errors
     ///
@@ -87,9 +122,9 @@ impl StdFileTree {
             ));
         }
         Ok(if rel.as_os_str().is_empty() {
-            self.root.clone()
+            self.dir.clone()
         } else {
-            self.root.join(rel)
+            self.dir.join(rel)
         })
     }
 
@@ -103,7 +138,7 @@ impl StdFileTree {
     /// symlink, displayed as `symlinks are not followed`.
     fn resolve_unlinked(&self, rel: &Path) -> io::Result<PathBuf> {
         let full = self.resolve(rel)?;
-        let mut walked = self.root.clone();
+        let mut walked = self.dir.clone();
         for part in rel.components() {
             if let Component::Normal(name) = part {
                 walked.push(name);
@@ -120,7 +155,7 @@ impl StdFileTree {
 
 impl FileTree for StdFileTree {
     fn root(&self) -> &Path {
-        &self.root
+        &self.label
     }
 
     fn kind(&self, rel: &Path) -> io::Result<EntryKind> {
@@ -179,6 +214,26 @@ mod tests {
             StdFileTree::new("packs/core").root(),
             Path::new("packs/core")
         );
+    }
+
+    #[test]
+    fn new_tree_label_is_its_root() {
+        let path = Path::new("some/dir");
+        assert_eq!(StdFileTree::new(path).root(), path);
+    }
+
+    #[test]
+    fn labelled_tree_reads_the_directory_but_names_the_label() -> TestResult {
+        let temp = tempfile::tempdir()?;
+        write(temp.path(), "pack.toml", b"name = \"core\"\n")?;
+        write(temp.path(), "d/a.md", b"a\n")?;
+        let tree = StdFileTree::labelled(temp.path(), "packs/core");
+        assert_eq!(tree.root(), Path::new("packs/core"));
+        assert_eq!(tree.read_text(Path::new("pack.toml"))?, "name = \"core\"\n");
+        assert_eq!(tree.kind(Path::new("d"))?, EntryKind::Dir);
+        assert_eq!(sorted_names(&tree, "d")?, ["a.md"]);
+        assert_eq!(tree.read_file(Path::new("d/a.md"))?, b"a\n");
+        Ok(())
     }
 
     #[test]

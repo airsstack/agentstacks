@@ -17,7 +17,8 @@
 //!
 //! # Non-responsibilities
 //!
-//! It is compiled for tests only. How the real `git` behaves is proven by the tests of the
+//! It is compiled for tests and under the `testing` feature.
+//! How the real `git` behaves is proven by the tests of the
 //! `process` module.
 
 use std::cell::RefCell;

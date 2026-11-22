@@ -1,8 +1,7 @@
 //! The flow that finds newer tags for the packs and extensions taken from git sources.
 //!
 //! It exists so a user can see, without changing anything, which git source of `agentstacks.toml`
-//! has a newer released tag. It never writes the file: putting a new tag into it belongs to the
-//! command.
+//! has a newer released tag, and to put the newer tags into the file once the user accepts them.
 //!
 //! # Responsibilities
 //!
@@ -11,19 +10,22 @@
 //!   sources that need them and hands the tags back to the rules. It collects one entry per git
 //!   source, or every refusal: git's failures located at their source, and one refusal for git
 //!   missing from `PATH` that names every source that needed it.
+//! - [`retag`] writes the newer tags of those entries into `agentstacks.toml`: it reads the file
+//!   again, checks it, hands every change to [`retag_project`] and writes the text once. `update`
+//!   itself never writes.
 //!
 //! # Non-responsibilities
 //!
-//! No rule: how a tag is split, which tag is newest and the words of every note belong to
-//! [`UpdateQuery`] and [`UpdateNote`](crate::types::resolve::UpdateNote). No write, and no
-//! shorthand expansion.
+//! No rule: how a tag is split, which tag is newest, the words of every note and how a tag is
+//! replaced in the file belong to [`UpdateQuery`], [`UpdateNote`](crate::types::resolve::UpdateNote)
+//! and [`retag_project`]. No shorthand expansion.
 
 use std::path::Path;
 
 use crate::port::{Git, Workspace};
-use crate::types::project::ProjectFile;
+use crate::types::project::{ProjectFile, retag_project};
 use crate::types::report::{Diagnostic, Diagnostics, Location};
-use crate::types::resolve::{FetchError, SourceKey, UpdateEntry, UpdateQuery};
+use crate::types::resolve::{FetchError, SourceKey, UpdateEntry, UpdateOutcome, UpdateQuery};
 
 /// The project file, the file every refusal here is located in.
 const PROJECT_FILE: &str = "agentstacks.toml";
@@ -82,6 +84,39 @@ pub fn update<W: Workspace, G: Git>(
         refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
     }
     refusals.into_result(entries)
+}
+
+/// Writes the newer tags of `entries` into `agentstacks.toml`, once.
+///
+/// Returns `Ok(false)` and writes nothing when no entry carries a newer tag. Otherwise the file is
+/// read again and checked, every `(key, current tag, new tag)` is applied in one edit that keeps the
+/// comments, and the text is written; `Ok(true)` says it was.
+///
+/// # Errors
+///
+/// Returns the refusal, with nothing written, when the file cannot be read or no longer parses as a
+/// project file, when an entry has no tag now or a tag other than the one `update` listed (the file
+/// was edited since), or when the write fails. A read or write failure is located at the file.
+pub fn retag<W: Workspace>(workspace: &W, entries: &[UpdateEntry]) -> Result<bool, Diagnostics> {
+    let changes: Vec<_> = entries
+        .iter()
+        .filter_map(|entry| match (&entry.outcome, &entry.current) {
+            (UpdateOutcome::NewTag(new), Some(current)) => {
+                Some((entry.key.clone(), current.clone(), new.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    if changes.is_empty() {
+        return Ok(false);
+    }
+    let at_file =
+        |error: std::io::Error| single(Diagnostic::new(Location::file(PROJECT_FILE), error));
+    let text = workspace.project_text().map_err(at_file)?;
+    ProjectFile::parse(Path::new(PROJECT_FILE), &text)?;
+    let edited = retag_project(&text, &changes).map_err(single)?;
+    workspace.write_project(&edited).map_err(at_file)?;
+    Ok(true)
 }
 
 /// The refusal for `error`, which git failed with while listing the tags of `key`: located at the
@@ -505,5 +540,157 @@ mod tests {
             ["agentstacks.toml: tools.claude: git ls-remote failed: no"]
         );
         Ok(())
+    }
+
+    fn newer(
+        key: SourceKey,
+        current: &str,
+        new: &str,
+    ) -> Result<UpdateEntry, Box<dyn std::error::Error>> {
+        Ok(UpdateEntry {
+            key,
+            current: Some(GitTag::new(current)?),
+            outcome: UpdateOutcome::NewTag(GitTag::new(new)?),
+        })
+    }
+
+    /// The tool the retag tests list beside their packs, a project needing one of each.
+    fn claude_path() -> (&'static str, String) {
+        ("claude", "path = \"extensions/claude\"\n".to_owned())
+    }
+
+    fn lint() -> Result<SourceKey, Box<dyn std::error::Error>> {
+        Ok(SourceKey::Pack(PackName::new("lint")?))
+    }
+
+    fn two_packs() -> String {
+        project(
+            &[
+                ("core", tagged(CORE_URL, "packs-v0.1.0")),
+                ("lint", tagged(LINT_URL, "packs-v0.1.0")),
+            ],
+            &[claude_path()],
+        )
+    }
+
+    #[test]
+    fn retag_writes_every_newer_tag_once() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&two_packs());
+        let entries = [
+            newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?,
+            newer(lint()?, "packs-v0.1.0", "packs-v0.3.0")?,
+        ];
+        assert!(retag(&workspace, &entries).map_err(|d| format!("{d:?}"))?);
+        let written = workspace.project_written().ok_or("a write")?;
+        assert_eq!(
+            written,
+            two_packs()
+                .replacen("packs-v0.1.0", "packs-v0.2.0", 1)
+                .replacen("packs-v0.1.0", "packs-v0.3.0", 1)
+        );
+        let writes = workspace
+            .calls()
+            .iter()
+            .filter(|call| **call == WorkspaceCall::WriteProject)
+            .count();
+        assert_eq!(writes, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn retag_with_no_newer_tag_writes_nothing() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&two_packs());
+        let no_newer = UpdateEntry {
+            key: core()?,
+            current: Some(GitTag::new("packs-v0.1.0")?),
+            outcome: UpdateOutcome::Note(UpdateNote::NoNewer {
+                key: core()?,
+                tag: GitTag::new("packs-v0.1.0")?,
+            }),
+        };
+        assert!(!retag(&workspace, &[no_newer]).map_err(|d| format!("{d:?}"))?);
+        assert!(!retag(&workspace, &[]).map_err(|d| format!("{d:?}"))?);
+        assert_eq!(workspace.project_written(), None);
+        assert!(workspace.calls().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn retag_refuses_text_that_no_longer_parses() -> TestResult {
+        let workspace = FakeWorkspace::new().project("[packs.core\n");
+        let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
+        let shown = refused(retag(&workspace, &entries))?;
+        assert_eq!(shown, ["agentstacks.toml:1: unclosed table, expected `]`"]);
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn retag_refuses_a_tag_changed_at_re_read() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&project(
+            &[("core", tagged(CORE_URL, "packs-v0.1.5"))],
+            &[claude_path()],
+        ));
+        let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
+        assert_eq!(
+            refused(retag(&workspace, &entries))?,
+            ["agentstacks.toml: packs.core: tag changed during update (run update again)"]
+        );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn retag_reports_a_failed_write() -> TestResult {
+        let workspace = FakeWorkspace::new()
+            .project(&two_packs())
+            .fail(WorkspaceCall::WriteProject);
+        let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
+        assert_eq!(
+            refused(retag(&workspace, &entries))?,
+            [format!("agentstacks.toml: {}", FakeWorkspace::denied())]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retag_reports_a_failed_re_read() -> TestResult {
+        let workspace = FakeWorkspace::new()
+            .project(&two_packs())
+            .fail(WorkspaceCall::ProjectText);
+        let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
+        assert_eq!(
+            refused(retag(&workspace, &entries))?,
+            [format!("agentstacks.toml: {}", FakeWorkspace::denied())]
+        );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn retag_refuses_a_key_missing_at_re_read() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&project(
+            &[("lint", tagged(LINT_URL, "packs-v0.1.0"))],
+            &[claude_path()],
+        ));
+        let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
+        assert_eq!(
+            refused(retag(&workspace, &entries))?,
+            ["agentstacks.toml: packs.core: no tag to update (run update again)"]
+        );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    fn refused(
+        result: Result<bool, Diagnostics>,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        Ok(result
+            .err()
+            .ok_or("retag succeeded")?
+            .into_sorted()
+            .iter()
+            .map(ToString::to_string)
+            .collect())
     }
 }

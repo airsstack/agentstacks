@@ -23,7 +23,7 @@ if type(result) == "table" and result.block ~= nil and not may_block then
     .. tostring(result.block) .. "\n")
   result.block = nil
 end
-local out = translate.result(result)
+local out = translate.result(result, payload)
 if out ~= nil then
   airsstack.stdio.write(out)
 end

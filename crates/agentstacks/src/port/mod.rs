@@ -19,14 +19,14 @@
 //! # Non-responsibilities
 //!
 //! No logic and no adapter: reading the real disk belongs to the `fs` module, and a rule over a
-//! port belongs to `types`. The in-memory tree that tests build lives here but is compiled for
-//! tests only.
+//! port belongs to `types`. The in-memory tree and the other fakes that tests build live here
+//! and are compiled for tests and under the `testing` feature.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
 pub mod adapter;
 pub mod binary;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub mod fake;
 pub mod git;
 pub mod kind;
@@ -46,36 +46,36 @@ pub use tree::FileTree;
 #[doc(inline)]
 pub use workspace::Workspace;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use adapter::AdapterCall;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use adapter::FakeAdapter;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use adapter::ScriptStep;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use adapter::ToolScript;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use binary::BinaryCall;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use binary::FakeBinary;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::FakeFileTree;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use git::FakeGit;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use git::GitCall;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use workspace::FakeWorkspace;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use workspace::WorkspaceCall;

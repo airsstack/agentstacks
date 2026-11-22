@@ -1,0 +1,323 @@
+//! End-to-end runs of the `agentstacks` binary on a temporary project.
+//!
+//! Each test copies `tests/fixtures/project` and the shipped `extensions/claude` into a temporary
+//! directory and runs the real binary there with `-C`, stdin null. Nothing here proves a rule on
+//! its own: the rules are proven in the library, and these runs show that the commands, the claude
+//! extension and the airsl adapter hold together.
+
+use std::error::Error;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output, Stdio};
+
+use tempfile::TempDir;
+
+type TestResult = Result<(), Box<dyn Error>>;
+
+/// The variable that turns a missing `airsl` from a skip into a failure.
+const REQUIRE_AIRSL: &str = "AGENTSTACKS_REQUIRE_AIRSL";
+
+/// The skill the demo pack writes into the project.
+const SKILL: &str = ".claude/skills/greet/SKILL.md";
+
+/// What every run that applies nothing without a terminal prints on stderr.
+const NO_TERMINAL: &str = "stdin is not a terminal; pass --yes to apply";
+
+/// Whether `airsl` can run on this machine.
+fn airsl_runs() -> bool {
+    Command::new("airsl")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+/// Whether the test must stop: the demo pack holds a lua hook, so the plan checks `airsl`. When it
+/// cannot run the test says so, unless `AGENTSTACKS_REQUIRE_AIRSL` is set: then it fails, so a
+/// missing binary cannot pass the suite unseen.
+fn skip_without_airsl() -> Result<bool, Box<dyn Error>> {
+    if airsl_runs() {
+        return Ok(false);
+    }
+    if std::env::var_os(REQUIRE_AIRSL).is_some() {
+        return Err(format!("airsl cannot run on this machine and {REQUIRE_AIRSL} is set").into());
+    }
+    eprintln!("skipped: airsl cannot run on this machine");
+    Ok(true)
+}
+
+fn copy_tree(from: &Path, to: &Path) -> TestResult {
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_tree(&entry.path(), &target)?;
+        } else {
+            fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
+/// A temporary project holding the fixture packs and a copy of the claude extension.
+struct Project {
+    dir: TempDir,
+}
+
+impl Project {
+    fn new() -> Result<Self, Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        copy_tree(&manifest.join("tests/fixtures/project"), dir.path())?;
+        copy_tree(
+            &manifest.join("../../extensions/claude"),
+            &dir.path().join("ext/claude"),
+        )?;
+        Ok(Self { dir })
+    }
+
+    /// A temporary directory with no fixture: nothing but what a test adds.
+    fn empty() -> Result<Self, Box<dyn Error>> {
+        Ok(Self {
+            dir: tempfile::tempdir()?,
+        })
+    }
+
+    fn path(&self, rel: &str) -> PathBuf {
+        self.dir.path().join(rel)
+    }
+
+    /// Runs the binary with `-C <project>` and stdin null.
+    fn run(&self, args: &[&str]) -> Result<Run, Box<dyn Error>> {
+        let output = Command::new(env!("CARGO_BIN_EXE_agentstacks"))
+            .arg("-C")
+            .arg(self.dir.path())
+            .args(args)
+            .stdin(Stdio::null())
+            .output()?;
+        Run::new(&output)
+    }
+
+    /// `init --tool ./ext/claude --pack ./packs/demo --yes`, which must succeed.
+    fn init(&self) -> TestResult {
+        let run = self.run(&[
+            "init",
+            "--tool",
+            "./ext/claude",
+            "--pack",
+            "./packs/demo",
+            "--yes",
+        ])?;
+        assert_eq!(run.code, 0, "init failed: {}", run.stderr);
+        Ok(())
+    }
+}
+
+/// One finished run: the exit code and both streams as text.
+struct Run {
+    code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+impl Run {
+    fn new(output: &Output) -> Result<Self, Box<dyn Error>> {
+        Ok(Self {
+            code: output
+                .status
+                .code()
+                .ok_or("the binary was killed by a signal")?,
+            stdout: String::from_utf8(output.stdout.clone())?,
+            stderr: String::from_utf8(output.stderr.clone())?,
+        })
+    }
+}
+
+#[test]
+fn init_with_yes_writes_toml_and_applies() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    let run = project.run(&[
+        "init",
+        "--tool",
+        "./ext/claude",
+        "--pack",
+        "./packs/demo",
+        "--yes",
+    ])?;
+
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    let toml = fs::read_to_string(project.path("agentstacks.toml"))?;
+    assert!(toml.contains("path = \"./ext/claude\""), "{toml}");
+    assert!(toml.contains("path = \"./packs/demo\""), "{toml}");
+    for written in [SKILL, ".claude/settings.json", "agentstacks.lock"] {
+        assert!(project.path(written).is_file(), "{written} was not written");
+    }
+    let last = run.stdout.lines().last().ok_or("stdout is empty")?;
+    assert!(last.starts_with("applied: "), "{last}");
+    Ok(())
+}
+
+#[test]
+fn init_without_terminal_keeps_the_toml_and_is_refused() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    let run = project.run(&["init", "--tool", "./ext/claude", "--pack", "./packs/demo"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert_eq!(
+        run.stderr,
+        format!("{NO_TERMINAL}\nagentstacks.toml written; nothing applied (run apply)\n")
+    );
+    assert!(project.path("agentstacks.toml").is_file());
+    assert!(!project.path(SKILL).exists());
+    Ok(())
+}
+
+#[test]
+fn init_refuses_an_existing_toml() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    let run = project.run(&["init", "--tool", "./ext/claude", "--pack", "./packs/demo"])?;
+
+    assert_eq!(run.code, 1);
+    assert_eq!(
+        run.stderr,
+        "agentstacks.toml: already exists (edit it and run apply)\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn plan_after_apply_reports_nothing_to_write() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    let run = project.run(&["plan"])?;
+
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    let summary = run.stdout.lines().last().ok_or("stdout is empty")?;
+    assert!(summary.starts_with("0 to write"), "{}", run.stdout);
+    Ok(())
+}
+
+#[test]
+fn apply_without_terminal_or_yes_refuses() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    fs::remove_file(project.path(SKILL))?;
+    let lock = fs::read(project.path("agentstacks.lock"))?;
+    let run = project.run(&["apply"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert_eq!(run.stderr, format!("{NO_TERMINAL}\n"));
+    assert!(!project.path(SKILL).exists(), "apply wrote without consent");
+    assert_eq!(
+        fs::read(project.path("agentstacks.lock"))?,
+        lock,
+        "apply rewrote the lock"
+    );
+    Ok(())
+}
+
+#[test]
+fn apply_yes_with_nothing_pending_prints_nothing_to_change() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    let run = project.run(&["apply", "--yes"])?;
+
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    assert!(run.stdout.contains("nothing to change"), "{}", run.stdout);
+    Ok(())
+}
+
+#[test]
+fn doctor_is_healthy_then_reports_a_change() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    let healthy = project.run(&["doctor"])?;
+    assert_eq!(healthy.code, 0, "stdout: {}", healthy.stdout);
+    assert_eq!(healthy.stdout.trim_end(), "healthy");
+
+    fs::write(project.path(SKILL), "edited by hand\n")?;
+    let changed = project.run(&["doctor"])?;
+    assert_eq!(changed.code, 1);
+    assert!(
+        changed
+            .stdout
+            .lines()
+            .any(|line| line == format!("changed: {SKILL}")),
+        "{}",
+        changed.stdout
+    );
+    Ok(())
+}
+
+#[test]
+fn init_with_unknown_name_is_refused() -> TestResult {
+    let project = Project::empty()?;
+    let run = project.run(&["init", "--tool", "./ext/claude", "--pack", "nope"])?;
+
+    assert_eq!(run.code, 1);
+    assert!(
+        run.stderr
+            .contains("--pack \"nope\": not an official pack; pass a path, or add a git source to agentstacks.toml\n"),
+        "{}",
+        run.stderr
+    );
+    assert!(!project.path("agentstacks.toml").exists());
+    Ok(())
+}
+
+#[test]
+fn usage_error_exits_two() -> TestResult {
+    let project = Project::empty()?;
+    let run = project.run(&["init", "--tool", "claude"])?;
+
+    assert_eq!(run.code, 2, "stderr: {}", run.stderr);
+    Ok(())
+}
+
+#[test]
+fn path_pack_refusal_names_the_path_as_written() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    fs::create_dir_all(project.path("packs/bad"))?;
+    fs::write(project.path("packs/bad/pack.toml"), "this is not a pack\n")?;
+    let toml_path = project.path("agentstacks.toml");
+    let mut toml = fs::read_to_string(&toml_path)?;
+    toml.push_str("\n[packs.bad]\npath = \"packs/bad\"\n");
+    fs::write(&toml_path, toml)?;
+    let run = project.run(&["plan"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert!(
+        run.stderr.starts_with("packs/bad/pack.toml:"),
+        "{}",
+        run.stderr
+    );
+    let root = project.dir.path().to_string_lossy();
+    assert!(!run.stderr.contains(root.as_ref()), "{}", run.stderr);
+    Ok(())
+}

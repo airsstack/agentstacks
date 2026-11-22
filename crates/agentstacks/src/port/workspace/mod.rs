@@ -8,18 +8,18 @@
 //! # Non-responsibilities
 //!
 //! No logic and no adapter: the real disk belongs to the `fs` module. The in-memory project that
-//! tests build lives here but is compiled for tests only.
+//! tests build lives here and is compiled for tests and under the `testing` feature.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 mod fake;
 mod seam;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::FakeWorkspace;
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use fake::WorkspaceCall;
 #[doc(inline)]

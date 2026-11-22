@@ -11,6 +11,7 @@ authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
 publish       = false
 
 [workspace.dependencies]
+agentstacks = { path = "crates/agentstacks", version = "0.0.0" }
 airsl = "0.1.4"
 clap = { version = "4", features = ["derive"] }
 globset = "0.4"
@@ -19,9 +20,11 @@ serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11"
+similar = "3"
 tempfile = "3"
 thiserror = "2"
 toml = "1"
+toml_edit = "0.25"
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"

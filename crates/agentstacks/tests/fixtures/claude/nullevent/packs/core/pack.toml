@@ -1,0 +1,13 @@
+[pack]
+name = "core"
+version = "0.1.0"
+api = 0
+description = "One lua hook on tool.before"
+
+[requires]
+airsl = ">=0.1.4"
+
+[[hooks]]
+kind = "lua"
+event = "tool.before"
+run = "hooks/enforce.lua"

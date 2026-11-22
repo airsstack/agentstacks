@@ -10,6 +10,8 @@
 //!   normalised path, and answers every [`Workspace`] method from them. A staged file is a
 //!   temporary file beside its canonical target and a swap moves it onto the target, keeping an
 //!   existing file's mode and writing through a symlink.
+//! - [`FakeWorkspace::project_written`] and [`FakeWorkspace::lock_written`] return the last text
+//!   written to each project file.
 //! - [`FakeWorkspace::fail`] makes one exact call fail every time with
 //!   [`FakeWorkspace::denied`], and [`FakeWorkspace::set_file`] and [`FakeWorkspace::remove`] edit
 //!   the disk between two calls.
@@ -17,7 +19,8 @@
 //!
 //! # Non-responsibilities
 //!
-//! It is compiled for tests only. How the real disk behaves is proven by the tests of the `fs`
+//! It is compiled for tests and under the `testing` feature.
+//! How the real disk behaves is proven by the tests of the `fs`
 //! module.
 
 use std::cell::RefCell;
@@ -60,6 +63,8 @@ pub enum WorkspaceCall {
     Delete(OpPath),
     /// [`Workspace::write_lock`].
     WriteLock,
+    /// [`Workspace::write_project`].
+    WriteProject,
 }
 
 /// The part of the fake that the write methods change.
@@ -68,6 +73,8 @@ struct Disk {
     entries: BTreeMap<OpPath, Entry>,
     /// Temporary files, keyed by the canonical path of the file they will replace.
     temps: BTreeMap<OpPath, Vec<u8>>,
+    project: Option<String>,
+    project_written: Option<String>,
     lock: Option<String>,
     lock_written: Option<String>,
 }
@@ -123,7 +130,6 @@ impl Disk {
 /// An in-memory project.
 #[derive(Debug, Default)]
 pub struct FakeWorkspace {
-    project: Option<String>,
     sources: BTreeMap<LocalPath, Option<FakeFileTree>>,
     failing: Vec<WorkspaceCall>,
     disk: RefCell<Disk>,
@@ -142,8 +148,8 @@ impl FakeWorkspace {
 
     /// Sets the text of `agentstacks.toml`.
     #[must_use]
-    pub fn project(mut self, text: &str) -> Self {
-        self.project = Some(text.to_owned());
+    pub fn project(self, text: &str) -> Self {
+        self.disk.borrow_mut().project = Some(text.to_owned());
         self
     }
 
@@ -273,6 +279,12 @@ impl FakeWorkspace {
         self.disk.borrow().temps.keys().cloned().collect()
     }
 
+    /// The last text given to [`Workspace::write_project`].
+    #[must_use]
+    pub fn project_written(&self) -> Option<String> {
+        self.disk.borrow().project_written.clone()
+    }
+
     /// The last text given to [`Workspace::write_lock`].
     #[must_use]
     pub fn lock_written(&self) -> Option<String> {
@@ -301,7 +313,11 @@ impl Workspace for FakeWorkspace {
 
     fn project_text(&self) -> io::Result<String> {
         self.enter(WorkspaceCall::ProjectText)?;
-        self.project.clone().ok_or_else(FakeFileTree::not_found)
+        self.disk
+            .borrow()
+            .project
+            .clone()
+            .ok_or_else(FakeFileTree::not_found)
     }
 
     fn lock_text(&self) -> io::Result<Option<String>> {
@@ -365,6 +381,14 @@ impl Workspace for FakeWorkspace {
             .remove(path)
             .map(|_| ())
             .ok_or_else(FakeFileTree::not_found)
+    }
+
+    fn write_project(&self, text: &str) -> io::Result<()> {
+        self.enter(WorkspaceCall::WriteProject)?;
+        let mut disk = self.disk.borrow_mut();
+        disk.project = Some(text.to_owned());
+        disk.project_written = Some(text.to_owned());
+        Ok(())
     }
 
     fn write_lock(&self, text: &str) -> io::Result<()> {
@@ -551,6 +575,20 @@ mod tests {
         ws.write_lock("# new\n")?;
         assert_eq!(ws.lock_written(), Some("# new\n".to_owned()));
         assert_eq!(ws.lock_text()?, Some("# new\n".to_owned()));
+        Ok(())
+    }
+
+    #[test]
+    fn fake_records_the_written_project_text() -> TestResult {
+        let ws = FakeWorkspace::new();
+        assert_eq!(ws.project_written(), None);
+        ws.write_project("tools = []\n")?;
+        assert_eq!(ws.project_written(), Some("tools = []\n".to_owned()));
+        assert_eq!(ws.project_text()?, "tools = []\n");
+        let failing = FakeWorkspace::new().fail(WorkspaceCall::WriteProject);
+        let error = failing.write_project("x").err().ok_or("a failure")?;
+        assert_eq!(error.to_string(), FakeWorkspace::denied().to_string());
+        assert_eq!(failing.project_written(), None);
         Ok(())
     }
 

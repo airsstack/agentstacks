@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" \"$TMPDIR/x\" # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit|Write"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"additionalContext\":\"failed\",\"hookEventName\":\"PostToolUseFailure\"}}' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \"--allow-read\" \".claude/agentstacks/core\" \"--allow-write\" \"$TMPDIR\" \"--allow-env\" \"HOME\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"1\" \"neutral\" \"--manifest\" \".claude/agentstacks/core/data.json\" # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"additionalContext\":\"It'\"'\"'s a \\\"test\\\"\\nline two\",\"hookEventName\":\"SessionStart\"}}' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup|resume"
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"1\" \"native\" # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "coder"
+      }
+    ]
+  }
+}

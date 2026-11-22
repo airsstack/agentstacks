@@ -4,7 +4,8 @@
 //!
 //! - [`StdWorkspace`]: the `Workspace` port over a project directory on the real disk. Its work is
 //!   split by job: where a path leads (`resolve`), what a target holds (`state`), the temporary
-//!   file beside a target (`stage`), and installing, deleting and the lock write (`swap`).
+//!   file beside a target (`stage`), and installing, deleting and the project and lock writes
+//!   (`swap`).
 //!
 //! # Non-responsibilities
 //!

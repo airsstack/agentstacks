@@ -10,10 +10,15 @@ function M.event(p)
   return { event = e, session_id = p.session_id, cwd = p.cwd }
 end
 
-function M.result(r)
+function M.result(r, p)
   if r == nil then return nil end
-  if r.block ~= nil then return airsstack.json.encode({ decision = "block", reason = r.block }) .. "\n" end
-  if r.context ~= nil then return airsstack.json.encode({ context = r.context }) .. "\n" end
+  local event = type(p) == "table" and p.hook_event_name or nil
+  if r.block ~= nil then
+    return airsstack.json.encode({ decision = "block", reason = r.block, event = event }) .. "\n"
+  end
+  if r.context ~= nil then
+    return airsstack.json.encode({ context = r.context, event = event }) .. "\n"
+  end
   return nil
 end
 

@@ -15,7 +15,8 @@ pub const RUNTIME_FILE: &str = "runtime.lua";
 /// the hook's own. For a neutral hook it builds a neutral event from the payload the tool sends and
 /// stays silent when the translator has no event for it; for a native hook the event holds the raw
 /// payload. It then runs the hook module. A `block` from a hook not declared `may_block` is dropped
-/// with one line on standard error, and the translator's `result` is printed.
+/// with one line on standard error, and the translator's `result` is printed; it receives the hook's
+/// result and the raw payload, for neutral and native hooks alike.
 ///
 /// # Examples
 ///
@@ -35,9 +36,9 @@ mod tests {
     fn runtime_lua_hash_is_pinned() {
         assert_eq!(
             ContentHash::of_bytes(RUNTIME_LUA.as_bytes()).to_string(),
-            "sha256:4ce3f46b94f471cd15beac1d987207647b082d0399275e0485b64f1f1b2e72f4"
+            "sha256:05ba59c1af4002b5a212f9eacd1cb74253f69cc79c9bf3a95d4dda312f89a282"
         );
-        assert_eq!(RUNTIME_LUA.len(), 905);
+        assert_eq!(RUNTIME_LUA.len(), 914);
     }
 
     #[test]

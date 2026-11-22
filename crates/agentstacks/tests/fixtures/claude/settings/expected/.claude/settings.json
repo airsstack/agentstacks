@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)"
+    ]
+  },
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "echo user-hook",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit|Write"
+      }
+    ]
+  }
+}

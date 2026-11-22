@@ -1,0 +1,1 @@
+{"session_id":"s1","transcript_path":"/t/s1.jsonl","cwd":"/p","prompt_id":"p1","permission_mode":"bypassPermissions","agent_id":"a1","agent_type":"probe-agent","effort":{"level":"low"},"hook_event_name":"SubagentStop","stop_hook_active":false,"agent_transcript_path":"/t/s1/subagents/agent-a1.jsonl","last_assistant_message":"PONG"}

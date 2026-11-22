@@ -1,0 +1,12 @@
+{
+  "permissions": { "deny": ["Bash(rm:*)"] },
+  "hooks": {
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "echo only-ours # agentstacks" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "echo user", "timeout": 3 } ] },
+      { "hooks": [ { "type": "command", "command": "echo gone # agentstacks" } ] }
+    ]
+  }
+}
