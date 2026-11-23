@@ -17,6 +17,11 @@ renamed to the module naming rule. Four supporting changes make that possible:
 - the neutral event gains an optional `agent_id`;
 - the core drops its cross-pack name clash rule.
 
+This spec supersedes `spec-superseded-2026-11-23.md`. It closes the gaps the plan-set review found:
+`toplevel` is kept for GATE 3; the doctor's usage refusal is stated; hook tests use a fake
+`airsstack.env`; the `agent_id` mapping is tested through the Rust translator tests; and the text
+rules cover Lua comments, bare own-pack references and the deny.toml entry.
+
 Proof notation: `Proof:` is a probe in `probes/` (raw output, pasted verbatim), a `file:line` opened
 in this design session, or a fetched document at `<file>:<line>`. `P/` is
 `../claudestacks/plugins/` (`/Users/hiraq/Projects/airsstack/claudestacks/plugins/`), `C/` is
@@ -73,6 +78,18 @@ in this design session, or a fetched document at `<file>:<line>`. `P/` is
 | The agent-stop matcher is the hook's `agents` joined with `\|` | `W/extensions/claude/lib/hooks.lua:40-45,63-64`; `probes/manifests-results.md` (`"matcher": "task-briefer\|chain-reader\|artifact-reviewer"`) |
 | The official pack list is `OFFICIAL_PACKS` and holds `cmux` | `W/crates/agentstacks/src/types/shorthand.rs:39-46` |
 | The CLI end-to-end tests copy a fixture project and `extensions/claude` into a temp dir and skip without airsl unless `AGENTSTACKS_REQUIRE_AIRSL` is set | `W/crates/agentstacks-cli/tests/commands.rs:3-6,17-44,68-73` |
+| `toplevel` reads `.git` (it runs no git), and GATE 3's `path_for_matching` calls it. `common_dir` has one caller, `project_key` (GATE 1) | `P/claudestacks/hooks/lib/enforce.lua:103-104,181-185`; `grep -n common_dir P/claudestacks/hooks/lib/enforce.lua` → `:45` (comment), `:118` (definition), `:157` (in `project_key`) |
+| `airsstack.fs.list` lists a directory and is gated by the read grant; the plugin enforce library already uses it, and its suite passes (row "plugins' Lua suites") | `~/.cargo/registry/src/*/airsl-0.1.4/src/modules/fs.rs:285-302`; `P/claudestacks/hooks/lib/enforce.lua:430-480` |
+| A `require` module name may hold hyphens (`team-lint.hooks.my-file` loads through `runtime.lua`) | `W/.claudestacks/sdlc/2026-11-20-core-plan-and-apply/probes/hookreq-results.md:7-9` |
+| Under the `lua` task's test grants (no `--allow-env`), `airsstack.env.get` raises `env.get denied: … is not granted`; a test can replace `airsstack.env` with a fake table, and a required module that reads `airsstack.env` when called sees the fake | `probes/envfake-results.md` |
+| The plugin enforce entry binds `local env = airsstack.env` when it loads; `vault.root()` reads `airsstack.env.get` when called | `P/claudestacks/hooks/enforce.lua:23-35`; `P/claudestacks-journal/scripts/lib/vault.lua:125-128` |
+| The journal session-start emits nothing when the orientation card is empty. On a fresh vault it rebuilds the index, which writes `.index/summaries.tsv` (empty when there are no notes), and the card is empty because no session or note matches the project | `P/claudestacks-journal/scripts/session-start.lua:31-34,57-72`; `P/claudestacks-journal/scripts/lib/index.lua:300-330`; `P/claudestacks-journal/scripts/lib/orientation.lua:84-90` |
+| A `{{skill}}` or `{{agent}}` token in a `SKILL.md` or agent frontmatter value renders, as in the body | `probes/fmtoken-results.md` (`description: "Recall notes. Use when the user says \"/recall X\"."`) |
+| The plugin `enforce.lua --explain` with no path, or an empty one, writes `usage: enforce.lua --explain <path>` to stderr, nothing to stdout, and exits 0 | `probes/doctor-usage-results.md` |
+| The claude translator is shipped as text (`M.text()`); its mapping is tested in Rust by running fixture hooks through the real runtime. `payloads/hooks/echo.lua` prints a fixed `FIELDS` list per event, and only `input/subagent.json` carries an `agent_id` (`"a1"`) | `W/extensions/claude/lib/translate.lua:6,113`, `lib/translate_test.lua:13-30`; `W/crates/agentstacks/tests/claude.rs:530-550`; `W/crates/agentstacks/tests/fixtures/claude/payloads/hooks/echo.lua:3`; `grep -o '"agent_id":"[^"]*"' …/payloads/input/*.json` → `subagent.json:"agent_id":"a1"` only |
+| Plugin Lua files that are carried and name a plugin item or variable: comments at `scripts/discuss.lua:1`, `scripts/lib/discuss.lua:1,19`, `scripts/lib/style.lua:34`, `scripts/style.lua:8`; code at `scripts/style.lua:20` and `lib/status.lua:825` | `probes/selfref-results.md`, first grep |
+| Plugin Markdown that names a plugin skill or agent without a namespace: `/snapshot-save`, `/snapshot-load`, `/journal-<x>` (second grep); `subagent_type: journal-<x>`, the `journal-<x>` subagent, and `orchestrate/SKILL.md:18` "Namespaced as" (third grep); backticked bare names such as `coder`, `explorer`, `reviewer`, `task-briefer`, `orchestrate`, `snapshot-save` in core and sdlc skills and references, including sdlc `execute/SKILL.md:61` `coder`, which is core's agent (fourth grep). One backticked hit is a label, not a reference: `snapshot-save/SKILL.md:45` "the `discuss` archive" | `probes/selfref-results.md`, second to fourth grep |
+| `deny.toml` exempts airsl's own tree from the duplicate-version rule: `skip-tree = [{ crate = "airsl@0.1.4", reason = "airsl 0.1.4 pins sha2 0.10 and toml 0.8; …" }]` | `W/deny.toml:69-81` |
 
 ## 2. claudevs move
 
@@ -129,7 +146,12 @@ in this design session, or a fetched document at `<file>:<line>`. `P/` is
   - bumps the CI binary pin to 0.1.5 with its new SHA-256. The CI comment requires the version, the
     hash and the library to move together (`.github/workflows/ci.yml`, step "Install the airsl
     binary");
-  - sets `requires.airsl = ">=0.1.5"` on every pack holding `.lua` files (core, sdlc, journal; §6).
+  - sets `requires.airsl = ">=0.1.5"` on every pack holding `.lua` files (core, sdlc, journal; §6);
+  - moves the `deny.toml` `skip-tree` entry to `crate = "airsl@0.1.5"`, with a reason naming the
+    `sha2` and `toml` versions 0.1.5 pins (`cargo tree -p airsl@0.1.5 --depth 1 -e normal`). If
+    0.1.5 pins no older `sha2` or `toml` than agentstacks, the entry is removed, and the `[bans]`
+    comment that describes it ("The one exemption is the `skip-tree` entry for `airsl` …") goes
+    with it. Either way `cargo make deny` is green (§1 deny.toml row).
 - Work order: §2, §4 and §5 do not need airsl 0.1.5. §6, §7, the Lua step and the end-to-end test
   of §11 do.
 - claudevs is proven against airsl 0.1.4 (§1). After the bump, `cargo make dod` re-proves it on
@@ -161,7 +183,15 @@ All of these changes are in `extensions/claude/`. The core stays tool-agnostic.
 | Translator | `M.event` sets `e.agent_id = p.agent_id` when it is a non-empty string, on every event, beside `agent` |
 | Native files | unchanged: `native/claude/<rel>` → `.claude/<rel>`. A native skill carries its own final name (`core-statusline`) |
 
-- The extension's Lua tests (`lib/*_test.lua`) are updated for each row.
+- The extension's Lua tests (`lib/*_test.lua`) are updated for each row, except the translator
+  row. The translator is shipped as text, and its mapping is tested in Rust (§1). For `agent_id`:
+  - `payloads/hooks/echo.lua` adds `agent_id` to the end of `FIELDS`, so every `expected/echo/*.err`
+    line gains ` agent_id=<value>`: `a1` for `subagent`, `nil` for the rest;
+  - `input/noagent.json` gains `"agent_id":""`, and its line shows `agent_id=nil` (an empty id is
+    absent). The test `empty_agent_type_maps_to_nil_agent` becomes
+    `empty_agent_type_and_id_map_to_nil`;
+  - `tests/fixtures/claude/full/expected/.claude/agentstacks/translate.lua` is the new translator
+    text byte for byte.
 - **Collisions.** The prefixed forms of pack `a-b` skill `c` and pack `a` skill `b-c` are the same
   name. The second proposal of `.claude/skills/a-b-c/SKILL.md` is refused by the existing rule:
   `claude/adapter.lua:<n>: write: path ".claude/skills/a-b-c/SKILL.md" is already proposed at adapter.lua:<m>`.
@@ -476,8 +506,15 @@ description = "Rust engineering rules and the Definition of Done gate"
 `{ context = … }` or `{ block = … }` (`docs/hooks.md` §5), and never calls
 `airsstack.hook.context`, `airsstack.hook.emit`, `airsstack.hook.payload` or `airsstack.stdio`. A
 library that today switches on `payload.hook_event_name` switches on `event.event` (`tool.after`,
-`agent.stop`), or on `event.payload ~= nil` for the native case. The §3 idiom applies to every file
-a hook loads.
+`agent.stop`), or on `event.payload ~= nil` for the native case. This includes
+`lib/handoff_report.lua` `file_from_payload` and `lib/comm_report.lua` `hook_output`. The §3 idiom
+applies to every file a hook loads.
+
+**Environment.** A hook module and every library it calls read `airsstack.env` when called, never
+into a module-level local. The plugin enforce entry's `local env = airsstack.env` (§1) moves inside
+the function that builds its settings, and so does `scripts/lib/handoff_report.lua:11`, which both
+check hooks load. A test swaps `airsstack.env` for a fake table and restores
+it (§1, `probes/envfake-results.md`), so no test needs an `--allow-env` grant.
 
 ### 6.4 Text conversion
 
@@ -493,6 +530,9 @@ a hook loads.
 | `${CLAUDE_SESSION_ID}` | `{{var session_id}}` |
 | `$ARGUMENTS` | `{{var arguments}}` |
 | `${user_config.archive_keep}` | `{{option archive_keep}}` |
+| A skill or agent of this pack or a required pack, named in Markdown (body or frontmatter) without a namespace: as a command (`/snapshot-load`, `/journal-recall`), a spawn target (`subagent_type: journal-capture`), a backticked bare name (`` `coder` ``, `` `task-briefer` ``, `` `orchestrate` ``), or a hyphenated journal item name in prose (the isolated journal-capture subagent). The inventory is `probes/selfref-results.md` greps 2–4 (§1) | `{{skill <s'>}}` / `{{agent <a'>}}` for its own pack, `{{skill <pack>/<s'>}}` / `{{agent <pack>/<a'>}}` for a required pack (sdlc `execute/SKILL.md:61` `coder` → `{{agent core/coder}}`). Backticks around a name stay around the token. Plain role words without backticks ("the coder", "the reviewer") are prose and stay. Labels stay: headings (`# journal-capture`), file names (`journal-curator-review.md`) and "the `discuss` archive" (`snapshot-save/SKILL.md:45`) |
+| `orchestrate/SKILL.md:18` "Namespaced as `claudestacks:coder`, `claudestacks:reviewer`, etc." | "Named {{agent coder}}, {{agent reviewer}}, and so on." The rest of the line stays |
+| A plugin item or variable named in a comment of a carried `.lua` or `.sh` file (not rendered; §1 row "Plugin Lua files") | plain prose naming the pack item: `/claudestacks:discuss` → "the core pack's discuss skill"; `${user_config.archive_keep}` → "the `archive_keep` option"; `CLAUDE_PLUGIN_OPTION_STYLE_REINJECT` → "the `style_reinject` option (args[2])". A usage comment that shows a top-level `airsl run` command line for a file that becomes a hook module (`scripts/style.lua:5-9`, and the same block in each converted entry) is dropped: a module has no command line. Code lines change by §6.3 (`style.lua:20`, `status.lua:825`) |
 | A literal `{{` (none today; §1 of the formats spec) | `\{{` |
 | `[[wiki links]]` (journal) | unchanged |
 
@@ -506,11 +546,22 @@ Frontmatter:
 - `name` is the pack name (`capture`), never the rendered one.
 - The native `core-statusline/SKILL.md` keeps Claude's own frontmatter, `name: core-statusline`.
 
-Each plan converts its files by this table and greps the result. After conversion no pack file
-holds `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_OPTION`, `user_config` or a namespaced reference
-(`grep -rnE 'CLAUDE_PLUGIN_(ROOT|OPTION)|user_config|claudestacks(-[a-z]+)*:[a-z]' packs/` gives
-no output). Test fixtures are exempt, and so are `README.md` files, which describe the old plugin
-names on purpose.
+Each plan converts its files by this table and greps the result. After conversion:
+
+- no pack file holds `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_OPTION`, `user_config` or a namespaced
+  reference:
+  `grep -rnE 'CLAUDE_PLUGIN_(ROOT|OPTION)|user_config|claudestacks(-[a-z]+)*:[a-z]' packs/ --exclude=README.md --exclude='*_test.lua'`
+  gives no output;
+- no pack Markdown names a pack item without a token:
+  ``grep -rnE '(^|[ `"(])/(snapshot-(load|save)|journal-[a-z]+)\b|subagent_type: [a-z]|Namespaced as|`(coder|explorer|reviewer|task-briefer|chain-reader|artifact-reviewer|journal-[a-z]+|context-handoff|enforce-doctor|orchestrate|process-guidelines|snapshot-load|snapshot-save|statusline)`' packs/ --include='*.md' --exclude=README.md``
+  gives no output;
+- no journal Markdown names a journal item by its plugin name outside a label:
+  `grep -rnE 'journal-(capture|curator|note|recall|helped|link|review|setup)' packs/journal --include='*.md' --exclude=README.md | grep -vE ':[0-9]+:# |journal-curator-review\.md'`
+  gives no output.
+
+Test files (`*_test.lua` and fixtures) are exempt. So are `README.md` files, which describe the old
+plugin names on purpose: each README is the plugin's, with its install block replaced by the
+`agentstacks init --tool claude --pack …` line for the pack and the packs it requires.
 
 Product names are not namespaced references and stay as they are: "claudestacks", "the
 claudestacks-journal vault", the sentinel prefix `claudestacks-enforce-`
@@ -528,16 +579,39 @@ the product is not this chain's work (§14).
   | Test | Change |
   |---|---|
   | `core/hooks/enforce_test.lua` | Its registry cases become sibling-pack cases: fixtures are directories holding `enforcement.json` under a temp packs root, asserting the §7 trace lines. GATE 1 and parity cases are removed with the code. `plugins_root()` (`:84-100`) anchors on `packs/core/pack.toml` instead of `claudestacks/.claude-plugin/plugin.json`. Its sweep "no driver emits `permissionDecision`" (`:521-540`) keeps running over `packs/`. The `skill` string at `:18` becomes the rendered form `/guideline-rust-guidelines` |
-  | `core/scripts/discuss_skill_test.lua:8` | path becomes `packs/core/skills/discuss/SKILL.md`. It asserts that the archive-keep value is single-quoted around `{{option archive_keep}}` |
+  | `core/scripts/discuss_skill_test.lua:8` | path becomes `packs/core/skills/discuss/SKILL.md`. It asserts that the archive-keep value is single-quoted around `{{option archive_keep}}`. By §6.4, `:15-21` asserts `invocation: user` and `:33-38` asserts `{{var session_id}}` and `"{{var project_dir}}/{{root}}/scripts/discuss.lua"` |
   | `core/scripts/style_test.lua:69` | path becomes `packs/core/skills/discuss/references/protocol.md`; the env case becomes the `args[2]` case of §6.3 |
   | `sdlc/scripts/status_test.lua` (the six status-line strings) | the board name comes from the argument (§6.3 H2) |
   | all others | unchanged, except the §3 idiom where the module under test now uses it |
 
-- **New unit tests.** Each converted hook entry module gets a `*_test.lua` beside it. The test calls
-  the returned function with a neutral event and asserts the result: `rearm`, `style` (session start
-  always returns context; prompt submit with `"false"` returns nil), `enforce`,
-  `handoff_check_hook` and `comm_check_hook` (a `tool.after`, an `agent.stop` and a native event,
-  each with a bad report giving `{ block = … }`), `attention` and `session-start`.
+- **New unit tests.** Each converted hook entry module gets cases in the `*_test.lua` beside it (a
+  new file, or the existing one where it already exists: `hooks/enforce_test.lua`,
+  `scripts/style_test.lua`). The test calls the returned function with a neutral event and asserts
+  the result. A module that reads the environment runs under a fake `airsstack.env` (§6.3
+  "Environment"):
+  - `style`: session start always returns context; prompt submit with `"false"` returns nil;
+  - `handoff_check_hook` and `comm_check_hook`: a `tool.after`, an `agent.stop` and a native event,
+    each with a bad report, give `{ block = … }`;
+  - `enforce`: with a fake env whose `TMPDIR` is a fresh temp directory, a temp packs root holding
+    `core/` and `guideline-rust/enforcement.json`, `args = {"<packs root>/core"}` and a project with
+    `Cargo.toml`, a `tool.before` event for `src/main.rs` returns `{ context = … }` holding the
+    pack's `skill`;
+  - `rearm`: with a fake env, it clears that session's sentinels and keeps another session's;
+  - `attention`: a chain root with an open chain gives context whose first line ends with
+    `full board: <args[1]>`;
+  - `session-start`: with a fake env whose `AIRSSTACK_HOME` is a temp directory, it creates
+    `daily`, `sessions`, `notes`, `mocs` and `.index` under the vault root `<AIRSSTACK_HOME>/journal`
+    (`lib/vault.lua:124-131`) and returns
+    `nil`, because no session or note matches in an empty vault (§1). The card itself stays covered by the
+    moved `orientation_test`;
+  - `doctor`: `explain` moves into `hooks/lib/enforce.lua` as `M.explain(pack_root, file_path,
+    env)`, which returns the text and lists the directories beside `pack_root`. `M.doctor(args,
+    env)` returns `out, err`: `nil` and `"usage: doctor.lua <pack-root> <path>\n"` when `args[1]` or
+    `args[2]` is missing or empty, else `M.explain(args[1], args[2], env)` and `nil`.
+    `hooks/doctor.lua` is a script that calls `M.doctor(arg, airsstack.env)`, writes `out` to
+    stdout and `err` to stderr, and returns (exit 0). The tests call `M.doctor`: a pack root inside
+    a temp packs root gives the header and trace, and `{}` and `{"/r", ""}` each give the usage
+    text. `airsl check packs` compiles `doctor.lua`.
 - **`cargo make lua`** becomes an `@shell` script task (the `${TMPDIR:-/tmp}` grant needs a shell)
   that runs, in order:
   1. `airsl check extensions` and `airsl check packs` (the `plugins-check` gate, §1);
@@ -559,10 +633,10 @@ the product is not this chain's work (§14).
 
   | Today | After |
   |---|---|
-  | `registry_path`, `read_registry`, the `@claudestacks` filter (`MARKETPLACE_SUFFIX`), `AIRSSTACK_ENFORCE_REGISTRY` | removed. The candidate list is the sibling directories of `args[1]`'s parent, in name order, whose `enforcement.json` loads (`load_manifest`, unchanged). The candidate key is the pack directory name |
-  | GATE 1 (`project_key`, `select_record`): a registry record must be bound to this project | removed. Every pack under the root is installed in this project by construction. GATE 2, GATE 3 and their labels are unchanged |
+  | `registry_path`, `read_registry`, the `@claudestacks` filter (`MARKETPLACE_SUFFIX`), `AIRSSTACK_ENFORCE_REGISTRY` | removed. The candidate list is the directories beside `args[1]` (the subdirectories of its parent; core itself ships no `enforcement.json`), in name order, whose `enforcement.json` loads (`load_manifest`, unchanged). The candidate key is the pack directory name |
+  | GATE 1 (`project_key`, `select_record`, and `common_dir`, whose one caller is `project_key`): a registry record must be bound to this project | removed. Every pack under the root is installed in this project by construction. GATE 2, GATE 3 and their labels are unchanged |
   | the bound manifest re-read from `record.installPath` | the candidate's manifest is used directly |
-  | doctor parity section (`toplevel`, `parity_report`, `tree_files`): compares the plugin repo with the install cache | removed. There is no cache, because the rendered files are the installed files |
+  | doctor parity section (`parity_report`, `tree_files`): compares the plugin repo with the install cache | removed. There is no cache, because the rendered files are the installed files. `toplevel` stays: GATE 3's `path_for_matching` uses it (§1) |
 
 - **Trace lines.** `resolve` and its trace change only in these lines. Every other line stays as
   it is today (`lib/enforce.lua:533-605`).
@@ -577,9 +651,13 @@ the product is not this chain's work (§14).
   | `<key>: GATE 1 no record bound to this project` | (none) |
   | `<key>: using <installPath>` | (none) |
 
-- **Doctor.** `doctor.lua <packs-root-arg> <path>` prints the same header as today, except that
-  `registry: <path>` becomes `packs:    <packs root>`. It then prints the trace and the
-  `outcome:` lines unchanged, and no parity section. The enforce-doctor skill runs:
+- **Doctor.** `doctor.lua <pack-root> <path>` takes core's own pack root, as the hook's `args[1]`
+  does, and finds the packs beside it the same way. It prints the same header as today, except
+  that `registry: <path>` becomes `packs:    <parent of pack-root>`. It then prints the trace and
+  the `outcome:` lines unchanged, and no parity section. With either argument missing or empty it
+  writes `usage: doctor.lua <pack-root> <path>` to stderr, nothing to stdout, and exits 0, as the
+  plugin's `--explain` does today (§1). `M.doctor` owns both outcomes (§6.5). The enforce-doctor
+  skill runs:
 
   ```text
   airsl run --policy confined \
@@ -615,6 +693,8 @@ the product is not this chain's work (§14).
     (shape: `op/airsl.rs:110`);
   - duplicate install path: `claude/adapter.lua:<n>: write: path ".claude/skills/<name>/SKILL.md" is already proposed at adapter.lua:<m>`
     (shape: §1, the probed `copy:` case).
+- **Doctor usage** (carried, renamed): `usage: doctor.lua <pack-root> <path>` on stderr, exit 0
+  (§7).
 - **Hooks.** They keep `--fail-open` (`docs/hooks.md` §3): a hook error never blocks Claude Code, as
   the wrappers' `exit 0` paths do today (`probes/hooks-map.md` §1, "Exit behaviour").
 
@@ -697,9 +777,9 @@ this one.
 | What | How |
 |---|---|
 | claudevs | Its existing unit, integration and doc tests and the cli tests, unchanged except the two renamed test files, under `cargo make dod` (all green today, `probes/claudevs-results.md` steps d–e). `cargo make claudevs-check` in CI (§2) |
-| claude extension | The updated `lib/*_test.lua`: `values_test` (prefixed invoke, dir, agent), `hooks_test` (prefixed agent-stop matcher), `frontmatter_test` (rendered `name`), `translate_test` (`agent_id` present and absent) |
-| core | `clash.rs` tests removed. A set test shows two packs shipping skill `setup` load with no diagnostic. `shorthand.rs` test lists 5 packs |
-| packs (Lua) | The 20 moved tests under `cargo make lua` (§6.5); test-only fixtures beside them |
+| claude extension | The updated `lib/*_test.lua`: `values_test` (prefixed invoke, dir, agent), `hooks_test` (prefixed agent-stop matcher), `frontmatter_test` (rendered `name`). `agent_id` through the Rust translator tests in `tests/claude.rs`: the echo hook prints it (`a1` for `subagent`, `nil` elsewhere, `nil` for the empty id in `noagent`) (§4) |
+| core | `clash.rs` tests removed. A set test loads `shared-skill` (two packs ship skill `status`) and `shared-agent` (two packs ship agent `coder`) with no diagnostic (§5). `shorthand.rs` test lists 5 packs |
+| packs (Lua) | The 20 moved tests and the new hook-module cases under `cargo make lua` (§6.5), with a fake `airsstack.env` where a module reads the environment; test-only fixtures beside them |
 | end to end | New `crates/agentstacks-cli/tests/packs.rs`, built like `commands.rs`: it copies `packs/` and `extensions/claude` into a temp git project, runs `init --tool ./… --pack ./…` for all five packs with `--yes`, and asserts the points below. Skipped without airsl ≥0.1.5 unless `AGENTSTACKS_REQUIRE_AIRSL` is set, as in `commands.rs` |
 | gate | `cargo make dod` green; `cargo make deny` green |
 
