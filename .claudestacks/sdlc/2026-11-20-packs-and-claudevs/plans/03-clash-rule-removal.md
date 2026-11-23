@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -110,3 +110,15 @@ crates/agentstacks/tests/fixtures/sets/skill-clash-three/ — delete
 
 - `cargo make dod` green.
 - `grep -rn 'clash\|two packs ship' crates/agentstacks/src/types/set` prints nothing.
+
+## Review findings
+
+- 🔵 open — `types/set/check.rs`: `failing_core`'s `.skill("status", "body")` and the `team_lint` PackSpec in `check_still_reports_unrelated_errors_beside_a_failed_load` existed only to cause the removed clash line.
+- 🔵 open — `tests/fixtures/sets/failed-pack/packs/team-lint/` and its `agentstacks.toml` entry now add nothing to `check_skips_follow_on_errors_from_failed_packs`.
+- Verification: `cargo make dod-crate agentstacks` exit 0 (lib 1690 passed, `tests/set.rs` 4 passed, 292 doctests); greps `NameClash|check_name_clashes|is shipped by` (src), `clash|two packs ship` (types/set), `shipped by` (docs, README) print nothing. Workspace `cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-23 — Tasks 1 and 2 ran in one coder: Task 1's gate needs Task 2's `tests/set.rs` changes.
+- 2026-11-23 — Test-first was partial: the first red run failed to compile on plan 04's in-flight `shorthand.rs` change (`[&str; 6]` vs `[&str; 5]`), so the red caused by the still-present rule was not seen; `packs_may_share_skill_and_agent_names` was written after the rule was gone.
+- 2026-11-23 — `git status` pairs the renames by content (`skill-clash-three → shared-skill` R, `skill-clash` D); the resulting tree is as planned. No per-task commits (execute does not commit unless told).

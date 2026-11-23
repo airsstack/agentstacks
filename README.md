@@ -99,7 +99,6 @@ The first packs come from today's claudestacks plugins:
 | `journal` | a vault of session and topic notes |
 | `guideline-rust` | the Rust Definition of Done and engineering rules |
 | `guideline-python` | the Python Definition of Done and engineering rules |
-| `cmux` | skills for driving cmux |
 
 ## Extending agentstacks
 

@@ -11,9 +11,8 @@
 //! - [`SetError`] has a variant per refusal that depends on several packs or on the project file:
 //!   a fetched name that differs from its key, a requirement that is not listed, a requirement
 //!   cycle, a token aimed at a pack that is not required, a missing option, a hook `run` that does
-//!   not exist in another pack, option values that do not resolve, airsl ranges that do not meet,
-//!   and a skill or agent that two packs ship. Each displays exactly the message the author reads
-//!   after the location.
+//!   not exist in another pack, option values that do not resolve and airsl ranges that do not
+//!   meet. Each displays exactly the message the author reads after the location.
 //!
 //! # Non-responsibilities
 //!
@@ -26,11 +25,9 @@ use std::fmt::{self, Display};
 
 use crate::types::manifest::AirslReq;
 use crate::types::manifest::PackVersion;
-use crate::types::name::ItemName;
 use crate::types::name::OptionName;
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
-use crate::types::pack::ItemKind;
 use crate::types::report::TypeWord;
 use crate::types::tokens::Token;
 
@@ -153,16 +150,6 @@ pub enum SetError {
         /// Each declared range, in pack name order, as written.
         ranges: Vec<AirslReq>,
     },
-    /// A skill or an agent that two or more packs ship.
-    #[error("{kind} \"{name}\" is shipped by {}", Shippers(packs))]
-    NameClash {
-        /// Whether a skill or an agent clashes.
-        kind: ItemKind,
-        /// The name the packs share.
-        name: ItemName,
-        /// The packs that ship it, in name order; at least two.
-        packs: Vec<PackName>,
-    },
 }
 
 /// Items written one after another with a separator.
@@ -195,28 +182,6 @@ impl Display for Needs<'_> {
             write!(f, "{pack} needs {range}")?;
         }
         Ok(())
-    }
-}
-
-/// The packs that ship one name: `both <a> and <b>` for two, else all but the last joined by `, `
-/// and then ` and ` before the last.
-struct Shippers<'a>(&'a [PackName]);
-
-impl Display for Shippers<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            [] => Ok(()),
-            [only] => only.fmt(f),
-            [first, second] => write!(f, "both {first} and {second}"),
-            [init @ .., last] => write!(
-                f,
-                "{} and {last}",
-                Joined {
-                    items: init,
-                    separator: ", "
-                }
-            ),
-        }
     }
 }
 
@@ -330,14 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn set_error_displays_the_airsl_and_clash_messages() -> TestResult {
-        let clash = |kind, name: &str, who: &[&str]| -> Result<SetError, Box<dyn Error>> {
-            Ok(SetError::NameClash {
-                kind,
-                name: ItemName::new(name)?,
-                packs: packs(who)?,
-            })
-        };
+    fn set_error_displays_the_airsl_messages() -> TestResult {
         let cases: Vec<(SetError, &str)> = vec![
             (
                 SetError::AirslDisjoint {
@@ -361,22 +319,6 @@ mod tests {
                     ranges: vec![range(">=0.1.4")?, range("<0.3")?],
                 },
                 "airsl 0.1.3 installed, packs need >=0.1.4, <0.3",
-            ),
-            (
-                clash(ItemKind::Skill, "status", &["sdlc", "team-lint"])?,
-                "skill \"status\" is shipped by both sdlc and team-lint",
-            ),
-            (
-                clash(ItemKind::Agent, "coder", &["core", "team-lint"])?,
-                "agent \"coder\" is shipped by both core and team-lint",
-            ),
-            (
-                clash(ItemKind::Skill, "status", &["sdlc", "team-lint", "x"])?,
-                "skill \"status\" is shipped by sdlc, team-lint and x",
-            ),
-            (
-                clash(ItemKind::Agent, "y", &["a", "b", "c", "d"])?,
-                "agent \"y\" is shipped by a, b, c and d",
             ),
         ];
         for (error, expected) in cases {

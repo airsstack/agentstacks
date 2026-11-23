@@ -223,6 +223,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0921b3876b3a1df8a1c9f912e7f94342458022c2e84288015893d83c4d62a79"
 
 [[package]]
+name = "claudevs"
+version = "0.1.0"
+dependencies = [
+ "airsl",
+ "regex",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "toml 1.2.0+spec-1.1.0",
+ "walkdir",
+]
+
+[[package]]
+name = "claudevs-cli"
+version = "0.1.1"
+dependencies = [
+ "clap",
+ "claudevs",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -141,3 +141,23 @@ The commit message and files name no claudestacks commit.
 
 - `cargo make dod` green after every task; `cargo make deny` green after Task 1.
 - `cargo test -p claudevs` runs the same test count before Task 2 and after Task 3.
+
+## Review findings
+
+- 🟡 fixed — git index half-staged (`types/mod.rs`, `harness/mod.rs` staged with old content beside staged renames; `types/name/mod.rs`, `scripts/` untracked): `git add -A`; `git status --short` then shows only `A`/`M`/`D`/`R` entries (178 A, 17 M, 10 D, 14 R), none partial.
+- 🔵 fixed — `types/mod.rs:4` "(in `name`)" read as PluginName only; now "(all in `name`)".
+- 🔵 fixed — `types/mod.rs:12` "the exception in this file" (Task 2 "this file" rewording missed); now "[`HookEvent`] (in `event`) is the exception here".
+- 🔵 fixed — `types/mod.rs:28` 82-char line; block reflowed to ≤ 80.
+- 🔵 fixed — `types/name/mod.rs:8` named "the parent `types` module"; now names `types::ident` and says only `marketplace` and `plugin` use it.
+- Verification after fixes: `cargo make dod` (workspace) exit 0 — 21 `test result: ok` blocks, 2472 Rust tests passed, lua `63 passed, 0 failed (5 files)`, `Build Done in 77.30 seconds`.
+- 🔵 open — `crates/claudevs/tests/corpus/corpus.toml:13` cites a claudestacks planning path (carried over unchanged; Task 1 is a no-edit import).
+- ❓ open — `crates/claudevs/README.md:64` links claudestacks `examples/README.md` (carried over unchanged).
+- 🔵 open — nothing in the gate guards the one-word file-name rule; only the plan's grep does.
+
+## Deviations
+
+- 2026-11-23 — The task-briefer ledger spawn was skipped; tasks were listed with `grep -n '^### Task'` (same rows).
+- 2026-11-23 — Tasks 2 and 3 ran in one coder, in order: both rebuild `claudevs`, so parallel coders would break each other's build.
+- 2026-11-23 — Per-task commits were not made (execute does not commit unless told). The three tasks sit staged in one index, renames recorded by `git mv` after `git add crates/claudevs crates/claudevs-cli` (git mv refuses untracked files). Cutting the three commits needs restaging.
+- 2026-11-23 — Plan claim "the 11 crates of `probes/claudevs-results.md` step h": `cargo tree -d | grep -E '^[a-z]'` gives 20 lines = 10 crates with two versions each (block-buffer, cpufeatures, crypto-common, digest, serde_spanned, sha2, toml, toml_datetime, toml_edit, winnow), identical before and after the import. The proof (no crate gains a version) holds; the count differs.
+- 2026-11-23 — Test counts: 321 claudevs tests before Task 2 and after Task 3 (lib 301, corpus 4, engine/verify_core 2, examples 2, fetch/corpus_fetch 4, installed 2, wiring 5, doc 1); `find … | grep '_'` prints nothing; `wc -l` 57.

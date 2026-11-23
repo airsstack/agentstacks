@@ -10,7 +10,7 @@
 //!   check, and returns a [`ValidSet`] or every refusal in one [`Diagnostics`]: the load refusals
 //!   of each entry that failed together with those of the checks.
 //! - The checks run in this order: fetched names, requirements and cycles, token targets and
-//!   option tokens, hook `run`s into other packs, option values, airsl ranges, name clashes.
+//!   option tokens, hook `run`s into other packs, option values, airsl ranges.
 //! - Every check reads only the entries that loaded, so an entry that failed to load causes no
 //!   second refusal, while every refusal that does not depend on it is still reported.
 //! - No [`ValidSet`] is returned when any listed entry failed to load.
@@ -32,7 +32,6 @@ use crate::types::project::ProjectFile;
 use crate::types::project::Source;
 use crate::types::report::Diagnostics;
 use crate::types::set::airsl::AirslRange;
-use crate::types::set::clash::check_name_clashes;
 use crate::types::set::fetched::check_fetched_names;
 use crate::types::set::graph::check_requires;
 use crate::types::set::options::resolve_options;
@@ -126,7 +125,6 @@ where
             .as_ref()
             .and_then(|range| range.disjoint_refusal(project_file)),
     );
-    diagnostics.extend(check_name_clashes(project_file, &loaded_packs));
 
     if !(all_packs && all_tools && diagnostics.is_empty()) {
         return Err(diagnostics);
@@ -224,7 +222,6 @@ mod tests {
                 "agentstacks.toml: requires cycle: a → b → a",
                 "agentstacks.toml: packs.core: option \"x\" is required",
                 "agentstacks.toml: airsl: sdlc needs <0.2, team-lint needs >=0.2",
-                "agentstacks.toml: skill \"status\" is shipped by both sdlc and team-lint",
                 "packs/sdlc/skills/status/SKILL.md:6: pack \"core\" has no agent \"codr\"",
                 "packs/sdlc/skills/status/SKILL.md:7: pack \"sdlc\" has no option \"nope\"",
                 "packs/team-lint/pack.toml: hooks[0].run: \"{{root core}}/hooks/nope.lua\" does not exist in core",
@@ -255,7 +252,6 @@ mod tests {
         assert_eq!(
             refusals(&[(failing_core(), ""), (sdlc, ""), (team_lint, "")])?,
             [
-                "agentstacks.toml: skill \"status\" is shipped by both sdlc and team-lint",
                 CORE_API,
                 "packs/sdlc/skills/status/SKILL.md:6: {{skill guideline-rust/rust-guidelines}} targets pack \"guideline-rust\", which sdlc does not require. Add it to requires.packs or remove the ref.",
             ]

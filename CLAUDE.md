@@ -102,7 +102,7 @@ crates/agentstacks/      types · port · app · fs · process · host (see docs
 crates/agentstacks-cli/  init · plan · apply · doctor · update
 crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (keep the crate names)
 extensions/{claude,opencode}/   official tool extensions (Lua)
-packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python, cmux
+packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python
 docs/                    contributor docs until the book exists
 book/                    mdBook, published to airsstack.github.io/agentstacks/
 ```

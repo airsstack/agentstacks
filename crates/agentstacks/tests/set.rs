@@ -3,7 +3,8 @@
 //! Each fixture is a project: an `agentstacks.toml` whose entries are `path` sources, with the
 //! packs under `packs/` and the extensions under `extensions/`. The valid fixture shows every
 //! feature of a set at once; each invalid fixture is valid except for the one refusal its name
-//! says, and the test asserts that refusal's exact text.
+//! says, and the test asserts that refusal's exact text. The `shared-*` fixtures are valid: two
+//! packs may ship a skill or an agent of the same name.
 
 use std::cell::RefCell;
 use std::error::Error;
@@ -170,18 +171,6 @@ fn check_reports_each_set_refusal() -> TestResult {
             "airsl-disjoint",
             "agentstacks.toml: airsl: core needs >=0.2, sdlc needs <0.2",
         ),
-        (
-            "skill-clash",
-            "agentstacks.toml: skill \"status\" is shipped by both sdlc and team-lint",
-        ),
-        (
-            "skill-clash-three",
-            "agentstacks.toml: skill \"status\" is shipped by sdlc, team-lint and x",
-        ),
-        (
-            "agent-clash",
-            "agentstacks.toml: agent \"coder\" is shipped by both core and team-lint",
-        ),
     ];
     for (name, expected) in cases {
         let expected = expected.replace("<fx>", &fixture(name).display().to_string());
@@ -192,19 +181,26 @@ fn check_reports_each_set_refusal() -> TestResult {
 }
 
 #[test]
+fn packs_may_share_skill_and_agent_names() -> TestResult {
+    for name in ["shared-skill", "shared-agent"] {
+        let checked = run(name)?;
+        if let Err(refused) = checked {
+            return Err(format!("{name} was refused: {refused:?}").into());
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn check_skips_follow_on_errors_from_failed_packs() -> TestResult {
     let fx = fixture("failed-pack");
     let refused = run("failed-pack")?.err().ok_or("failed-pack passed")?;
     assert_eq!(
         refused,
-        [
-            // The fixture path is absolute, so it sorts before the project file's relative name.
-            format!(
-                "{}/packs/core/pack.toml: core: api 1 not supported (this agentstacks speaks 0)",
-                fx.display()
-            ),
-            "agentstacks.toml: skill \"status\" is shipped by both sdlc and team-lint".to_owned(),
-        ]
+        [format!(
+            "{}/packs/core/pack.toml: core: api 1 not supported (this agentstacks speaks 0)",
+            fx.display()
+        )]
     );
     Ok(())
 }

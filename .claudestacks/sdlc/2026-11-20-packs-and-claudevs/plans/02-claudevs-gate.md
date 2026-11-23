@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [01]
 built-on: 0f89fdb3ebb3
@@ -99,3 +99,16 @@ Makefile.toml               — modify: tasks claudevs-check, corpus-fetch, corp
 
 - `cargo make claudevs-check` and `cargo make dod` green locally; CI `dod`, `deny` and
   `claudevs-check` green on the pull request.
+
+## Review findings
+
+- 🔵 open — `Makefile.toml:270` carried comment "The only step in this repository that touches the network" is false here (`deny` fetches advisories); the plan allows only the briefed comment edits.
+- 🔵 open — category `claudevs` is lowercase and sorts after `Tools`; other categories are capitalized.
+- 🔵 accepted — unbriefed comment at `ci.yml:90` ("Same step as in the `dod` job …"); accurate.
+- Verification: `cargo make claudevs-check` exit 0, 8/8 (`ok minimal-plugin`, `dead-script-plugin`, `escape-plugin (FAIL wiring)`, `bad-matcher-plugin (FAIL wiring)`, `hooks-array-plugin (FAIL wiring)`, `project-branch-plugin`, `exec-args-plugin`, `matcher-routing-plugin (FAIL test)`); with `claude`/`airsl` off PATH it still passes 8/8 and prints `skip  validate`. `cargo make --list-all-steps` lists the three tasks; `dod` deps unchanged. `ci.yml` parses (`ruby -ryaml`), jobs `["dod","claudevs-check","deny"]`. Workspace `cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-23 — `category = "claudevs"` set on all three tasks, not only `claudevs-check`: the source category "Plugin suite" names a suite this repo does not have.
+- 2026-11-23 — The validate stage ran locally (a `claude` binary is installed): `bad-matcher-plugin` gave `ok validate`, `FAIL wiring`. The Task 2 proof (CI job green with validate skipped) can only be checked after a push.
+- 2026-11-23 — Tasks 1 and 2 ran in one coder; no per-task commits (execute does not commit unless told).

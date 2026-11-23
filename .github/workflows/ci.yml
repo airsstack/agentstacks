@@ -80,6 +80,35 @@ jobs:
         env:
           AGENTSTACKS_REQUIRE_AIRSL: "1"
 
+  claudevs-check:
+    name: claudevs fixture corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same step as in the `dod` job: the pinned toolchain from rust-toolchain.toml.
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install
+          rustup show
+          cargo --version
+          cargo clippy --version
+          cargo fmt --version
+
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # No `claude` binary on the runner: the validate stage reports itself
+      # skipped and the deterministic stages gate.
+      - name: cargo make claudevs-check
+        run: cargo make claudevs-check
+
   deny:
     name: Supply chain
     runs-on: ubuntu-latest

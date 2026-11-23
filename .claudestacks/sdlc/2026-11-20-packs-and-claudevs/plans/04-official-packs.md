@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -65,3 +65,13 @@ CLAUDE.md                                  — modify: planned layout pack list 
 ## Proof
 
 - `cargo make dod` green.
+
+## Review findings
+
+- 🔵 fixed — `docs/cli.md:59` not reflowed after dropping `cmux`; "Official tools: `claude`." joined onto the line. Workspace `cargo make dod` exit 0 afterwards.
+- Verification: `cargo test -p agentstacks --lib shorthand` 12 passed (incl. `every_official_pack_name_is_accepted`, `cmux_is_not_an_official_pack`); `cargo make dod-crate agentstacks` exit 0.
+
+## Deviations
+
+- 2026-11-23 — Proof "`grep -rn cmux docs README.md CLAUDE.md crates/agentstacks/src/types/shorthand.rs` prints nothing": it prints `shorthand.rs:236,238,239`, all inside the new `cmux_is_not_an_official_pack`, which must name `cmux`. docs, README.md and CLAUDE.md are clean. `grep -rn '"cmux"\|pack cmux' crates` prints only that test and `name/binary.rs:104`.
+- 2026-11-23 — Not committed (execute does not commit unless told).

@@ -36,13 +36,12 @@ pub const OFFICIAL_REPOSITORY: &str = "https://github.com/airsstack/agentstacks"
 pub const TAG_PREFIX: &str = "packs-v";
 
 /// The pack names the official repository holds under `packs/`.
-pub const OFFICIAL_PACKS: [&str; 6] = [
+pub const OFFICIAL_PACKS: [&str; 5] = [
     "core",
     "sdlc",
     "journal",
     "guideline-rust",
     "guideline-python",
-    "cmux",
 ];
 
 /// The tool names the official repository holds under `extensions/`.
@@ -227,9 +226,17 @@ mod tests {
                 "sdlc",
                 "journal",
                 "guideline-rust",
-                "guideline-python",
-                "cmux"
+                "guideline-python"
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cmux_is_not_an_official_pack() -> TestResult {
+        assert_eq!(
+            refusal(Flag::Pack, "cmux")?,
+            "--pack \"cmux\": not an official pack; pass a path, or add a git source to agentstacks.toml"
         );
         Ok(())
     }

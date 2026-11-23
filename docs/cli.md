@@ -56,8 +56,7 @@ Refusals are printed one `Diagnostic` per line, sorted.
 | contains `/` or starts with `.` | a project-relative path, written as `path = "<argument>"` |
 | anything else | an official name |
 
-- Official packs: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`, `cmux`. Official
-  tools: `claude`.
+- Official packs: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`. Official tools: `claude`.
 - An official name expands to `git = "https://github.com/airsstack/agentstacks"`, the latest
   `packs-v*` tag, and `subdir = "packs/<name>"` (a tool: `extensions/<name>`).
 - A path's table key is the `name` in that directory's `pack.toml` or `extension.toml`.
