@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [01]
 built-on: 0f89fdb3ebb3
@@ -74,3 +74,16 @@ pushed CI `dod` job passes its `sha256sum -c` step. Commit `build(repo): airsl 0
 ## Proof
 
 - `cargo make dod`, `cargo make deny` and CI green on 0.1.5.
+
+## Review findings
+
+- No findings. The diff (5 files, 8 lines) was read against Task 1: `Cargo.toml` `airsl = "0.1.5"`; `Cargo.lock` moves only airsl; `deny.toml:81` `skip-tree` `airsl@0.1.5` (0.1.5 still pins `sha2 v0.10.9`, `toml v0.8.23` per `cargo tree -p airsl@0.1.5 --depth 1 -e normal`, so the entry stays); `ci.yml` `AIRSL_VERSION: 0.1.5`, `AIRSL_SHA256: a8a8f9e5…3006`, the same as the release's own `airsl-cli-x86_64-unknown-linux-gnu.tar.xz.sha256` asset.
+- Verification: `cargo tree -i airsl` → only `airsl v0.1.5`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`, 2474 passed, Lua `71 passed, 0 failed (5 files)`; claudevs needed no change); `cargo make deny` → `advisories ok, bans ok, licenses ok, sources ok`; `airsl --version` → `airsl 0.1.5`.
+
+## Deviations
+
+- 2026-11-23 — Before this plan ran, the release was probed: `cargo search airsl` → `airsl = "0.1.5"`, `airsl-cli = "0.1.5"`; airsl#17 closed; a 0.1.5 module that requires a sibling by its own module name loaded both under `airsl run` (`lib=ok via core.hooks.lib.x base=[core.hooks.]`) and under `airsl test` (`1 passed, 0 failed`); the same probe on 0.1.4 fails `attempt to index a nil value`.
+- 2026-11-23 — The local binary was installed by copying the `cargo install --locked airsl-cli@0.1.5` build into `~/.local/bin` (first on `PATH`) as well as `~/.cargo/bin`.
+- 2026-11-23 — `docs/architecture.md:55` also moved to 0.1.5: it describes the `deny.toml` entry. Fixture `requires.airsl = ">=0.1.4"`, sample versions in tests and docs, and `docs/authoring.md:70` (a dated run on 0.1.4) are left.
+- 2026-11-23 — Review done inline by the orchestrator (one-task, 8-line diff), not by a reviewer spawn. The pushed-CI `sha256sum -c` check is not run: nothing is pushed in execute; the hash equals the release's published `.sha256`.
+- 2026-11-23 — Not committed.

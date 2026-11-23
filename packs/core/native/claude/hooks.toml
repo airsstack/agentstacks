@@ -1,0 +1,19 @@
+[[hooks]]
+kind      = "lua"
+event     = "PreToolUse"
+match     = ["^SubagentHandback$"]
+run       = "scripts/handoff_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]
+
+[[hooks]]
+kind      = "lua"
+event     = "PreToolUse"
+match     = ["^SubagentHandback$"]
+run       = "scripts/comm_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]

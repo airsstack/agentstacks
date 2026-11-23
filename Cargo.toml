@@ -12,7 +12,7 @@ publish       = false
 
 [workspace.dependencies]
 agentstacks = { path = "crates/agentstacks", version = "0.0.0" }
-airsl = "0.1.4"
+airsl = "0.1.5"
 clap = { version = "4", features = ["derive"] }
 claudevs = { path = "crates/claudevs", version = "0.1.0" }
 globset = "0.4"

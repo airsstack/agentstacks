@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [06, 10]
 built-on: 0f89fdb3ebb3
@@ -189,3 +189,23 @@ green. Commit `feat(repo): core handoff and comm checks as pack hooks`.
 - `cargo make dod` green. A core-only `init` writes the `SessionStart`, `UserPromptSubmit`,
   `PostToolUse`, `SubagentStop` and `PreToolUse` (`^SubagentHandback$`) groups, and the plan has one
   skip.
+
+## Review findings
+
+Reviewer: no blocking findings. Re-ran `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`; lua `11 file(s) compiled`, `24 file(s) compiled`, `71 passed, 0 failed (5 files)`, `247 passed, 0 failed (10 files)`). Core-only `init` in a temp git project: `applied: 33 written`; `plan` `0 to write, 0 to delete, 33 unchanged, 1 skipped` — `skip core/hook/2: claude shows no hook output to the model at session end`; `settings.json` events `PostToolUse` (2× `Write`), `PreToolUse` (2× `^SubagentHandback$`), `SessionStart` (2), `SubagentStop` (handoff matcher `core-coder|core-explorer|core-reviewer`, comm no matcher), `UserPromptSubmit`. Rendered commands piped with `CLAUDE_PROJECT_DIR` set: SubagentStop bad handoff report → `{"decision":"block","reason":"handoff report does not conform to the protocol:\nfrontmatter-missing: …"}`; good → no output; comm bad → `{"decision":"block","reason":"communication protocol report does not conform:\ntopics-missing: …"}`; native PreToolUse bad → `"permissionDecision":"deny"`; PostToolUse bad → block; style hook context on SessionStart/UserPromptSubmit, `"false"` → no output; a bad report under `$TMPDIR` blocks (lazy env read under real airsl).
+
+- 🟡 open — `packs/core/scripts/lib/handoff_report.lua:13`: the `(...)` require idiom and the `pack.toml` `run` wiring are guarded only by the manual piped run. Under `airsl test` a bare `require("lib.handoff_report")` also resolves, and the runtime runs `--fail-open`, so a reverted idiom or a `run` typo makes the hook a silent no-op with `dod` green; `tests/runtime.rs` and `tests/claude.rs` never load the shipped `packs/core`.
+- 🔵 open — `lib/handoff_report.lua:72,95,111,309`: comments keep workflow vocabulary ("defect B's second half: the fix round").
+- 🔵 open — `lib/handoff_report.lua:74,362`: cites `protocol.md:90-92` by line (really 90-91); cite the "Return & routing contract" section.
+- 🔵 open — `lib/handoff_report.lua:366`: `file_from_payload(event)` now takes a neutral event; the name is kept per the plan.
+- 🔵 open — `lib/comm_report.lua:154` decides native with `event.payload == nil`, `lib/handoff_report.lua:369` with `type(payload) == "table"`; the comm filter is unreachable from `comm_check_hook` because `file_from_payload` already returns nil.
+- 🔵 open — `packs/core/pack.toml:72`: the check and native tables grant `env = ["HOME", "TMPDIR"]`; no loaded module reads `HOME` (the plan dictates the grant).
+- 🔵 open — `style_test.lua:68` uses `${user_config.style_reinject}` as the unrendered case; a raw `{{option style_reinject}}` would test the real one.
+
+## Deviations
+
+- 2026-11-23 — Tasks ran as two parallel coders on disjoint files: one did Tasks 1–2 (owning `pack.toml`); the other wrote Task 3's modules and tests, then, after the first finished, appended Task 3's four tables to `pack.toml` and created `native/claude/hooks.toml`. Coders ran file-local checks; the orchestrator ran `dod` once.
+- 2026-11-23 — Task 2: `style_test.lua` gained `prompt_submit_without_an_option_returns_the_rules`, `no_protocol_path_returns_nil`, `an_unreadable_protocol_returns_nil`; `lib/style.lua` and `style_test.lua` comments drop the "spec P3/P4" and "spec §8" cites.
+- 2026-11-23 — Task 3: the block reason no longer ends in `\n` (the runtime and translator own output); `hook_output(event, violations)` takes the event table (needed for the native case); `airsstack.env` is read inside `under_handoff_root` when it runs, so a test can swap it; extra tests `an_event_with_no_report_path_returns_nil`, `a_report_without_a_protocol_key_returns_nil`, and 12 `file_from_payload_*` cases (plan names 10), including `an_exception_tier_path_under_the_environment_tmpdir_qualifies`.
+- 2026-11-23 — Task 3's own Files list omits `scripts/handoff_report_test.lua`; the plan-level list and the Change text name it, and it was modified.
+- 2026-11-23 — Not committed (the plan's per-task commits are held for the author).

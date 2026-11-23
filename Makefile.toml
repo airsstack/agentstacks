@@ -10,9 +10,10 @@
 #
 # The five cargo gate steps mirror the canonical command set in the
 # `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
-# file follows. The `lua` step is the project's own addition: it runs the Lua
-# extension tests with `airsl test`. CI is meant to run `cargo make dod`, so the
-# pipeline and a local run are the same command.
+# file follows. The `lua` step is the project's own addition: it compiles and tests
+# the Lua under extensions/ and packs/ with `airsl check` and `airsl test`. CI is
+# meant to run `cargo make dod`, so the pipeline and a local run are the same
+# command.
 #
 # Install: cargo install --locked cargo-make cargo-deny
 #          plus the `airsl` binary on PATH for the `lua` step
@@ -95,9 +96,17 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua extension tests: every *_test.lua under extensions/"
-command = "airsl"
-args = ["test", "extensions"]
+description = "Lua: airsl check and airsl test over extensions/ and packs/"
+# A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
+# needs shell expansion. `set -e` stops the run at the first failing step.
+script_runner = "@shell"
+script = '''
+set -e
+airsl check extensions
+airsl check packs
+airsl test extensions
+airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git packs
+'''
 
 # ---------------------------------------------------------------------------
 # claudevs

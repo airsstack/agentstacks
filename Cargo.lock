@@ -41,9 +41,9 @@ dependencies = [
 
 [[package]]
 name = "airsl"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a47f225b4b5a151c26115ce4c9da03157f2220a164fa46a9f696246354af9c2b"
+checksum = "3553460cde52869fcb92d14dbdd75f57dcfd82e8925c775c644b4b85d2d9b362"
 dependencies = [
  "globset",
  "jiff",

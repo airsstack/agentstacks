@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [05, 09]
 built-on: 0f89fdb3ebb3
@@ -197,3 +197,32 @@ native claude skill`.
 ## Proof
 
 - `cargo make dod` green; the core-only `init` writes 7 skill directories and 3 agent files.
+
+## Review findings
+
+Reviewer: no blocking findings. Re-ran `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`; lua `11 file(s) compiled`, `17 file(s) compiled`, `71 passed, 0 failed (5 files)`, `216 passed, 0 failed (7 files)`); core-only `init` in a temp git project exit 0, 26 written, 7 skill dirs (`core-context-handoff`, `core-discuss`, `core-orchestrate`, `core-process-guidelines`, `core-snapshot-load`, `core-snapshot-save`, `core-statusline`), 3 agents, no `{{` or `CLAUDE_PLUGIN_ROOT` left under `.claude`; `plan` `0 to write`; `doctor` `healthy`; the two §6.4 gate greps over `packs/core` print nothing; `core-statusline` renders `${CLAUDE_PROJECT_DIR}/.claude/agentstacks/core` (16 lines).
+
+- 🟡 open — `packs/core/README.md:22` "Every skill is namespaced `claudestacks:`, so `discuss` runs as `/claudestacks:discuss`" is false (init renders `/core-discuss`); `:1-9` ("# claudestacks", "core plugin", "holds the suite's hooks") stale too. Task 1 says other README text stays.
+- 🟡 open — only `discuss/SKILL.md` is pinned by a test; reverting any other conversion (a `${CLAUDE_PLUGIN_ROOT}` in orchestrate/context-handoff/statusline, a bare `` `coder` ``, `name: statusline` in the native skill) passes `dod` and `init`. The §6.4 greps are a one-off proof, not a gate.
+- 🔵 open — `Makefile.toml:97`: reverting `[tasks.lua]` to `airsl test extensions` fails nothing; pack tests would drop out of `dod` silently.
+- 🔵 open — `core-statusline/SKILL.md:16,50,52-53`: prose still says "plugin root", `plugins/claudestacks/scripts/`, and an out-of-tree branch `{{var project_dir}}/{{root}}` can no longer reach.
+- 🔵 open — `discuss_skill_test.lua:23` test name `every_user_config_placeholder_is_single_quoted` names the retired `${user_config…}` form.
+- 🔵 open — `handoff_test.lua:6` names sibling `enforce_test.lua` fixtures (arrives plan 12).
+- 🔵 open — `install-airsl.sh:79` echo "Plugin hooks still find airsl there" and `:154` "the plugin tests" while `:2` says "every pack hook".
+- 🔵 open — `lib/discuss.lua:3` "this chain's spec" (workflow vocabulary); `:28` cites `hooks/lib/enforce.lua:35-174` by line (absent until plan 12; cite `M.project_key`).
+- 🔵 open — `statusline-install.lua:4` keeps "NOT plugin content".
+- 🔵 open — "plugin" wording mixed: `context-handoff/SKILL.md:28,71`, `discuss/references/protocol.md:75` vs `context-handoff/references/protocol.md:187` "the core pack".
+- 🔵 open — `context-handoff/references/protocol.md:145` "run the block above with that absolute literal in place of the variable" points at no variable any more.
+- 🔵 open — `context-handoff/references/protocol.md:187` "the core pack registers it as a hook on three events" is false until plan 11 lands.
+- 🔵 open — `snapshot-save/SKILL.md:74` cites `hooks/lib/enforce.lua` `M.project_key` (plan 12) and other plugin-era paths.
+
+## Deviations
+
+- 2026-11-23 — Tasks 1–4 ran as one parallel batch (disjoint files); coders ran file-local checks only, and the orchestrator ran the `init` proof, the gate greps and `dod` once after the batch.
+- 2026-11-23 — Task 1: carried comments naming retired things were rewritten beyond the three the plan names (`cargo make plugins-test` → `cargo make lua` in 5 files; `plugins/claudestacks/scripts` → `packs/core/scripts` in 4; `lib/handoff.lua:30` "the pack's"; `statusline-install.lua:4`; `install-airsl.sh` header and usage path, so it is not "carried unchanged"). Reviewer checked each is true.
+- 2026-11-23 — Task 1 README: LICENSE link `./LICENSE` → `../../LICENSE` (the old link is dead; same as the guideline packs) and "Then, in Claude Code:" → "Then, in your project:"; the rest kept per "Other text stays".
+- 2026-11-23 — Task 1 agents: no agent text held a namespaced reference; only frontmatter (`tools`, `model`) and the closing protocol path (`{{skill_dir core/context-handoff}}/references/protocol.md`) changed.
+- 2026-11-23 — Task 3: `context-handoff/references/protocol.md:145-151` `echo "$CLAUDE_PLUGIN_ROOT"` block dropped and the advice reworded; `context-handoff/SKILL.md` sentence on the variable reworded to the project directory; `orchestrate/SKILL.md:39` `claudestacks:explorer` → `{{agent explorer}}` (caught by gate grep 1); `protocol.md:10` plugin path → `{{root}}/scripts/lib/handoff.lua`; `protocol.md:187` "the `claudestacks` plugin" → "the core pack".
+- 2026-11-23 — Task 4: the plan lists `:41,81,91,115,126` but the source also has `${CLAUDE_PLUGIN_ROOT}` at `:69,82-83,92-93,116-117,127-128,153,162`; all were converted ("Every" governs).
+- 2026-11-23 — The worktree guard refuses a Bash command whose text holds the git exec grant of the pack test command; it was run from a scratch script (`sh <script>`). `cargo make lua` is unaffected.
+- 2026-11-23 — Not committed.

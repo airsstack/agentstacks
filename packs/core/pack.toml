@@ -1,0 +1,86 @@
+exclude = ["README.md", "**/*_test.lua"]
+
+[pack]
+name        = "core"
+version     = "0.1.0"
+api         = 0
+description = "Core workflow: coder, explorer and reviewer agents, orchestration, handoff and communication checks, guideline enforcement"
+
+[requires]
+airsl = ">=0.1.5"
+
+[options.style_reinject]
+type        = "boolean"
+default     = true
+description = "Re-inject the reply rules on every prompt; they are always sent at session start, /clear and compaction"
+
+[options.archive_keep]
+type        = "integer"
+default     = 20
+description = "Discussions kept per project besides the current one"
+
+[[hooks]]
+kind  = "message"
+event = "session.start"
+match = ["startup", "resume", "clear"]
+text  = "Reminder: run {{skill snapshot-load}} for the current git branch to rehydrate relevant project memory before starting work."
+
+[[hooks]]
+kind  = "lua"
+event = "session.start"
+run   = "scripts/style.lua"
+args  = ["{{skill_dir discuss}}/references/protocol.md"]
+[hooks.grants]
+read = ["{{skill_dir discuss}}"]
+
+[[hooks]]
+kind  = "message"
+event = "session.end"
+text  = "Reminder: run {{skill snapshot-save}} to flush durable session learnings into project memory (durability gate applies — thin sessions write nothing)."
+
+[[hooks]]
+kind  = "lua"
+event = "prompt.submit"
+run   = "scripts/style.lua"
+args  = ["{{skill_dir discuss}}/references/protocol.md", "{{option style_reinject}}"]
+[hooks.grants]
+read = ["{{skill_dir discuss}}"]
+
+[[hooks]]
+kind      = "lua"
+event     = "tool.after"
+match     = ["write"]
+run       = "scripts/handoff_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]
+
+[[hooks]]
+kind      = "lua"
+event     = "tool.after"
+match     = ["write"]
+run       = "scripts/comm_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]
+
+[[hooks]]
+kind      = "lua"
+event     = "agent.stop"
+agents    = ["coder", "explorer", "reviewer"]
+run       = "scripts/handoff_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]
+
+[[hooks]]
+kind      = "lua"
+event     = "agent.stop"
+run       = "scripts/comm_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]
