@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -145,3 +145,29 @@ Task 3 carries all three subjects in its body.)
 - `airsl test extensions` and `cargo make dod` green.
 - `grep -rn 'skills/status/\|agents/coder.md' crates/agentstacks/tests/fixtures/claude/*/expected docs`
   prints nothing.
+
+## Review findings
+
+- 🟡 fixed — `docs/authoring.md:120` worked example wrote the agent at `paths.agent_file(a.name)` while its `values` names it `<pack>-<agent>`; now `paths.agent_file(p.name .. "-" .. a.name)`. Re-run of the example (adapter re-extracted from the doc, demo pack, `agentstacks plan`): `create   .mytool/agents/demo-helper.md  demo`.
+- 🟡 fixed (follow-up) — `extensions/claude/adapter.lua:63`: reverting the `hook_agents` mapping (passing raw `hook.agents`) passes every test. The only neutral agent.stop hook with `agents` in the Rust fixtures (`full` hook 6) is skipped by the literal-`$` rule; `hooks_test` checks the join, not the prefixing. Needs a fixture with a rendered agent.stop hook, or the lookup moved into `lib/` with a unit test.
+- 🔵 fixed (follow-up) — `docs/authoring.md:70` says `airsl test` gave `2 passed, 0 failed`; the example's test file gives `1 passed, 0 failed (1 files)` (line not changed here).
+- 🔵 fixed (follow-up) — `extensions/claude/adapter.lua:12` comment says `plan` needs `run_values` for var forms; it now also supplies skill and agent names.
+- 🔵 fixed (follow-up) — `extensions/claude/lib/values.lua:21` one 120-column comment line.
+- 🔵 fixed (follow-up) — `full/packs/core/native/claude/hooks.toml:5` native `SubagentStop` matcher `"coder"` now matches no installed agent (`core-coder`); correct (native hooks are not renamed), but no doc tells pack authors native matchers must use `<pack>-<agent>`.
+- Verification (reviewer re-run): `cargo make dod` exit 0, `airsl test` 67 passed / 0 failed; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test claude` 23 passed; `cargo test -p agentstacks-cli --test commands` 10 passed.
+
+## Deviations
+
+- 2026-11-23 — The task-briefer spawns were skipped: the coder read this plan directly. Plans 05 and 06 ran in one coder, in order (both change `values.lua`, `values_test.lua`, `docs/extensions.md` and `full/expected/.claude/settings.json`).
+- 2026-11-23 — Task 3 claim "`settings.json` agent-stop `matcher` becomes the prefixed list (`"coder"` → `"core-coder"` in `full`)": that matcher comes from the native `SubagentStop` hook (`full/packs/core/native/claude/hooks.toml` `match = ["coder"]`), and native hooks are not renamed (Task 2); the neutral agent.stop hook listing `coder` is skipped in `full` (literal `$`). Left `"coder"`.
+- 2026-11-23 — `full/expected` rendered bodies and `references/guide.md` also changed (`/core-ask`, `core-coder`, `/core-status`, `.claude/skills/core-status/…`): they hold rendered `{{skill}}`, `{{agent}}`, `{{skill_dir}}` tokens.
+- 2026-11-23 — Docs: the `extensions.md`/`authoring.md` examples are multi-line; the `authoring.md` test example uses its pack name (`paths.skill_dir("demo-greet")`, `.mytool/skills/demo-greet`); the `cli.md` plan block is re-aligned.
+- 2026-11-23 — Test-first partial in Task 3: the Lua unit tests were seen red; `full_pack_renders_every_item_kind` was first run after both the Lua change and the expected tree, so not seen red. `agent_stop_without_agents_has_no_matcher` and `rendered_name_is_the_frontmatter_name` were green on first run (pin existing behaviour).
+- 2026-11-23 — Not committed (execute does not commit unless told).
+
+## Follow-up fixes
+
+- 2026-11-23 — Every open finding above was fixed in one follow-up pass (three parallel coders, disjoint files). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 23 `test result: ok` blocks, 2474 Rust tests passed, lua `71 passed, 0 failed (5 files)`, `Build Done in 55.65 seconds`.
+- `adapter.lua:63`: the lookup moved to `values.hook_agents(result, pack_name, hook)` with 4 unit tests; `full/packs/core/pack.toml` gains hook 7 (neutral agent.stop, `agents = ["coder"]`), expected `settings.json` gains a `SubagentStop` matcher `"core-coder"`. Revert proofs: raw `hook.agents` in the adapter → `full_pack_renders_every_item_kind … FAILED`; raw names in `hook_agents` → 2 Lua FAILs.
+- Native matcher: `full/packs/core/native/claude/hooks.toml` `match = ["core-coder"]`; `docs/extensions.md` says native matchers use the installed name `<pack>-<agent>`.
+- `docs/authoring.md:70` now quotes `1 passed, 0 failed (1 files)` (`airsl test mytool`, airsl 0.1.4).

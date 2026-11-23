@@ -9,7 +9,8 @@ local translate = agentstacks.require("lib.translate")
 
 local SETTINGS = ".claude/settings.json"
 
--- The `values` result of this run; the `plan` handler needs its var forms to check hook arguments.
+-- The `values` result of this run; the `plan` handler needs it for the skill and agent names and
+-- the var forms of hook arguments.
 -- The host always dispatches `values` before `plan` in one session, so this is set when `plan` runs.
 local run_values
 
@@ -31,9 +32,14 @@ local function split_skill_files(skill)
   return main, others
 end
 
-local function propose_skill(skill)
+-- The name Claude gives a skill: its `invoke` without the leading `/`.
+local function skill_name(pack, skill)
+  return run_values.skills[pack.name .. "/" .. skill.name].invoke:sub(2)
+end
+
+local function propose_skill(pack, skill)
   local main, others = split_skill_files(skill)
-  local content, reason = frontmatter.skill(skill.name, skill.meta, main.text)
+  local content, reason = frontmatter.skill(skill_name(pack, skill), skill.meta, main.text)
   if content == nil then
     agentstacks.skip({ item = skill.id, reason = reason })
     return
@@ -44,13 +50,14 @@ local function propose_skill(skill)
   end
 end
 
-local function propose_agent(agent)
-  local content, reason = frontmatter.agent(agent.name, agent.meta, agent.text)
+local function propose_agent(pack, agent)
+  local name = run_values.agents[pack.name .. "/" .. agent.name]
+  local content, reason = frontmatter.agent(name, agent.meta, agent.text)
   if content == nil then
     agentstacks.skip({ item = agent.id, reason = reason })
     return
   end
-  agentstacks.write({ path = ".claude/agents/" .. agent.name .. ".md", content = content, covers = { agent.id } })
+  agentstacks.write({ path = ".claude/agents/" .. name .. ".md", content = content, covers = { agent.id } })
 end
 
 -- Every hook of a pack, in payload order: the neutral ones by index, then the native ones.
@@ -71,7 +78,7 @@ local function render_hooks(packs)
   local groups, members = {}, {}
   for _, pack in ipairs(packs) do
     for _, hook in ipairs(pack_hooks(pack)) do
-      local rendered, reason = hooks.render(hook, run_values.vars)
+      local rendered, reason = hooks.render(hook, run_values.vars, values.hook_agents(run_values, pack.name, hook))
       if rendered == nil then
         agentstacks.skip({ item = hook.id, reason = reason })
       else
@@ -126,10 +133,10 @@ end
 agentstacks.on("plan", function(payload)
   for _, pack in ipairs(payload.packs) do
     for _, skill in ipairs(pack.skills or {}) do
-      propose_skill(skill)
+      propose_skill(pack, skill)
     end
     for _, agent in ipairs(pack.agents or {}) do
-      propose_agent(agent)
+      propose_agent(pack, agent)
     end
     for _, file in ipairs((pack.native and pack.native.files) or {}) do
       agentstacks.copy({ path = ".claude/" .. file.rel, file = file.id })

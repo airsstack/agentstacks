@@ -9,12 +9,11 @@
 # claudevs.
 #
 # Cloned and swept on 2026-08-29 with `claudevs check` built from `main` at
-# 2db55e4. That sweep is the source of every corpus number in
-# `.claudestacks/sdlc/2026-08-29-claudevs-plugin-correctness/`: 43 of 156 roots
-# failing with only 3 genuine, 34 `refs` errors partitioning 29/3/1/1, and 77
-# dead-file warnings partitioning 40/26/5/5. Without this file those numbers are
-# unreproducible, because nothing else records which repositories at which
-# commits produced them.
+# 2db55e4. That sweep is the source of every corpus number quoted for claudevs
+# plugin correctness: 43 of 156 roots failing with only 3 genuine, 34 `refs`
+# errors partitioning 29/3/1/1, and 77 dead-file warnings partitioning
+# 40/26/5/5. Without this file those numbers are unreproducible, because
+# nothing else records which repositories at which commits produced them.
 #
 # The `sha` values are what was actually measured — `git rev-parse HEAD` in each
 # `git clone --depth 1` at sweep time. Re-fetching one is

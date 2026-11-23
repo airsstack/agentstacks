@@ -113,8 +113,8 @@ crates/agentstacks/tests/fixtures/sets/skill-clash-three/ — delete
 
 ## Review findings
 
-- 🔵 open — `types/set/check.rs`: `failing_core`'s `.skill("status", "body")` and the `team_lint` PackSpec in `check_still_reports_unrelated_errors_beside_a_failed_load` existed only to cause the removed clash line.
-- 🔵 open — `tests/fixtures/sets/failed-pack/packs/team-lint/` and its `agentstacks.toml` entry now add nothing to `check_skips_follow_on_errors_from_failed_packs`.
+- 🔵 fixed (follow-up) — `types/set/check.rs`: `failing_core`'s `.skill("status", "body")` and the `team_lint` PackSpec in `check_still_reports_unrelated_errors_beside_a_failed_load` existed only to cause the removed clash line.
+- 🔵 fixed (follow-up) — `tests/fixtures/sets/failed-pack/packs/team-lint/` and its `agentstacks.toml` entry now add nothing to `check_skips_follow_on_errors_from_failed_packs`.
 - Verification: `cargo make dod-crate agentstacks` exit 0 (lib 1690 passed, `tests/set.rs` 4 passed, 292 doctests); greps `NameClash|check_name_clashes|is shipped by` (src), `clash|two packs ship` (types/set), `shipped by` (docs, README) print nothing. Workspace `cargo make dod` exit 0.
 
 ## Deviations
@@ -122,3 +122,8 @@ crates/agentstacks/tests/fixtures/sets/skill-clash-three/ — delete
 - 2026-11-23 — Tasks 1 and 2 ran in one coder: Task 1's gate needs Task 2's `tests/set.rs` changes.
 - 2026-11-23 — Test-first was partial: the first red run failed to compile on plan 04's in-flight `shorthand.rs` change (`[&str; 6]` vs `[&str; 5]`), so the red caused by the still-present rule was not seen; `packs_may_share_skill_and_agent_names` was written after the rule was gone.
 - 2026-11-23 — `git status` pairs the renames by content (`skill-clash-three → shared-skill` R, `skill-clash` D); the resulting tree is as planned. No per-task commits (execute does not commit unless told).
+
+## Follow-up fixes
+
+- 2026-11-23 — Every open finding above was fixed in one follow-up pass (three parallel coders, disjoint files). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 23 `test result: ok` blocks, 2474 Rust tests passed, lua `71 passed, 0 failed (5 files)`, `Build Done in 55.65 seconds`.
+- `check.rs` leftover clash setup removed (`check::` 12 passed); `failed-pack/packs/team-lint` removed with `git rm -r` plus its `agentstacks.toml` entry (`--test set` 4 passed).

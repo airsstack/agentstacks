@@ -5,6 +5,13 @@ local function eq(got, want)
 end
 
 return {
+  rendered_name_is_the_frontmatter_name = function()
+    local skill = frontmatter.skill("sdlc-status", { description = "d" }, "")
+    eq(skill, '---\nname: "sdlc-status"\ndescription: "d"\n---\n')
+    local agent = frontmatter.agent("core-coder", { description = "d" }, "")
+    eq(agent, '---\nname: "core-coder"\ndescription: "d"\n---\n')
+  end,
+
   skill_frontmatter_has_name_and_description_in_order = function()
     local out = frontmatter.skill("status", { description = "Show the board" }, "\nbody\n")
     eq(out, '---\nname: "status"\ndescription: "Show the board"\n---\n\nbody\n')

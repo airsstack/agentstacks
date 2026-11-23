@@ -104,7 +104,7 @@ args = ["test", "extensions"]
 # ---------------------------------------------------------------------------
 
 [tasks.claudevs-check]
-category = "claudevs"
+category = "Claudevs"
 description = "claudevs check over the fixture plugin corpus, both directions"
 # Not a dependency of `dod`: the gate is the five commands the guideline skill
 # owns plus the project's `lua` step. This lane asserts the checkers
@@ -265,10 +265,10 @@ expect_stage_fail matcher-routing-plugin 1 test
 '''
 
 [tasks.corpus-fetch]
-category = "claudevs"
+category = "Claudevs"
 description = "Clone the pinned third-party plugin corpus into target/corpus"
-# The only step in this repository that touches the network. It is never a
-# dependency of `dod`, never runs in CI, and is run before a release rather
+# Clones third-party repositories over the network (`deny` also fetches the
+# advisory database). It is never a dependency of `dod`, never runs in CI, and is run before a release rather
 # than on every commit — the corpus is pinned by commit SHA rather than
 # vendored, which keeps repository weight at zero (vendoring measured 19 MB
 # for all 156 roots) and keeps the published .crate clear of the crates.io
@@ -291,7 +291,7 @@ description = "Clone the pinned third-party plugin corpus into target/corpus"
 command = "./scripts/corpus-fetch.sh"
 
 [tasks.corpus-check]
-category = "claudevs"
+category = "Claudevs"
 description = "Sweep the fetched third-party corpus and check it is not short (slow; needs corpus-fetch)"
 # Not a dependency of `dod` and not in CI, for the reason the corpus is
 # pinned rather than vendored: the clones are not in the repository, so this

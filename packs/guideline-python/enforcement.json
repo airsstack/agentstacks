@@ -1,0 +1,7 @@
+{
+  "stack": "python",
+  "detect": ["pyproject.toml"],
+  "match": ["**/*.py", "**/*.pyi", "**/pyproject.toml"],
+  "skill": "{{skill guidelines}}",
+  "phase": ["code", "design"]
+}

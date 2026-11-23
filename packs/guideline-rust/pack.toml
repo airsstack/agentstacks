@@ -1,0 +1,8 @@
+render  = ["enforcement.json"]
+exclude = ["README.md"]
+
+[pack]
+name        = "guideline-rust"
+version     = "0.1.0"
+api         = 0
+description = "Rust engineering rules and the Definition of Done gate"

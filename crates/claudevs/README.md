@@ -59,9 +59,8 @@ The book covers the binary and the crate.
 
 The API reference is the rustdoc.
 
-The repository also holds nine small example plugins, each with its case files and the `claudevs
-check` outcome it produces, in
-[`examples/`](https://github.com/airsstack/claudestacks/blob/main/crates/claudevs/examples/README.md).
+The crate also holds nine small example plugins, each with its case files and the `claudevs check`
+outcome it produces, in [`examples/`](examples/README.md).
 
 ## License
 

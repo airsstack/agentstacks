@@ -1,6 +1,6 @@
 -- Writes the neutral event's fields to stderr as `key=value`, `nil` for an absent one, and
 -- returns nothing, so the mapping shows for every event whatever it prints on stdout.
-local FIELDS = { "event", "source", "prompt", "tool", "path", "last_message", "agent", "session_id", "cwd" }
+local FIELDS = { "event", "source", "prompt", "tool", "path", "last_message", "agent", "session_id", "cwd", "agent_id" }
 
 return function(ev)
   local parts = {}

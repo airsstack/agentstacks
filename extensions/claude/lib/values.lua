@@ -11,25 +11,26 @@ local VARS = {
   session_id = "${CLAUDE_SESSION_ID}",
   arguments = "$ARGUMENTS",
   project_dir = "${CLAUDE_PROJECT_DIR}",
-  tmpdir = "$TMPDIR",
+  tmpdir = "${TMPDIR:-/tmp}",
   home = "$HOME",
   airsstack_home = "${AIRSSTACK_HOME:-$HOME/.airsstack}",
 }
 
 -- The `values` result for `payload`: the pack root, the invocation and
--- directory of every skill, the name of every agent, and the values of the
--- vars the payload names. Names this table has no value for are left out.
+-- directory of every skill, the name of every agent (skills and agents are
+-- named `<pack>-<item>`), and the values of the vars the payload names. Names
+-- this table has no value for are left out.
 function M.result(payload)
   local out = { root = ".claude/agentstacks", skills = {}, agents = {}, vars = {} }
   for _, pack in ipairs(payload.packs or {}) do
     for _, skill in ipairs(pack.skills or {}) do
       out.skills[pack.name .. "/" .. skill] = {
-        invoke = "/" .. skill,
-        dir = ".claude/skills/" .. skill,
+        invoke = "/" .. pack.name .. "-" .. skill,
+        dir = ".claude/skills/" .. pack.name .. "-" .. skill,
       }
     end
     for _, agent in ipairs(pack.agents or {}) do
-      out.agents[pack.name .. "/" .. agent] = agent
+      out.agents[pack.name .. "/" .. agent] = pack.name .. "-" .. agent
     end
   end
   for _, name in ipairs(payload.vars or {}) do
@@ -38,6 +39,20 @@ function M.result(payload)
     end
   end
   return out
+end
+
+-- The rendered names of the agents `hook` lists, in the hook's order, looked up
+-- in `result` (a `result` return) under pack `pack_name`. Nil when the hook
+-- lists no agents.
+function M.hook_agents(result, pack_name, hook)
+  if hook.agents == nil then
+    return nil
+  end
+  local names = {}
+  for i, agent in ipairs(hook.agents) do
+    names[i] = result.agents[pack_name .. "/" .. agent]
+  end
+  return names
 end
 
 return M

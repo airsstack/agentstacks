@@ -180,9 +180,7 @@ mod tests {
 
     /// A `core` whose `pack.toml` asks for api 1, so it fails to load.
     fn failing_core() -> PackSpec {
-        PackSpec::new("core")
-            .skill("status", "body")
-            .file("pack.toml", API_ONE)
+        PackSpec::new("core").file("pack.toml", API_ONE)
     }
 
     fn refusals(packs: &[(PackSpec, &str)]) -> Result<Vec<String>, Box<dyn Error>> {
@@ -248,9 +246,8 @@ mod tests {
         let sdlc = PackSpec::new("sdlc")
             .requires(&["core"])
             .skill("status", "{{skill guideline-rust/rust-guidelines}}");
-        let team_lint = PackSpec::new("team-lint").skill("status", "body");
         assert_eq!(
-            refusals(&[(failing_core(), ""), (sdlc, ""), (team_lint, "")])?,
+            refusals(&[(failing_core(), ""), (sdlc, "")])?,
             [
                 CORE_API,
                 "packs/sdlc/skills/status/SKILL.md:6: {{skill guideline-rust/rust-guidelines}} targets pack \"guideline-rust\", which sdlc does not require. Add it to requires.packs or remove the ref.",

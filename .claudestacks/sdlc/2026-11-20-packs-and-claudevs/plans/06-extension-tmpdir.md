@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -65,3 +65,14 @@ docs/extensions.md                        — modify: values example (:150)
 
 - `cargo make dod` green.
 - `grep -rn '"\$TMPDIR' extensions/claude/lib/values.lua` prints nothing.
+
+## Review findings
+
+- No findings on this plan. Verification: red `every_var_has_its_value`, `only_requested_vars_are_returned` → green after `VARS.tmpdir = "${TMPDIR:-/tmp}"`; `grep '"\$TMPDIR' extensions/claude/lib/values.lua` prints nothing; reviewer re-run `cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-23 — Ran in the same coder as plan 05, after it (shared files).
+- 2026-11-23 — Added `tmpdir_var_form_passes_the_literal_dollar_rule` in `values_test.lua`; green before the change (pins that `hooks.lua` accepts the form).
+- 2026-11-23 — `docs/authoring.md:142` and `docs/hooks.md:67` still say `$TMPDIR`: generic var-expression examples, outside this plan's file list.
+- 2026-11-23 — Not committed (execute does not commit unless told).

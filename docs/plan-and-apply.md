@@ -114,13 +114,13 @@ handles it by rerunning the extension.
 
 | Situation | Step |
 |---|---|
-| first apply; `.claude/skills/status/SKILL.md` absent | `create` |
-| user edited that file after apply; pack unchanged | refused `.claude/skills/status/SKILL.md: changed since the last apply` |
+| first apply; `.claude/skills/core-status/SKILL.md` absent | `create` |
+| user edited that file after apply; pack unchanged | refused `.claude/skills/core-status/SKILL.md: changed since the last apply` |
 | user deleted it | `restore` |
-| pack `team-lint` removed from toml; its file untouched | `delete` |
+| pack `team-lint` removed from toml; its file `.claude/agents/team-lint-old.md` untouched | `delete` |
 | `.claude/settings.json` holds the user's permissions; the claude extension read it and proposes it with hooks added | `update` (shared), diff shown, not locked |
 | `.claude/settings.json` absent; the extension read `nil` and proposes it | `create` (shared), new-file mode |
-| `.claude/agents/coder.md` exists, never written by agentstacks, different content | refused `.claude/agents/coder.md: exists and was not written by agentstacks` |
+| `.claude/agents/core-coder.md` exists, never written by agentstacks, different content | refused `.claude/agents/core-coder.md: exists and was not written by agentstacks` |
 | a proposed path is a symlink to `/etc/hosts` | refused `<path>: resolves outside the project` |
 
 ## 4. Inside the project

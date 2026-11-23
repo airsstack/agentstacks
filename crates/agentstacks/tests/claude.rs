@@ -280,7 +280,7 @@ fn hooks_left_empty_stays_an_empty_object() -> TestResult {
 fn settings_absent_and_no_hooks_proposes_no_settings_write() -> TestResult {
     let (_dir, plan) = planned("nohooks")?;
     let written: Vec<String> = proposed(&plan).into_keys().collect();
-    assert_eq!(written, [".claude/skills/a/SKILL.md"]);
+    assert_eq!(written, [".claude/skills/core-a/SKILL.md"]);
     Ok(())
 }
 
@@ -544,7 +544,7 @@ fn fork_source_maps_to_nil() -> TestResult {
 }
 
 #[test]
-fn empty_agent_type_maps_to_nil_agent() -> TestResult {
+fn empty_agent_type_and_id_map_to_nil() -> TestResult {
     check(&Run::new("echo", "noagent"), "empty", Some("echo/noagent"))
 }
 

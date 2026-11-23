@@ -67,8 +67,8 @@ entry       = "adapter.lua"
 ### 3. Start from a working adapter
 
 This adapter installs skills and agents, and skips every hook. It was run on the demo pack with
-airsl 0.1.4: `airsl test` gave `2 passed, 0 failed`, and `agentstacks init` wrote four files and
-showed two skips.
+airsl 0.1.4: `airsl test mytool` gave `1 passed, 0 failed (1 files)`, and `agentstacks init` wrote
+four files and showed two skips.
 
 ```lua
 -- lib/paths.lua: pure rules; no agentstacks.* here.
@@ -97,10 +97,13 @@ agentstacks.on("values", function(q)
   local out = { root = paths.ROOT, skills = {}, agents = {}, vars = {} }
   for _, p in ipairs(q.packs) do
     for _, s in ipairs(p.skills or {}) do
-      out.skills[p.name .. "/" .. s] = { invoke = "/" .. s, dir = paths.skill_dir(s) }
+      out.skills[p.name .. "/" .. s] = {
+        invoke = "/" .. p.name .. "-" .. s,
+        dir = paths.skill_dir(p.name .. "-" .. s),
+      }
     end
     for _, a in ipairs(p.agents or {}) do
-      out.agents[p.name .. "/" .. a] = a
+      out.agents[p.name .. "/" .. a] = p.name .. "-" .. a
     end
   end
   return out
@@ -114,7 +117,8 @@ agentstacks.on("plan", function(q)
       end
     end
     for _, a in ipairs(p.agents or {}) do
-      agentstacks.write({ path = paths.agent_file(a.name), content = a.text, covers = { a.id } })
+      local file = paths.agent_file(p.name .. "-" .. a.name)
+      agentstacks.write({ path = file, content = a.text, covers = { a.id } })
     end
     for _, h in ipairs(p.hooks or {}) do
       agentstacks.skip({ item = h.id, reason = NO_HOOKS })
@@ -153,7 +157,7 @@ local paths = require("paths")
 
 return {
   skill_dir_is_under_mytool = function()
-    assert(paths.skill_dir("greet") == ".mytool/skills/greet")
+    assert(paths.skill_dir("demo-greet") == ".mytool/skills/demo-greet")
   end,
 }
 ```

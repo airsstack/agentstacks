@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [03, 05]
 built-on: 0f89fdb3ebb3
@@ -109,3 +109,18 @@ the README install line `agentstacks init --tool claude --pack guideline-python`
 ## Proof
 
 - `cargo make dod` green; the two-pack `init` in a temp project exits 0.
+
+## Review findings
+
+- 🔵 fixed (follow-up) — `packs/guideline-rust/README.md:26`, `packs/guideline-python/README.md:27`: `See [LICENSE](./LICENSE)` is broken (LICENSE not carried, spec §6.1); the README is excluded from install.
+- Verification: in temp git projects holding copies of `packs/` and `extensions/claude`, `agentstacks init --tool ./extensions/claude --pack ./packs/<p> --yes` exit 0 for `guideline-rust`, `guideline-python` and both together; SKILL.md `name: "guideline-rust-guidelines"` / `"guideline-python-guidelines"`; references 9 / 13; `enforcement.json` `"skill": "/guideline-rust-guidelines"` / `"/guideline-python-guidelines"`; no README.md written outside `packs/`/`extensions/`. Plan grep over `packs` (`--exclude=README.md`) exit 1 (no match). `diff -r` of references against the plugin sources prints nothing. Reviewer re-ran the two-pack init: exit 0, 26 files.
+
+## Deviations
+
+- 2026-11-23 — The pack files were created in parallel with plans 05–07 (no cargo, `packs/` only); the `init` proof ran by hand once plan 05 landed.
+- 2026-11-23 — Not committed (execute does not commit unless told).
+
+## Follow-up fixes
+
+- 2026-11-23 — Every open finding above was fixed in one follow-up pass (three parallel coders, disjoint files). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 23 `test result: ok` blocks, 2474 Rust tests passed, lua `71 passed, 0 failed (5 files)`, `Build Done in 55.65 seconds`.
+- Pack READMEs link the root `../../LICENSE` (Apache-2.0).

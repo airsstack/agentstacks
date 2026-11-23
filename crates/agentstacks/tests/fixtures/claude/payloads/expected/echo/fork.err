@@ -1,1 +1,1 @@
-event=session.start source=nil prompt=nil tool=nil path=nil last_message=nil agent=nil session_id=s1 cwd=/p
+event=session.start source=nil prompt=nil tool=nil path=nil last_message=nil agent=nil session_id=s1 cwd=/p agent_id=nil

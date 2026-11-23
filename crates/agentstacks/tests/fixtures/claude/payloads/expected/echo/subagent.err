@@ -1,1 +1,1 @@
-event=agent.stop source=nil prompt=nil tool=nil path=nil last_message=PONG agent=probe-agent session_id=s1 cwd=/p
+event=agent.stop source=nil prompt=nil tool=nil path=nil last_message=PONG agent=probe-agent session_id=s1 cwd=/p agent_id=a1

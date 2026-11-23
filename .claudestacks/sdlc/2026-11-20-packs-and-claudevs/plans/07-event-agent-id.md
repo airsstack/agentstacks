@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 built-on: 0f89fdb3ebb3
 ---
@@ -85,3 +85,12 @@ docs/hooks.md                                                         — modify
 ## Proof
 
 - `cargo make dod` green.
+
+## Review findings
+
+- No findings on this plan. Verification: red `echo_maps_each_event` (subagent: left `agent_id=nil`, right `agent_id=a1`), 22 others passed → green 23 passed after `translate.lua`; reviewer re-run `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test claude` 23 passed, `cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-23 — Claim "the `full` expected `translate.lua` is the new translator text, byte for byte" of `extensions/claude/lib/translate.lua`: that file wraps the shipped text (`local TEXT = [==[ … ]==]`, `M.text()`); copying the whole file failed 10 `--test claude` tests. The expected file is the text between the brackets; its diff against the old expected file is the 3 `agent_id` lines (reviewer: `cmp` matches).
+- 2026-11-23 — Ran after plans 05/06 (shared `crates/agentstacks/tests/claude.rs`). Not committed.

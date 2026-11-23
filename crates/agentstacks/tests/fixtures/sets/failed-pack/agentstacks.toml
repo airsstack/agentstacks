@@ -8,6 +8,3 @@ path = "packs/core"
 
 [packs.sdlc]
 path = "packs/sdlc"
-
-[packs.team-lint]
-path = "packs/team-lint"

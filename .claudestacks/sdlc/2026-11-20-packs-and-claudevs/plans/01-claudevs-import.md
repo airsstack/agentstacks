@@ -150,9 +150,9 @@ The commit message and files name no claudestacks commit.
 - 🔵 fixed — `types/mod.rs:28` 82-char line; block reflowed to ≤ 80.
 - 🔵 fixed — `types/name/mod.rs:8` named "the parent `types` module"; now names `types::ident` and says only `marketplace` and `plugin` use it.
 - Verification after fixes: `cargo make dod` (workspace) exit 0 — 21 `test result: ok` blocks, 2472 Rust tests passed, lua `63 passed, 0 failed (5 files)`, `Build Done in 77.30 seconds`.
-- 🔵 open — `crates/claudevs/tests/corpus/corpus.toml:13` cites a claudestacks planning path (carried over unchanged; Task 1 is a no-edit import).
-- ❓ open — `crates/claudevs/README.md:64` links claudestacks `examples/README.md` (carried over unchanged).
-- 🔵 open — nothing in the gate guards the one-word file-name rule; only the plan's grep does.
+- 🔵 fixed (follow-up) — `crates/claudevs/tests/corpus/corpus.toml:13` cites a claudestacks planning path (carried over unchanged; Task 1 is a no-edit import).
+- ❓ fixed (follow-up) — `crates/claudevs/README.md:64` links claudestacks `examples/README.md` (carried over unchanged).
+- 🔵 fixed (follow-up) — nothing in the gate guards the one-word file-name rule; only the plan's grep does.
 
 ## Deviations
 
@@ -161,3 +161,9 @@ The commit message and files name no claudestacks commit.
 - 2026-11-23 — Per-task commits were not made (execute does not commit unless told). The three tasks sit staged in one index, renames recorded by `git mv` after `git add crates/claudevs crates/claudevs-cli` (git mv refuses untracked files). Cutting the three commits needs restaging.
 - 2026-11-23 — Plan claim "the 11 crates of `probes/claudevs-results.md` step h": `cargo tree -d | grep -E '^[a-z]'` gives 20 lines = 10 crates with two versions each (block-buffer, cpufeatures, crypto-common, digest, serde_spanned, sha2, toml, toml_datetime, toml_edit, winnow), identical before and after the import. The proof (no crate gains a version) holds; the count differs.
 - 2026-11-23 — Test counts: 321 claudevs tests before Task 2 and after Task 3 (lib 301, corpus 4, engine/verify_core 2, examples 2, fetch/corpus_fetch 4, installed 2, wiring 5, doc 1); `find … | grep '_'` prints nothing; `wc -l` 57.
+
+## Follow-up fixes
+
+- 2026-11-23 — Every open finding above was fixed in one follow-up pass (three parallel coders, disjoint files). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 23 `test result: ok` blocks, 2474 Rust tests passed, lua `71 passed, 0 failed (5 files)`, `Build Done in 55.65 seconds`.
+- File-name rule: `source_and_test_names_are_one_word` in `crates/claudevs/tests/layout.rs` and `crates/agentstacks/tests/layout.rs` (red with a stray `src/x_y/`; green after removal). CLI crates checked by hand: `find crates/*-cli/src -name '*_*'` prints nothing.
+- `corpus.toml` comment drops the planning path; `crates/claudevs/README.md` links the local `examples/README.md`.

@@ -102,8 +102,8 @@ Makefile.toml               — modify: tasks claudevs-check, corpus-fetch, corp
 
 ## Review findings
 
-- 🔵 open — `Makefile.toml:270` carried comment "The only step in this repository that touches the network" is false here (`deny` fetches advisories); the plan allows only the briefed comment edits.
-- 🔵 open — category `claudevs` is lowercase and sorts after `Tools`; other categories are capitalized.
+- 🔵 fixed (follow-up) — `Makefile.toml:270` carried comment "The only step in this repository that touches the network" is false here (`deny` fetches advisories); the plan allows only the briefed comment edits.
+- 🔵 fixed (follow-up) — category `claudevs` is lowercase and sorts after `Tools`; other categories are capitalized.
 - 🔵 accepted — unbriefed comment at `ci.yml:90` ("Same step as in the `dod` job …"); accurate.
 - Verification: `cargo make claudevs-check` exit 0, 8/8 (`ok minimal-plugin`, `dead-script-plugin`, `escape-plugin (FAIL wiring)`, `bad-matcher-plugin (FAIL wiring)`, `hooks-array-plugin (FAIL wiring)`, `project-branch-plugin`, `exec-args-plugin`, `matcher-routing-plugin (FAIL test)`); with `claude`/`airsl` off PATH it still passes 8/8 and prints `skip  validate`. `cargo make --list-all-steps` lists the three tasks; `dod` deps unchanged. `ci.yml` parses (`ruby -ryaml`), jobs `["dod","claudevs-check","deny"]`. Workspace `cargo make dod` exit 0.
 
@@ -112,3 +112,8 @@ Makefile.toml               — modify: tasks claudevs-check, corpus-fetch, corp
 - 2026-11-23 — `category = "claudevs"` set on all three tasks, not only `claudevs-check`: the source category "Plugin suite" names a suite this repo does not have.
 - 2026-11-23 — The validate stage ran locally (a `claude` binary is installed): `bad-matcher-plugin` gave `ok validate`, `FAIL wiring`. The Task 2 proof (CI job green with validate skipped) can only be checked after a push.
 - 2026-11-23 — Tasks 1 and 2 ran in one coder; no per-task commits (execute does not commit unless told).
+
+## Follow-up fixes
+
+- 2026-11-23 — Every open finding above was fixed in one follow-up pass (three parallel coders, disjoint files). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 23 `test result: ok` blocks, 2474 Rust tests passed, lua `71 passed, 0 failed (5 files)`, `Build Done in 55.65 seconds`.
+- `Makefile.toml` corpus-fetch comment now notes `deny` also fetches; category renamed `Claudevs` (others: Gate, Supply chain, Development). `cargo make claudevs-check` 8/8 ok.
