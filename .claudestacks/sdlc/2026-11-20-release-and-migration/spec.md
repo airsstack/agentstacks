@@ -86,6 +86,7 @@ claudestacks HEAD `e099300`.
 | P55 | The org's other books run no link checker: a grep for `linkcheck`, `lychee`, `link-check`, `markdown-link` over the `.github/`, `book/book.toml` and `Makefile.toml` of airsl, buildl and claudestacks exits 1 for each (control: each `pages.yml` pins `mdbook@0.4.52`) | `probes/book-results.md:381-387` |
 | P56 | GitHub's default shell for `run:` on Linux and macOS is `bash -e {0}` | `probes/workflow-syntax.md:910` |
 | P57 | Each claudestacks `e099300` chapter of the claudevs part, piped through the §7.6 claudevs map, equals the moved file of the probe book (`cmp`): 22 identical, 0 differ | `probes/book-results.md:392-393` |
+| P58 | `journal` requires `core`, as `sdlc` does: its manifest reads `[requires]`, `packs = ["core"]`, `airsl = ">=0.1.5"`. Found at execute by plan 10 (`disproves: d3463785d0cb`), which corrected the earlier §7.6 text "`core`, `journal` → airsl ≥0.1.5" | `packs/journal/pack.toml:9-11` |
 
 ## 2. Versions and crate metadata
 
@@ -479,7 +480,7 @@ Plugins`), then these `##` sections, in order:
    at (default user). Or remove the whole marketplace with `claude plugin marketplace remove
    claudestacks`, which uninstalls every plugin from it, cmux included (P27).
 4. **Set up each project**: `agentstacks init --tool claude --pack core --pack sdlc --pack journal
-   --pack guideline-rust` (pick the packs you used; `sdlc` requires `core`, P32), review the plan,
+   --pack guideline-rust` (pick the packs you used; `sdlc` and `journal` require `core`, P32, P58), review the plan,
    answer the apply prompt, then commit `agentstacks.toml`, `agentstacks.lock` and `.claude/`.
    Packs install per project, never machine-wide.
 5. **What changed**: packs spec §9's rows, rewritten for users (every row except the last, which is
@@ -487,7 +488,7 @@ Plugins`), then these `##` sections, in order:
    (`/claudestacks:x` → `/core-x`, … from §9 row 1 and §6.1). Then the rest: airsl on `PATH`
    ≥0.1.5, reported by `plan` and `doctor`; `style_reinject` in `agentstacks.toml`
    `[packs.core.options]`; `/core-statusline`; the enforce hook finds guideline packs installed in
-   the same project; `sdlc` requires `core`; the enforce pointer names `/guideline-rust-guidelines`;
+   the same project; `sdlc` and `journal` require `core` (P58); the enforce pointer names `/guideline-rust-guidelines`;
    the enforce doctor's changes; the SessionEnd reminder shown as a skip by `plan`; the
    SubagentHandback deny text.
 6. **What stays**: `.claudestacks/sdlc/` chain files are read and written at the same paths. The
@@ -742,9 +743,9 @@ is shown as output. Every `init` line that names `--pack sdlc` names `--pack cor
   and [Plan, Apply and the Lock](ch05-00-plan-and-apply.md).
 - `ch02-00-packs.md`: a pack is what the agent gets, rendered for each tool by its extension. A
   table of the five packs: name, one line taken from the first paragraph of its README, and what
-  it needs: `core`, `journal` → airsl ≥0.1.5; `sdlc` → `core` and airsl ≥0.1.5;
-  `guideline-rust`, `guideline-python` → nothing (P5, P32). The refusal when `sdlc` comes without
-  `core`, quoted (P32). They are released together as `packs-v*` tags, and `update` moves a
+  it needs: `core` → airsl ≥0.1.5; `sdlc`, `journal` → `core` and airsl ≥0.1.5;
+  `guideline-rust`, `guideline-python` → nothing (P5, P32, P58). The sentence that `sdlc` or
+  `journal` without `core` is refused, with the `sdlc` refusal quoted (P32). They are released together as `packs-v*` tags, and `update` moves a
   project to the newest (§4.3). One page per pack follows.
 - `appendix-00.md`: one sentence: the appendix holds the claudevs command-line reference.
 
