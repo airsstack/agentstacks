@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agentstacks"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "airsl",
  "globset",
@@ -21,7 +21,7 @@ dependencies = [
 
 [[package]]
 name = "agentstacks-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "agentstacks",
  "clap",
@@ -224,7 +224,7 @@ checksum = "e0921b3876b3a1df8a1c9f912e7f94342458022c2e84288015893d83c4d62a79"
 
 [[package]]
 name = "claudevs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "airsl",
  "regex",
@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "claudevs-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "claudevs",

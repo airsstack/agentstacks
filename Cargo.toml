@@ -8,13 +8,13 @@ rust-version  = "1.94"
 license       = "Apache-2.0"
 repository    = "https://github.com/airsstack/agentstacks"
 authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
-publish       = false
+publish       = true
 
 [workspace.dependencies]
-agentstacks = { path = "crates/agentstacks", version = "0.0.0" }
+agentstacks = { path = "crates/agentstacks", version = "0.1.0" }
 airsl = "0.1.5"
 clap = { version = "4", features = ["derive"] }
-claudevs = { path = "crates/claudevs", version = "0.1.0" }
+claudevs = { path = "crates/claudevs", version = "0.1.1" }
 globset = "0.4"
 regex = "1"
 semver = "1"
