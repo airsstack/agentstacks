@@ -1,7 +1,7 @@
 ---
 status: approved
 created: 2026-11-24
-built-on: 726d0575c25a
+built-on: 97ea787d2a1e
 ---
 
 # Spec: First release and migration
@@ -10,13 +10,20 @@ This spec ships agentstacks to users who have no Rust toolchain. It covers the f
 four crates on crates.io, prebuilt `agentstacks` and `claudevs` binaries through dist, the
 `packs-v0.1.0` tag that makes `init --tool claude --pack <p>` resolve official names, installers
 that also install `airsl` when it is missing, a migration guide from the claudestacks marketplace
-plugins, the README and org-doc status changes, and the archive of claudestacks after all of that
-is out. No Rust module is added, moved or changed. The work is versions, release configuration,
-installer scripts and docs.
+plugins, an mdBook that holds all agentstacks and claudevs documentation and is published on Pages
+beside the installers, the README and org-doc status changes, and the archive of claudestacks
+after all of that is out. `docs/` moves into the book and is removed. No Rust module is added,
+moved or changed. The work is versions, release configuration, installer scripts, the book and
+docs.
+
+This spec replaces `spec-superseded-2026-11-24.md`, which had no book. Everything except the book
+and the links it moves is carried over unchanged.
 
 Probe outputs live in `probes/` next to this file, and the scripts that produced them in
 `probes/scripts/`. Every probe ran on 2026-11-24 against worktree HEAD `0fe1f61`, cargo 1.94.1,
-dist (`cargo-dist`) 0.33.1 and jq 1.7.1.
+dist (`cargo-dist`) 0.33.1 and jq 1.7.1. The book probes (P38-P57) ran against HEAD `e4e1acd`
+(which changed only `.claudestacks/`), mdBook 0.4.52, mdbook-mermaid 0.16.2, airsl 0.1.5 and
+claudestacks HEAD `e099300`.
 
 ## 1. Premises (proven)
 
@@ -59,6 +66,26 @@ dist (`cargo-dist`) 0.33.1 and jq 1.7.1.
 | P35 | dist's generated shell installer installs to `$HOME/.local/bin` (help text and the default branch), unless `AGENTSTACKS_CLI_INSTALL_DIR` (or `CARGO_DIST_FORCE_INSTALL_DIR`) is set | `probes/round2-results.md` §d |
 | P36 | `cargo publish` uploads one package, then polls until it appears in the index; that poll may time out, which does not affect the upload | `probes/docs-excerpts.md` (cargo publish block) |
 | P37 | GitHub's "List releases" section states no order (no `sort`, `order` or `created_at` in it), while the latest-release section does say `sorted by the created_at attribute` | `probes/round2-results.md` §f |
+| P38 | claudestacks' book shape: `book/book.toml` (`create-missing = false`, the `mermaid` preprocessor, `site-url`, `git-repository-url`, `edit-url-template`, `additional-js`), `mermaid.min.js` and `mermaid-init.js` beside it, the Makefile tasks `book-mdbook`, `book-mermaid`, `book`, `book-build` pinning mdBook 0.4.52 and mdbook-mermaid 0.16.2, a `book` CI job installing both with `taiki-e/install-action@v2`, a `pages.yml` that builds the book and copies `install/install.sh` into `book/book/`, and `book/book/` in `.gitignore` | `/Users/hiraq/Projects/airsstack/claudestacks/book/book.toml`; `claudestacks/Makefile.toml:542-584`; `claudestacks/.github/workflows/ci.yml:144-162`; `claudestacks/.github/workflows/pages.yml`; `claudestacks/.gitignore:40-41` |
+| P39 | The §7.6 book (docs moved by the §7.6 link map, the claudevs chapters moved by the §7.6 rename and URL map, pack READMEs included after the §7.6 link edit, placeholders for the new chapters) builds with exit 0 and no `ERROR` line. All 843 relative hrefs of its pages (chapter links, anchors, assets) resolve: the file or directory exists, and the anchor when there is one. The moved pages carry their `SUMMARY.md` titles. The 5 mermaid diagrams render. No relative link is left in the pack chapters | `probes/book-results.md:10-158` |
+| P40 | Today `docs/extensions.md:297` links `(#missing-values)`, but "Missing values" is a bold paragraph (`:175`) under the heading `` ### `values` `` (`:133`), so no heading makes that anchor. The §7.6 map points it at `#values`, which resolves (P39) | `docs/extensions.md:133,175,297`; `probes/book-results.md:52-64` |
+| P41 | A chapter listed in `SUMMARY.md` with no file fails the build: `Chapter file not found`, exit 101 | `probes/book-results.md:159-162` |
+| P42 | `{{#include ../../packs/<p>/README.md}}` in `book/src/` pulls in a file outside `book/`, but does not fix up its relative links: a `.md` file link only becomes `.html` (`skills/guidelines/SKILL.md` → `skills/guidelines/SKILL.html`), while a directory link (`skills/guidelines/references/`) and `../../LICENSE` stay as written. All of them break on the site. A missing include target logs `[ERROR] (mdbook::preprocess::links): Error updating …` and the build still exits 0, leaving the raw `{{#include …}}` in the page | `probes/book-results.md:332-341` (the unedited README); `probes/book-results.md:288-302` (missing target) |
+| P43 | The §7.7 build step, run under `bash -e`, exits 0 on a clean book and 1 on a missing include target or a missing chapter, printing its own line after mdBook's | `probes/book-results.md:303-328` |
+| P44 | A repo-wide `git grep 'docs/'` outside `.claudestacks/`, outside URLs dropped, finds this repository's `docs/` only in `README.md:86,115,144,150-151`, `CLAUDE.md:18,73,95-96,103,108` and `crates/claudevs/Cargo.toml:13` (`exclude = ["docs/"]`). Every other hit names some other `docs/`: test data in `crates/agentstacks/src/types/pack/`, a plugin-folder comment and fixture in `crates/claudevs/src/contract/site.rs`, and generic `docs/specs/` text and glob tests in `packs/` (control: the same grep finds `packs/` 12 times in `Makefile.toml`). `README.md:119` and `docs/authoring.md:7,18-19` hold raw `…/main/docs/…` URLs. Nothing in `Makefile.toml`, `.github/` or `deny.toml` names `docs/` | `probes/book-results.md:347-380` (repo-wide), `:270-282` (build files, and the raw URLs in `docs/`); `probes/book-structure-results.txt:5-17` |
+| P45 | `crates/claudevs/docs/` holds nine one-line pointers to the claudestacks book, and nothing links to them (grep exit 1; control: the same grep shape finds `claudevs/examples`) | `probes/book-structure-results.txt:18-30` |
+| P46 | The claudestacks book's claudevs part is 21 chapter files (ch05-ch09) plus `appendix-01-claudevs-cli.md`. No link in them leaves that set (grep exit 1; control: 7 in-set links in `ch05-00`). All 19 of their `claudestacks` mentions are URLs: the examples on GitHub and `install.sh` | `probes/book-structure-results.txt:31-63` |
+| P47 | Every pack excludes `README.md` from what it installs, and both pack text gates skip `README.md` (P30). So the README link edit changes no installed file and no gate result | `probes/book-structure-results.txt:82-86`; `Makefile.toml:173,181` |
+| P48 | With official names and `packs-v0.1.0` (official URL redirected to a bare copy of HEAD): `init --tool claude --pack core --pack sdlc --pack guideline-rust` with no terminal prints the plan, ending `76 to write, 0 to delete, 0 unchanged, 1 skipped`, `stdin is not a terminal; pass --yes to apply` and `agentstacks.toml written; nothing applied (run apply)`, exit 1. `apply --yes` ends `applied: 76 written, 0 deleted`. `plan` then ends `0 to write, 0 to delete, 76 unchanged, 1 skipped`, and its skip line is `skip     core/hook/3: claude shows no hook output to the model at session end`. `doctor` prints `healthy`. `update` prints one `no newer tag than packs-v0.1.0` note per entry and `nothing to update`. `init … --yes` in a fresh project ends `76 to write, 0 to delete, 0 unchanged, 1 skipped` and `applied: 76 written, 0 deleted`, exit 0. An `init` whose plan is accepted applies at once, as `--yes` does (`docs/cli.md:96-107`, row "applied") | `probes/book-results.md:182-269` |
+| P49 | In GitHub's path filters, `*` matches zero or more characters but not `/` | `probes/workflow-syntax-filter.md:5` |
+| P50 | The org README's Projects table has a Docs column, with `[Book](https://airsstack.github.io/<project>/)` for airsl, buildl and claudestacks | `/Users/hiraq/Projects/airsstack/README.md:99,104-106` |
+| P51 | The §3 `packs/CHANGELOG.md` text, with the book link, passes both pack text gates (grep exit 1 each) | `probes/book-results.md:283-287` |
+| P52 | The claudevs README book links are `crates/claudevs/README.md:47,49,51,53,55,57` and `crates/claudevs-cli/README.md:36-42`, all under `https://airsstack.github.io/claudestacks/` | `probes/book-structure-results.txt:67-80` |
+| P53 | GitHub sets `RUNNER_TEMP` on every runner: "The path to a temporary directory on the runner. This directory is emptied at the beginning and end of each job." `mdbook-mermaid install book` leaves the §7.6 `book.toml` unchanged (diff exit 0) | `probes/variables.md:67`; `probes/book-probe5-results.txt` |
+| P54 | mdBook 0.4.52 builds a chapter holding a link to a missing chapter file (`nope.md`) and an anchor no heading makes (`gr.md#no-such-anchor`) with exit 0 and no `ERROR` or `WARN` line | `probes/book-results.md:342-346` |
+| P55 | The org's other books run no link checker: a grep for `linkcheck`, `lychee`, `link-check`, `markdown-link` over the `.github/`, `book/book.toml` and `Makefile.toml` of airsl, buildl and claudestacks exits 1 for each (control: each `pages.yml` pins `mdbook@0.4.52`) | `probes/book-results.md:381-387` |
+| P56 | GitHub's default shell for `run:` on Linux and macOS is `bash -e {0}` | `probes/workflow-syntax.md:910` |
+| P57 | Each claudestacks `e099300` chapter of the claudevs part, piped through the §7.6 claudevs map, equals the moved file of the probe book (`cmp`): 22 identical, 0 differ | `probes/book-results.md:392-393` |
 
 ## 2. Versions and crate metadata
 
@@ -90,16 +117,25 @@ New files. Every link in them is an absolute `https://github.com/airsstack/agent
 because crates.io renders the README away from the repository:
 
 - `crates/agentstacks/README.md`: what the library is, that it backs the `agentstacks` CLI, that
-  its API is unstable during `0.x`, and a link to `docs/architecture.md`.
+  its API is unstable during `0.x`, and a link to the book's Under the Hood chapter
+  (`https://airsstack.github.io/agentstacks/ch07-00-architecture.html`).
 - `crates/agentstacks-cli/README.md`: install with the §5.3 one-liner, or with
   `cargo install agentstacks-cli` plus the note "this route does not install airsl, which `plan`
   needs (≥0.1.5)"; usage (`init --tool claude --pack core`, `plan`, `apply`, `doctor`, `update`);
-  links to the repository README and `docs/migration.md`.
+  links to the repository README, the book (`https://airsstack.github.io/agentstacks/`) and its
+  migration chapter (`https://airsstack.github.io/agentstacks/ch03-00-migration.html`).
 
 `crates/claudevs-cli/README.md:12` becomes
 `curl -LsSf https://airsstack.github.io/agentstacks/claudevs.sh | sh   # prebuilt binary, no Rust needed`.
-The book links in both claudevs READMEs point to the claudestacks book. It keeps being served
-after the archive (P19), so they stay.
+The book links in both claudevs READMEs (P52) move to the agentstacks book: the prefix
+`https://airsstack.github.io/claudestacks/` becomes `https://airsstack.github.io/agentstacks/`, and
+the chapter file is renamed by the §7.6 claudevs map (`ch05-00-claudevs-getting-started.html` →
+`ch08-00-claudevs-getting-started.html`, `ch07-03-ci.html` → `ch10-03-ci.html`, and so on;
+`appendix-01-claudevs-cli.html` keeps its name). The link texts stay.
+
+`crates/claudevs/docs/` (nine pointers to the claudestacks book that nothing links to, P45) is
+deleted, and with it the line `exclude    = ["docs/"]` in `crates/claudevs/Cargo.toml:13`, which
+then excludes nothing. The publish dry run (§12) covers the manifest after the change.
 
 ## 3. CHANGELOGs
 
@@ -111,7 +147,7 @@ Every file follows Keep a Changelog 1.1.0 with the header shape of
 |---|---|
 | `crates/agentstacks/CHANGELOG.md` (create) | `## [0.1.0] - Unreleased`: initial release, minimum supported Rust 1.94; Added: the pack, extension, project and lock formats; the plan, apply, doctor and update flows; the extension host and the hook runtime |
 | `crates/agentstacks-cli/CHANGELOG.md` (create) | `## [0.1.0] - Unreleased`: initial release; Added: `init`, `plan`, `apply`, `doctor`, `update`; official names `--tool claude` and `--pack core\|sdlc\|journal\|guideline-rust\|guideline-python`, resolved to the newest `packs-v*` tag; prebuilt archives for the six targets of §4 and the installer `curl -LsSf https://airsstack.github.io/agentstacks/install.sh \| sh`, which also installs airsl when it is missing |
-| `crates/claudevs/CHANGELOG.md` | `## [0.1.1] - Unreleased`: Changed: the source moved to https://github.com/airsstack/agentstacks; behaviour is unchanged. (The packs spec §2 is the source of "unchanged"; the entry carries no citation) |
+| `crates/claudevs/CHANGELOG.md` | `## [0.1.1] - Unreleased`: Changed: the source moved to https://github.com/airsstack/agentstacks, and the documentation to the agentstacks book, https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html; behaviour is unchanged. (The packs spec §2 is the source of "unchanged"; the entry carries no citation) |
 | `crates/claudevs-cli/CHANGELOG.md` | `## [0.1.2] - Unreleased`, built on `claudevs` 0.1.1: Changed: built and released from https://github.com/airsstack/agentstacks; the prebuilt installer is `curl -LsSf https://airsstack.github.io/agentstacks/claudevs.sh \| sh` |
 | `packs/CHANGELOG.md` (create) | exactly the text below |
 
@@ -134,12 +170,13 @@ First release.
 - Packs `core`, `sdlc`, `journal`, `guideline-rust` and `guideline-python`, each at 0.1.0.
 - The `claude` tool extension at 0.1.0, on extension API `api = 0`.
 
-Coming from the claudestacks plugins? See [docs/migration.md](../docs/migration.md).
+Coming from the claudestacks plugins? See
+[Moving from the claudestacks Plugins](https://airsstack.github.io/agentstacks/ch03-00-migration.html).
 ```
 
 Text rule for later entries: name no skill, agent, command or plugin, only pack and extension names,
 versions and docs. The pack text gates scan this file (P30), and `cargo make dod` runs them. Both
-gates pass the text above (`probes/spec-examples-results.md` §3).
+gates pass the text above (P51).
 
 ## 4. Release workflow (dist)
 
@@ -219,20 +256,32 @@ P12; the two texts above are what `probes/spec-examples-results.md` §1 ran).
   because GitHub creates no event when more than three tags are pushed at once (P16).
 - The first release tags the merged release commit with all five, in the order of §9.
 - Later, each crate and the packs release on their own. A new `packs-vX.Y.Z` needs no binary
-  release; `update` picks the newest stable `packs-v*` tag (`docs/plan-and-apply.md:336`).
+  release; `update` picks the newest stable `packs-v*` tag (`docs/plan-and-apply.md:336`, which §7.6 moves to `book/src/ch05-00-plan-and-apply.md`).
 
 ## 5. Installers
 
 ### 5.1 Hosting: `.github/workflows/pages.yml` (create)
 
-The shape of `/Users/hiraq/Projects/airsstack/airsl/.github/workflows/pages.yml`, minus the book.
-Triggers are a push to `main` touching `install/**` or the workflow, and `workflow_dispatch`. The
-build job checks out, copies `install/install.sh` and `install/claudevs.sh` into a `site/`
-directory and uploads it with `actions/upload-pages-artifact@v5` (`path: site`). The deploy job is
-airsl's (`actions/deploy-pages@v5`, `pages: write`, `id-token: write`, environment `github-pages`),
-with the same `concurrency` and `permissions`. The scripts are served at
-`https://airsstack.github.io/agentstacks/install.sh` and `…/claudevs.sh`. The repository's Pages
-source must be set to "GitHub Actions" first (P21), an author step (§9).
+The shape of `/Users/hiraq/Projects/airsstack/claudestacks/.github/workflows/pages.yml` (P38), which
+publishes the book with its installer beside it. Triggers: `workflow_dispatch`, and a push to `main`
+touching `book/**`, `install/**`, `packs/*/README.md` (the pack chapters include them, P42; `*`
+does not cross `/`, P49) or `.github/workflows/pages.yml`. `permissions: contents: read`,
+`concurrency` group `pages` with `cancel-in-progress: false`.
+
+- **build** (`ubuntu-latest`, `timeout-minutes: 10`): checkout with `persist-credentials: false`;
+  `taiki-e/install-action@v2` with `tool: mdbook@0.4.52,mdbook-mermaid@0.16.2`; the §7.7 build
+  step; `cp install/install.sh install/claudevs.sh book/book/`;
+  `actions/upload-pages-artifact@v5` with `path: book/book`.
+- **deploy**: claudestacks' job unchanged (`needs: build`, `actions/deploy-pages@v5`,
+  `pages: write`, `id-token: write`, environment `github-pages`).
+- The header comment is claudestacks', adapted: it names the book, `install.sh` (agentstacks plus
+  airsl) and `claudevs.sh`, and says the Pages source must be "GitHub Actions" (P21).
+
+Served: the book at `https://airsstack.github.io/agentstacks/`, the scripts at
+`https://airsstack.github.io/agentstacks/install.sh` and `…/claudevs.sh`. The Pages source is an
+author step (§9 step 2). A failed book build stops the workflow before deploy (deploy `needs`
+build; GitHub skips a job whose needed job failed, P13), so the installers are never served
+without the book or the other way round.
 
 ### 5.2 Shared shape
 
@@ -375,14 +424,19 @@ repository and runs, for each of `install/install.sh` and `install/claudevs.sh`:
 | `env -i PATH=/nonexistent /bin/sh <script>` | exit 1, and stderr is exactly the M1 line. This proves §5.2 step 1 comes first. `command -v` and `printf` are shell builtins, so no external tool is needed to reach M1 |
 | `env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" <VAR>='a/b' /bin/sh <script>`, with `curl` and `wget` present on the runner | exit 1, and stderr is exactly the M2 line with `'a/b'` |
 
-All three are offline. Nothing else in `ci.yml` changes.
+All three are offline.
+
+Add a job `book`: claudestacks' `book` job (P38: `ubuntu-latest`, `timeout-minutes: 10`, checkout,
+`taiki-e/install-action@v2` with `tool: mdbook@0.4.52,mdbook-mermaid@0.16.2`, and its comments),
+with the §7.7 build step in place of its `mdbook build book` step. Nothing else in `ci.yml`
+changes.
 
 ### 7.2 `README.md` (modify)
 
 - Status block becomes: `> **Status: pre-release (0.1.0).** The CLI and the Claude Code extension
   are released, with the five official packs (`packs-v0.1.0`). OpenCode is not here yet. The
   extension API is `api = 0` and will change. Coming from the claudestacks plugins? See
-  [docs/migration.md](docs/migration.md).`
+  [the migration guide](https://airsstack.github.io/agentstacks/ch03-00-migration.html).`
 - A new `## Install` section before `## Usage`: the install.sh one-liner, the line that it also
   installs airsl when it is missing, and `cargo install agentstacks-cli` with the §2 airsl note.
 - `## Usage` leads with the official-names block, which works now:
@@ -392,12 +446,28 @@ All three are offline. Nothing else in `ci.yml` changes.
   `--tool opencode` example and the "Planned, once the official packs are released" heading go.
 - Tools table: Claude Code → `Released (`extensions/claude`, `packs-v0.1.0`)`.
 - Packs: one line saying they are released as `packs-v0.1.0`.
-- Layout tree: add `install/` (installer scripts, served on Pages) and `RELEASING.md`.
+- Tools table, the "Your own" row (`README.md:86`): `Write a tool extension against the public API:
+  [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html)`.
+- "Extending agentstacks" (`README.md:115-119`): the guide link becomes
+  `[Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html)`, and
+  the raw link in the text block becomes
+  `Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-00-authoring.md`.
+- Layout tree: add `install/` (installer scripts, served on Pages) and `RELEASING.md`; the `docs/`
+  line goes; the `book/` line becomes
+  `├─ book/                 the agentstacks book (mdBook), on airsstack.github.io/agentstacks   built`,
+  in the tree's column layout.
+- `## Documentation` becomes: `The agentstacks book, https://airsstack.github.io/agentstacks/, covers
+  installing, the packs, moving from the claudestacks plugins, the CLI, plan and apply, writing a
+  tool extension, the architecture, and claudevs. Its source is book/src/; contributors start with
+  [Under the Hood](https://airsstack.github.io/agentstacks/ch07-00-architecture.html): the layers,
+  the dependency rule, where logic lives, and how it is tested.` (`book/src/` in backticks.)
 - Roadmap: `M1  claude extension (api = 0) ✓ released (0.1.0); the claudestacks plugins are packs`.
+- After the edits, `README.md` names no `docs/` path (P44).
 
-### 7.3 `docs/migration.md` (create)
+### 7.3 `book/src/ch03-00-migration.md` (create): Moving from the claudestacks Plugins
 
-For a user of the claudestacks marketplace plugins. Sections, in order:
+For a user of the claudestacks marketplace plugins. A `#` title (`# Moving from the claudestacks
+Plugins`), then these `##` sections, in order:
 
 1. **What maps to what**: `claudestacks` → `core`, `claudestacks-sdlc` → `sdlc`,
    `claudestacks-journal` → `journal`, `claudestacks-guideline-rust` → `guideline-rust`,
@@ -427,15 +497,17 @@ For a user of the claudestacks marketplace plugins. Sections, in order:
    `cargo install claudevs-cli` is unchanged; the old claudestacks installer URL forwards here once
    §8.2 lands.
 
-The doc cites no `.claudestacks/` planning path for its content. `docs/README.md` gains a row for
-`migration.md`.
+The chapter cites no `.claudestacks/` planning path for its content. Install steps link to
+[Installation](ch01-01-installation.md); the claudevs section links to the claudevs
+[Installation](ch08-01-installation.md).
 
 ### 7.4 `RELEASING.md` (create)
 
 The author's checklist: §9 as numbered steps with its commands and recovery lines, and the tag
 table of §4.3. It says that `cargo publish` is irreversible (a version can be yanked, never
 replaced) and that each tag is pushed alone. It also says to revisit the installers' release
-lookup when the repository passes 100 releases (§10).
+lookup when the repository passes 100 releases (§10). It stays at the repository root, outside the
+book: the book is for users and contributors, and this is the maintainer's runbook.
 
 ### 7.5 `CLAUDE.md` (modify)
 
@@ -448,6 +520,249 @@ lookup when the repository passes 100 releases (§10).
 - The "Archiving claudestacks … is `2026-11-20-release-and-migration` work" sentence becomes
   `claudestacks is archived after the first release (RELEASING.md); never delete it: releases,
   install.sh and the old marketplace still point there.`
+- The book replaces `docs/` everywhere it is named (P44): the layout line `docs/ …` (line 18)
+  becomes `book/                     the agentstacks book (mdBook); book/src/ch07-00-architecture.md
+  is the layering contract`; the sentence "`book/` has not landed." goes; line 73's contract link
+  becomes `[`book/src/ch07-00-architecture.md`](book/src/ch07-00-architecture.md)`; lines 95-96
+  name `book/src/ch06-00-authoring.md`, `book/src/ch06-01-extensions.md` and
+  `book/src/ch06-02-hooks.md`, and the "keep it in step" sentence names those files; in the
+  planned layout, line 103's `(see docs/architecture.md)` becomes
+  `(see book/src/ch07-00-architecture.md)`, the `docs/` line (108) goes, and the `book/` line ends
+  `(built)`.
+- Commands gain `cargo make book                # serve the book at http://localhost:3000` and
+  `cargo make book-build          # build the book once into book/book/ (CI also fails on [ERROR] lines)`, and the
+  CI sentence names the `book` job too.
+- A new paragraph after the Architecture bullets, carried from `docs/README.md:15-17`: `A book
+  chapter describes what the code does, or, while marked planned, what it is agreed to do. When
+  the two disagree, the code is wrong or the chapter is out of date. Fix one of them in the same
+  change. Links in pack READMEs are absolute URLs, because the book includes those files.`
+- After the edits, `CLAUDE.md` names no `docs/` path.
+
+### 7.6 The book: `book/` (create)
+
+The shape of the org's other books (P38). `docs/` moves in and is removed; the claudevs chapters
+move in from the claudestacks book; the rest is new. The proposed layout builds with every internal
+link resolving (P39).
+
+**Files.**
+
+- `book/book.toml`, exactly (claudestacks' file with its name swapped, P38; `mdbook-mermaid
+  install` leaves it unchanged, P53):
+
+  ```toml
+  [book]
+  title = "The agentstacks Book"
+  authors = ["airsstack"]
+  language = "en"
+  src = "src"
+
+  # A chapter named in SUMMARY.md with no file behind it fails the build
+  # (`Chapter file not found`) instead of being created empty.
+  [build]
+  create-missing = false
+
+  # Turns ```mermaid blocks into diagrams. mermaid.min.js and mermaid-init.js
+  # beside this file are written by `mdbook-mermaid install book`.
+  [preprocessor.mermaid]
+  command = "mdbook-mermaid"
+
+  [output.html]
+  # Pages serves this repository as a project site under /agentstacks/, so the 404
+  # page needs the prefix to load its own stylesheets.
+  site-url = "/agentstacks/"
+  git-repository-url = "https://github.com/airsstack/agentstacks"
+  edit-url-template = "https://github.com/airsstack/agentstacks/edit/main/book/{path}"
+  additional-js = ["mermaid.min.js", "mermaid-init.js"]
+  ```
+
+- `book/mermaid.min.js`, `book/mermaid-init.js`: written by `mdbook-mermaid install book` with
+  mdbook-mermaid 0.16.2, and committed (P38). The moved claudevs chapters hold 5 diagrams (P39).
+- `.gitignore`: append a blank line, `# The book's build output. Pages builds its own copy; nothing
+  built is committed.` and `book/book/` (claudestacks' two lines, P38).
+- `Makefile.toml`: claudestacks' tasks `book-mdbook`, `book-mermaid`, `book` and `book-build`
+  with the comment block above them, verbatim (`claudestacks/Makefile.toml:529-584`, P38), and its
+  two header usage lines (`claudestacks/Makefile.toml:7-8`) in this file's header comment. They are
+  not part of `dod`.
+- `book/src/SUMMARY.md`, exactly:
+
+  ```markdown
+  # Summary
+
+  [Introduction](introduction.md)
+
+  # agentstacks
+
+  - [Getting Started](ch01-00-getting-started.md)
+    - [Installation](ch01-01-installation.md)
+    - [A First Project](ch01-02-first-project.md)
+  - [The Packs](ch02-00-packs.md)
+    - [core](ch02-01-core.md)
+    - [sdlc](ch02-02-sdlc.md)
+    - [journal](ch02-03-journal.md)
+    - [guideline-rust](ch02-04-guideline-rust.md)
+    - [guideline-python](ch02-05-guideline-python.md)
+  - [Moving from the claudestacks Plugins](ch03-00-migration.md)
+  - [The Command Line](ch04-00-cli.md)
+  - [Plan, Apply and the Lock](ch05-00-plan-and-apply.md)
+  - [Writing a Tool Extension](ch06-00-authoring.md)
+    - [The Extension API](ch06-01-extensions.md)
+    - [Hooks](ch06-02-hooks.md)
+  - [Under the Hood](ch07-00-architecture.md)
+
+  # claudevs
+
+  - [Getting Started](ch08-00-claudevs-getting-started.md)
+    - [Installation](ch08-01-installation.md)
+    - [A First Plugin](ch08-02-first-plugin.md)
+    - [A First Case](ch08-03-first-case.md)
+    - [Running the Gate](ch08-04-running-the-gate.md)
+  - [Writing Cases](ch09-00-writing-cases.md)
+    - [Hook Decisions](ch09-01-hook-decisions.md)
+    - [Scripts and Flows](ch09-02-scripts-and-flows.md)
+    - [Cases in Lua](ch09-03-cases-in-lua.md)
+    - [Native Suites](ch09-04-native-suites.md)
+    - [Selecting Cases and Reading Skips](ch09-05-selecting-and-skips.md)
+  - [The check Gate](ch10-00-check-gate.md)
+    - [Stages](ch10-01-stages.md)
+    - [Wiring](ch10-02-wiring.md)
+    - [Running in CI](ch10-03-ci.md)
+  - [Embedding](ch11-00-embedding.md)
+    - [Your First Suite](ch11-01-first-suite.md)
+    - [Recipes](ch11-02-recipes.md)
+  - [Under the Hood](ch12-00-claudevs-under-the-hood.md)
+    - [Why It Works This Way](ch12-01-design.md)
+    - [How the Engine Fits Together](ch12-02-engine.md)
+
+  # Appendix
+
+  - [Appendix](appendix-00.md)
+    - [A. claudevs CLI Reference](appendix-01-claudevs-cli.md)
+  ```
+
+  (`probes/book-results.md:92-142` is this file.) It lists 40 chapter files; with `SUMMARY.md`,
+  `book/src/` holds 41 files and nothing else (P39).
+
+**Where each chapter comes from.**
+
+| File | Source | Edits |
+|---|---|---|
+| `introduction.md`, `ch01-00-getting-started.md`, `ch01-01-installation.md`, `ch01-02-first-project.md`, `ch02-00-packs.md`, `appendix-00.md` | new | content below |
+| `ch02-01-core.md`, `ch02-02-sdlc.md`, `ch02-03-journal.md`, `ch02-04-guideline-rust.md`, `ch02-05-guideline-python.md` | new | each exactly one line, `{{#include ../../packs/<pack>/README.md}}` (P42). The README's own `# <pack>` title is the page title |
+| `ch03-00-migration.md` | new | §7.3 |
+| `ch04-00-cli.md` | `git mv docs/cli.md` | docs link map |
+| `ch05-00-plan-and-apply.md` | `git mv docs/plan-and-apply.md` | docs link map |
+| `ch06-00-authoring.md` | `git mv docs/authoring.md` | docs link map, and the raw URLs below |
+| `ch06-01-extensions.md` | `git mv docs/extensions.md` | docs link map, including `#values` (P40) |
+| `ch06-02-hooks.md` | `git mv docs/hooks.md` | docs link map |
+| `ch07-00-architecture.md` | `git mv docs/architecture.md` | docs link map |
+| `ch08-*` … `ch12-*` (21 files), `appendix-01-claudevs-cli.md` | claudestacks `book/src/` at `e099300` (P46) | claudevs map |
+
+`docs/README.md` is deleted; its last paragraph moves to `CLAUDE.md` (§7.5). After the move
+`docs/` does not exist.
+
+**Docs link map.** One pass over each moved file, these replacements and the title line below,
+and nothing else:
+
+```text
+](cli.md              → ](ch04-00-cli.md
+](plan-and-apply.md   → ](ch05-00-plan-and-apply.md
+](authoring.md        → ](ch06-00-authoring.md
+](extensions.md       → ](ch06-01-extensions.md
+](hooks.md            → ](ch06-02-hooks.md
+](architecture.md     → ](ch07-00-architecture.md
+(#missing-values)     → (#values)
+```
+
+Line 1 of each moved file, its title, becomes its `SUMMARY.md` entry: `# CLI` → `# The Command
+Line`; `# Plan, apply, doctor and update` → `# Plan, Apply and the Lock`; `# Build an agentstacks
+tool extension` → `# Writing a Tool Extension`; `# Writing a tool extension` → `# The Extension
+API`; `# Architecture` → `# Under the Hood`; `# Hooks` already matches. (`probes/book-results.md:52-64`
+is the map that ran; `:149-155` the titles it produced.)
+
+The anchors after `#` stay; they resolve under mdBook as they are (P39). In
+`ch06-00-authoring.md` the three raw URLs (P44) also change:
+`https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authoring.md` →
+`…/main/book/src/ch06-00-authoring.md`; `[extensions.md](…/main/docs/extensions.md)` →
+`[ch06-01-extensions.md](…/main/book/src/ch06-01-extensions.md)`; `[hooks.md](…/main/docs/hooks.md)`
+→ `[ch06-02-hooks.md](…/main/book/src/ch06-02-hooks.md)`.
+
+**claudevs map.** Each file is renamed by its claudestacks chapter number, one rule per file and
+never chained: `ch05-` → `ch08-`, `ch06-` → `ch09-`, `ch07-` → `ch10-`, `ch08-` → `ch11-`,
+`ch09-` → `ch12-`; `appendix-01-claudevs-cli.md` keeps its name. The same full-name map rewrites
+every chapter link inside the moved files (applied in one pass, so a renamed name is never renamed
+again; old `ch08-00-embedding.md` → `ch11-00-embedding.md`, old `ch05-00-…` → `ch08-00-…`). Then:
+
+```text
+https://airsstack.github.io/claudestacks/install.sh → https://airsstack.github.io/agentstacks/claudevs.sh
+https://github.com/airsstack/claudestacks/          → https://github.com/airsstack/agentstacks/
+claudevs 0.1.1  (the output line in ch08-01-installation.md) → claudevs 0.1.2
+```
+
+Every example the rewritten URLs name exists here (P39, `probes/book-results.md:163-181`), and no
+`claudestacks` mention is left in the moved chapters (P46). Everything else is byte-identical to
+claudestacks `e099300` (P57).
+
+**Pack README links** (P42, P47): in the five `packs/*/README.md`, every relative link becomes
+absolute. `../../LICENSE` → `https://github.com/airsstack/agentstacks/blob/main/LICENSE`; a link
+to a directory (ending `/`) → `https://github.com/airsstack/agentstacks/tree/main/packs/<pack>/<path>`;
+a link to a file → `https://github.com/airsstack/agentstacks/blob/main/packs/<pack>/<path>`.
+Absolute links stay. That rewrites 12 links: `../../LICENSE` in five READMEs, and two each in
+`guideline-python`, `guideline-rust`, `journal` and `sdlc`. With the 4 that were already absolute,
+the READMEs hold 16 links, listed at `probes/book-results.md:12-27`.
+
+**New chapters.** Each starts with a `#` title equal to its `SUMMARY.md` entry. Every command and
+every output line shown is a spec text with its proof (§5.5, P5, P26, P32, P35, P48); nothing else
+is shown as output. Every `init` line that names `--pack sdlc` names `--pack core` (P32).
+
+- `introduction.md`: what agentstacks is, in the README's terms (packs, tool extensions, plan and
+  apply, the lock); its status (pre-release 0.1.0, Claude Code only, extension API `api = 0`);
+  what claudevs is (claudestacks `book/src/introduction.md:45-51`, adapted) and that it moved here
+  from claudestacks; the book's three parts; and "Coming from the claudestacks plugins? Start with
+  [Moving from the claudestacks Plugins](ch03-00-migration.md)."
+- `ch01-00-getting-started.md`: install agentstacks, then set up a first project; links to both.
+- `ch01-01-installation.md`: `## A prebuilt binary` with the two §5.3 usage lines; what the script
+  prints about airsl (M8 or M9, verbatim, `<path>` as written in §5.5); binaries go to
+  `~/.local/bin` unless `AGENTSTACKS_CLI_INSTALL_DIR` is set (P35); macOS and Linux on x86_64 and
+  aarch64, no Windows (§4.1). `## From crates.io` with `cargo install agentstacks-cli`, the §2
+  airsl note, and `curl -LsSf https://airsstack.github.io/airsl/install.sh | sh` for airsl.
+  `## Check it works` with `agentstacks --version` → `agentstacks 0.1.0`, and `airsl --version`
+  at 0.1.5 or newer (P5). claudevs: a link to [its installation](ch08-01-installation.md).
+- `ch01-02-first-project.md`: in a project directory, `agentstacks init --tool claude --pack core
+  --pack sdlc --pack guideline-rust` prints the plan, one line per file, ending `76 to write, 0 to
+  delete, 0 unchanged, 1 skipped`, and asks before applying. Answering yes, or passing `--yes`,
+  applies at once and prints `applied: 76 written, 0 deleted` (P48). The chapter walks that path.
+  It then names the other one: with no terminal and no `--yes`, `init` prints the two P48 lines,
+  writes `agentstacks.toml` and applies nothing, and `agentstacks apply --yes` then prints
+  `applied: 76 written, 0 deleted`. The `agentstacks.toml` it writes, exactly as in P48. The skip
+  line, quoted, and what it means: an item the tool cannot express is shown, never dropped. Then
+  `agentstacks plan` → `0 to write, 0 to delete, 76 unchanged, 1 skipped`; `agentstacks doctor` →
+  `healthy`; `agentstacks update` → `nothing to update` while `packs-v0.1.0` is the newest tag.
+  Commit `agentstacks.toml`, `agentstacks.lock` and `.claude/`. The counts are those of
+  `packs-v0.1.0`. Links to [The Command Line](ch04-00-cli.md) (the prompt, `--yes`, exit codes)
+  and [Plan, Apply and the Lock](ch05-00-plan-and-apply.md).
+- `ch02-00-packs.md`: a pack is what the agent gets, rendered for each tool by its extension. A
+  table of the five packs: name, one line taken from the first paragraph of its README, and what
+  it needs: `core`, `journal` → airsl ≥0.1.5; `sdlc` → `core` and airsl ≥0.1.5;
+  `guideline-rust`, `guideline-python` → nothing (P5, P32). The refusal when `sdlc` comes without
+  `core`, quoted (P32). They are released together as `packs-v*` tags, and `update` moves a
+  project to the newest (§4.3). One page per pack follows.
+- `appendix-00.md`: one sentence: the appendix holds the claudevs command-line reference.
+
+### 7.7 The book build step
+
+The `ci.yml` `book` job and the `pages.yml` build job run this exact `run:` body, in a step named
+`Build the book`. mdBook exits 0 when an include target is missing (P42), so the step also fails on
+any `[ERROR]` line. Proven under `bash -e` (P43), GitHub's default for `run:` (P56). `RUNNER_TEMP` is
+GitHub's per-job temporary directory (P53):
+
+```bash
+mdbook build book > "$RUNNER_TEMP/mdbook.log" 2>&1 || { cat "$RUNNER_TEMP/mdbook.log"; exit 1; }
+cat "$RUNNER_TEMP/mdbook.log"
+if grep -q '\[ERROR\]' "$RUNNER_TEMP/mdbook.log"; then
+  echo "mdbook build book logged an error; see the [ERROR] lines above" >&2
+  exit 1
+fi
+```
 
 ## 8. Outside this repository
 
@@ -485,7 +800,8 @@ make. They state that claudestacks is archived, so the author commits them only 
   └── airsdk/           provider SDKs           ┘ no code yet
   ```
 - Projects table, the agentstacks row: name `[**agentstacks**](https://github.com/airsstack/agentstacks) (from claudestacks)`,
-  status `Pre-release`, Docs `[README](https://github.com/airsstack/agentstacks#readme)`, text
+  status `Pre-release`, Docs `[Book](https://airsstack.github.io/agentstacks/)` (the column's shape
+  for projects with a book, P50), text
   unchanged except `claudevs moves here.` → `Hosts claudevs.`.
 - The claudestacks row: text `Archived: its plugins became the agentstacks packs and claudevs moved to agentstacks; it still hosts airsclaude until airsdk.`,
   status `Archived`, Docs unchanged.
@@ -513,8 +829,17 @@ pull request.
 
 - `README.md`: a banner first, under the title: `> **Archived.** The Claude Code plugins are now
   agentstacks packs and claudevs lives in agentstacks: https://github.com/airsstack/agentstacks.
-  Migrating: https://github.com/airsstack/agentstacks/blob/main/docs/migration.md. airsclaude stays
+  Migrating: https://airsstack.github.io/agentstacks/ch03-00-migration.html. airsclaude stays
   here until it moves to airsdk.`
+- The book's claudevs part points to its new home. This blockquote goes under the `# Getting
+  Started` title of `book/src/ch05-00-claudevs-getting-started.md`, and above line 53
+  (`Start with [claudevs Getting Started](…)`) of `book/src/introduction.md`, each followed by a
+  blank line:
+  `> **claudevs moved to agentstacks.** Its book is now
+  > https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html. The claudevs
+  > chapters here describe claudevs 0.1.1 and are no longer updated.`
+  claudevs 0.1.1 is the last claudestacks release (P7). Check before merging: `mdbook build book`
+  exits 0 in claudestacks.
 - `install/install.sh` becomes a forwarder, with the same prefix (`claudevs-install`) and helpers:
   - `CLAUDEVS_VERSION` unset, empty or `latest`: say `claudevs moved to https://github.com/airsstack/agentstacks; running https://airsstack.github.io/agentstacks/claudevs.sh`,
     download that script to the temp directory and run it with `sh <file> "$@"`. The environment,
@@ -527,6 +852,8 @@ pull request.
   - the forwarded script fails to download:
     `claudevs-install: error: could not download https://airsstack.github.io/agentstacks/claudevs.sh`, exit 1.
 - Check before merging: `sh -n install/install.sh`. After its Pages deploy: §9 step 9's run.
+  claudestacks' `pages.yml` deploys on `book/**` and `install/**` (P38), so the one merge
+  republishes both.
 - It is merged and its Pages deploy has finished **before** the archive. An archived repository is
   read-only (P19), so nothing can redeploy its Pages afterwards.
 
@@ -543,11 +870,13 @@ release before crates.io, because dist builds from the repository and every step
 be undone.
 
 1. Release pull request (this chain's work) green: `cargo make dod`, `cargo make claudevs-check`,
-   `cargo deny check`, the `installers` job, and the release workflow's plan job. In the pull
+   `cargo deny check`, the `installers` and `book` jobs, and the release workflow's plan job. In the pull
    request, replace every `Unreleased` in the five CHANGELOGs with the day you will run steps 3-6.
    Merge.
 2. Settings → Pages → Source: GitHub Actions. Run `pages.yml` (workflow_dispatch). Check that
-   `https://airsstack.github.io/agentstacks/install.sh` and `…/claudevs.sh` serve 200.
+   `https://airsstack.github.io/agentstacks/`, `…/ch03-00-migration.html`, `…/install.sh` and
+   `…/claudevs.sh` serve 200. The crate READMEs published at step 6 link into the book, so it is
+   up before then.
 3. On the merged commit, push `packs-v0.1.0`.
 4. Push `agentstacks-cli-v0.1.0` and wait for its release workflow to finish green; then the same
    for `claudevs-cli-v0.1.2`. **If one fails**, nothing was published (`host` waits for smoke,
@@ -580,7 +909,8 @@ be undone.
    that crate's code needs a new version: bump it, and for a `-cli` crate release that version
    again through step 4.
 7. Push `agentstacks-v0.1.0` and `claudevs-v0.1.1`, each alone.
-8. claudestacks: apply §8.2 on a branch, merge, and wait for its Pages deploy.
+8. claudestacks: apply §8.2 (README banner, book pointer, forwarder) on a branch, merge, and wait
+   for its Pages deploy.
 9. Check the forwarder: `( export HOME="$(mktemp -d)" PATH=/usr/bin:/bin; curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh && "$HOME/.local/bin/claudevs" --version )`
    prints `claudevs 0.1.2`.
 10. Archive claudestacks (§8.3).
@@ -615,40 +945,63 @@ be undone.
 | Windows | no installer or archive (§4.1). Not claimed to build |
 | claudestacks installer with an explicit old version | the claudestacks release (0.1.0, 0.1.1); newer versions forward to agentstacks (§8.2) |
 | Plugins and packs both active | duplicate skills and hooks. The migration doc removes the plugins first (§7.3 step 3) |
-| README example without `--pack core` | refused, because `sdlc` requires `core` (P32). Every example in §7.2 and §7.3 lists `core` with `sdlc` |
+| README example without `--pack core` | refused, because `sdlc` requires `core` (P32). Every example in §7.2, §7.3 and §7.6 lists `core` with `sdlc` |
+| A chapter in `SUMMARY.md` without its file | the build fails, exit 101 (P41); the `book` job and Pages fail |
+| A pack chapter's include target missing (a pack renamed or its README removed) | mdBook exits 0 with an `[ERROR]` line (P42); the §7.7 step fails on it (P43) |
+| A pack README changes | Pages redeploys (`packs/*/README.md` trigger, P49) |
+| A relative link added to a pack README later | it breaks in the book only; no CI check catches it (§13). `CLAUDE.md` states the absolute-link rule (§7.5) |
+| A broken internal link in a chapter | mdBook does not report it (P54). Execute checks every relative href of the built book once (§12); there is no permanent link checker (§13) |
+| The old raw URL `…/main/docs/authoring.md` | 404 once the move merges; README, CLAUDE.md and the chapter itself name `book/src/ch06-00-authoring.md` |
+| The old claudestacks book's claudevs pages | still served after the archive (P19), with the §8.2 pointer at their entry page and in the introduction |
+| `pages.yml` runs on the merge before the Pages source is set | that run fails at deploy; §9 step 2's `workflow_dispatch` run replaces it |
 
 ## 11. Architecture (approved by the author on 2026-11-24)
 
-No Rust module is added, moved or changed. `docs/architecture.md` and the crate layering are
-untouched. The rust-guidelines references were read for this spec. The rules applied come from
+No Rust module is added, moved or changed. The crate layering is untouched; its contract moves
+from `docs/architecture.md` to `book/src/ch07-00-architecture.md` with only its links renamed
+(§7.6). The rust-guidelines references were read for this spec. The rules applied come from
 `workspace.md`: members inherit `[workspace.package]`; publishable members carry a `description`
 and their own `README.md`; workspace dependencies carry `version` and `path`; publish dependency
 first. `modularity.md`, `mod-rs-export-only.md`, `static-dispatch.md` and `unit-test-mandate.md`
-have nothing to apply, since no source file changes.
+have nothing to apply, since no source file changes. `doc-comment-discipline.md` keeps planning
+paths out of the book chapters as it does out of source (§7.3, §7.6).
 
 ```text
 agentstacks/  (this repo)
 ├─ Cargo.toml                    publish = true; workspace dep versions (§2)
 ├─ crates/agentstacks{,-cli}/    + README.md + CHANGELOG.md; readme/keywords/categories (§2, §3)
-├─ crates/claudevs{,-cli}/       version bump + CHANGELOG entry; claudevs-cli README install line
+├─ crates/claudevs{,-cli}/       version bump + CHANGELOG entry; README install line and book links (§2)
+│  └─ claudevs/docs/             deleted, with its exclude line (§2)
 ├─ packs/CHANGELOG.md            packs-v releases (§3)
+├─ packs/*/README.md             relative links made absolute (§7.6)
 ├─ dist-workspace.toml           §4.1
 ├─ .github/workflows/
 │  ├─ release.yml               dist-generated + the trigger edit (§4.2)
 │  ├─ smoke.yml                 §6
-│  ├─ pages.yml                 §5.1
-│  └─ ci.yml                    + installers job (§7.1)
+│  ├─ pages.yml                 book + installers (§5.1, §7.7)
+│  └─ ci.yml                    + installers job, + book job (§7.1, §7.7)
 ├─ install/install.sh, claudevs.sh    §5
-├─ docs/migration.md (+ docs/README.md row)   §7.3
+├─ book/                         §7.6
+│  ├─ book.toml, mermaid.min.js, mermaid-init.js
+│  └─ src/  SUMMARY.md + 40 chapters
+│     ├─ introduction, ch01-ch03, appendix-00     new (ch03 = §7.3)
+│     ├─ ch02-01..05                             {{#include}} of packs/<pack>/README.md
+│     ├─ ch04-ch07                               ◄ docs/*.md (git mv, links renamed)
+│     └─ ch08-ch12, appendix-01                  ◄ claudestacks book claudevs part
+├─ docs/                         deleted (§7.6)
+├─ Makefile.toml                 + book-mdbook, book-mermaid, book, book-build (§7.6)
+├─ .gitignore                    + book/book/ (§7.6)
 ├─ RELEASING.md                  §7.4, §9
 └─ README.md, CLAUDE.md          §7.2, §7.5
 
 outside: org root docs (§8.1: edited by a plan, committed by the author after the archive) ·
-         claudestacks README + install.sh forwarder (§8.2, author) · archive (§8.3, author)
+         claudestacks README banner, book pointer, install.sh forwarder (§8.2, author) ·
+         archive (§8.3, author)
 ```
 
 Dependency direction is unchanged: `agentstacks-cli → agentstacks`, `claudevs-cli → claudevs`,
-and both libraries → `airsl` from crates.io.
+and both libraries → `airsl` from crates.io. The book depends on `packs/*/README.md` through its
+includes, and nothing depends on the book.
 
 ## 12. Testing
 
@@ -659,17 +1012,25 @@ and both libraries → `airsl` from crates.io.
 | dist config | the release workflow's plan job on the pull request (P12) |
 | Archives | smoke.yml on every binary tag, before publishing (§6) |
 | Installer scripts | the `installers` job (§7.1: parse, M1 first, M2); end to end at §9 step 5 |
+| Book builds | the `book` job and `pages.yml` (§7.7 step: mdBook exit 0 and no `[ERROR]` line, P43). `cargo make book-build` is for local iteration only; it does not fail on an `[ERROR]` line |
+| Book links | once at execute: build the book, then for every page except `print.html`, `toc.html` and `404.html`, every `href` that is not `http:`, `https:`, `mailto:` or `//` must name an existing file or directory under `book/book/`, and its anchor must be an `id` in that file, as `probes/scripts/book-probe.sh` does (843 checked, 0 broken, P39); 0 broken. Plus `grep -c -i claudestacks` over the moved claudevs chapters prints 0 (P46) |
+| Moves are moves | the six `docs/` files by `git mv`: `git diff -M --stat` shows each as a rename, and its diff is only the docs link map, the title line and (authoring) the raw URLs. The 22 claudevs files: each `git -C <claudestacks> show e099300:book/src/<old name>`, piped through the §7.6 claudevs map, equals the new file (`cmp`), as `probes/scripts/book-probe6.sh` section f does (P57) |
 
 The design-time probes of this spec's exact texts (the §4.1 file and §4.2 trigger with `dist plan`,
 the §2 metadata with the publish dry run, and `packs/CHANGELOG.md` with both pack text gates) are
-in `probes/spec-examples-results.md`.
+in `probes/spec-examples-results.md`; the book's are in `probes/book-results.md` and
+`probes/book-structure-results.txt`.
 
 ## 13. Non-goals
 
 - Windows archives or a PowerShell installer.
 - Installing, pinning or upgrading airsl beyond §5.3; that belongs to `airsstack tool install`.
 - An automated release command or a `/release` skill; the author runs §9.
-- The book (`book/`) and putting it on Pages.
+- A permanent link checker for the book (mdBook reports no broken link, P54; the org's other
+  books run none, P55).
+- Rewriting the moved reference chapters (ch04-ch07) or the claudevs chapters beyond the §7.6
+  edits. A tutorial rewrite was declined on 2026-11-24.
+- Changing the claudestacks book beyond the §8.2 pointer, or redirecting its old URLs.
 - Migration tooling beyond the documented steps (milestone non-goal).
 - Moving airsclaude or openrouter-rs (airsdk).
 - Changing `TAG_PREFIX` or any Rust code.

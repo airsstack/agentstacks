@@ -1,5 +1,5 @@
 ---
-status: approved
+status: superseded
 created: 2026-11-24
 depends-on: [01]
 built-on: a72a2ee643bb
