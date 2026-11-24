@@ -4,7 +4,7 @@ All notable changes to `claudevs-cli` (the `claudevs` binary) are recorded here.
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - Unreleased
+## [0.1.2] - 2026-11-24
 
 Built on `claudevs` 0.1.1.
 
