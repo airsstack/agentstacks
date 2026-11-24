@@ -52,7 +52,7 @@ or `std::net`. `crates/agentstacks/tests/isolation.rs` enforces this.
 ## Dependency policy
 
 `deny.toml` exempts airsl's subtree from the duplicate-version ban with `skip-tree`, because
-airsl 0.1.4 pins `sha2` 0.10 and `toml` 0.8 while agentstacks uses `sha2` 0.11 and `toml` 1. The
+airsl 0.1.5 pins `sha2` 0.10 and `toml` 0.8 while agentstacks uses `sha2` 0.11 and `toml` 1. The
 exemption can go once airsl moves to those versions. `Zlib` is in the allowed licences, for
 `foldhash`, which `serde_json`'s `preserve_order` feature pulls in.
 

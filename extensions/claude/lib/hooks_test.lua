@@ -22,8 +22,8 @@ local function message_hook(event, text, extra)
   return h
 end
 
-local function ok(hook)
-  local r, reason = hooks.render(hook, VARS)
+local function ok(hook, agents)
+  local r, reason = hooks.render(hook, VARS, agents)
   assert(r, "expected a rendered hook, got skip: " .. tostring(reason))
   return r
 end
@@ -68,8 +68,13 @@ return {
   end,
 
   agent_stop_matcher_joins_agents = function()
-    eq(ok(lua_hook("agent.stop", { agents = { "coder", "reviewer" } })).group.matcher, "coder|reviewer")
-    eq(ok(lua_hook("agent.stop")).group.matcher, nil)
+    local names = { "sdlc-task-briefer", "sdlc-chain-reader", "sdlc-artifact-reviewer" }
+    local hook = lua_hook("agent.stop", { agents = { "task-briefer", "chain-reader", "artifact-reviewer" } })
+    eq(ok(hook, names).group.matcher, "sdlc-task-briefer|sdlc-chain-reader|sdlc-artifact-reviewer")
+  end,
+
+  agent_stop_without_agents_has_no_matcher = function()
+    eq(ok(lua_hook("agent.stop"), nil).group.matcher, nil)
   end,
 
   prompt_submit_has_no_matcher = function()
@@ -189,6 +194,13 @@ return {
       r.group.hooks[1].command,
       'cd "$CLAUDE_PROJECT_DIR" && "airsl" "$TMPDIR/x" "${AIRSSTACK_HOME:-$HOME/.airsstack}/y" # agentstacks'
     )
+  end,
+
+  tmpdir_var_form_passes_the_literal_dollar_rule = function()
+    local hook = lua_hook("tool.before", { command = { "airsl", "${TMPDIR:-/tmp}/x" } })
+    local r, reason = hooks.render(hook, { tmpdir = "${TMPDIR:-/tmp}" })
+    assert(r, "expected a rendered hook, got skip: " .. tostring(reason))
+    eq(r.group.hooks[1].command, 'cd "$CLAUDE_PROJECT_DIR" && "airsl" "${TMPDIR:-/tmp}/x" # agentstacks')
   end,
 
   every_command_ends_with_the_marker = function()

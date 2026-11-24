@@ -1,7 +1,8 @@
 -- Renders one payload hook as a Claude Code hook group.
 --
--- Pure: it takes the hook and the rendered var forms and returns the Claude event with its group,
--- or nil and the reason the hook cannot be expressed. It calls no `agentstacks.*` and no `require`.
+-- Pure: it takes the hook, the rendered var forms and the rendered agent names and returns the
+-- Claude event with its group, or nil and the reason the hook cannot be expressed. It calls no
+-- `agentstacks.*` and no `require`.
 
 local M = {}
 
@@ -57,11 +58,12 @@ local function tool_matcher(match)
 end
 
 -- The matcher for a hook on `neutral` (the neutral event name, or nil for a native hook).
-local function matcher_for(hook, neutral)
+-- `agents` holds the rendered names of `hook.agents`, or is nil when the hook has none.
+local function matcher_for(hook, neutral, agents)
   if neutral == "tool.before" or neutral == "tool.after" then
     return tool_matcher(hook.match)
   elseif neutral == "agent.stop" then
-    return join(hook.agents)
+    return join(agents)
   elseif neutral == "session.end" or neutral == "prompt.submit" then
     return nil
   end
@@ -136,7 +138,9 @@ end
 
 -- Returns `{ event = <Claude event>, group = { matcher = <m>, hooks = {...} } }` for `hook`, or nil
 -- and the reason Claude cannot express it. `vars` is the `values` var map (name to rendered form).
-function M.render(hook, vars)
+-- `agents` is the rendered name of each of `hook.agents`, in the hook's order, or nil when the hook
+-- has none; an agent-stop matcher is built from it.
+function M.render(hook, vars, agents)
   local neutral = NEUTRAL_EVENTS[hook.event] and hook.event or nil
   local event = NEUTRAL_EVENTS[hook.event] or hook.event
   local message = hook.kind == "message"
@@ -170,7 +174,7 @@ function M.render(hook, vars)
   return {
     event = event,
     group = {
-      matcher = matcher_for(hook, neutral),
+      matcher = matcher_for(hook, neutral, agents),
       hooks = { { type = "command", command = command } },
     },
   }

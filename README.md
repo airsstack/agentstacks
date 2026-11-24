@@ -5,9 +5,9 @@ each tool's own format.**
 
 > **Status: early development, no release yet.** The CLI (`init`, `plan`, `apply`, `doctor`,
 > `update`) and the Claude Code extension are built and tested, and work from a local checkout with
-> local extensions and packs. Official packs, a tagged release and OpenCode are not here yet. The
-> extension API is `api = 0` and will change. Today's Claude Code plugins live in
-> [claudestacks](https://github.com/airsstack/claudestacks) until they move here.
+> local extensions and packs. The five official packs are in `packs/` but not released; a tagged
+> release and OpenCode are not here yet. The extension API is `api = 0` and will change. The
+> released Claude Code plugins still live in [claudestacks](https://github.com/airsstack/claudestacks).
 
 Every agentic coding tool wants its setup in its own shape: Claude Code reads `.claude/`, OpenCode
 reads `.opencode/` and `opencode.json`, and the next tool will want something else. agentstacks
@@ -99,7 +99,6 @@ The first packs come from today's claudestacks plugins:
 | `journal` | a vault of session and topic notes |
 | `guideline-rust` | the Rust Definition of Done and engineering rules |
 | `guideline-python` | the Python Definition of Done and engineering rules |
-| `cmux` | skills for driving cmux |
 
 ## Extending agentstacks
 
@@ -138,10 +137,10 @@ agentstacks/
 ├─ crates/
 │  ├─ agentstacks/       core library: types · port · app · fs · process · host     built
 │  ├─ agentstacks-cli/   init · plan · apply · doctor · update                       built
-│  ├─ claudevs/          deterministic test engine for Claude Code setups            planned (moving from claudestacks)
-│  └─ claudevs-cli/                                                                  planned
+│  ├─ claudevs/          deterministic test engine for Claude Code setups            built (moved from claudestacks)
+│  └─ claudevs-cli/      the claudevs binary                                         built
 ├─ extensions/           official tool extensions: claude/ built · opencode/ planned
-├─ packs/                official packs                                              planned
+├─ packs/                official packs: core · sdlc · journal · guideline-*         built
 ├─ docs/                 contributor docs, until the book exists                     built
 └─ book/                                                                             planned
 ```

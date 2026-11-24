@@ -61,3 +61,10 @@ event = "agent.stop"
 agents = ["coder"]
 run = "hooks/enforce.lua"
 args = ["^a$"]
+
+# 7: a lua hook on agent stop that lists an agent, matched by its installed name
+[[hooks]]
+kind = "lua"
+event = "agent.stop"
+agents = ["coder"]
+run = "hooks/enforce.lua"

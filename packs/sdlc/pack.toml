@@ -1,0 +1,29 @@
+exclude = ["README.md", "**/*_test.lua"]
+
+[pack]
+name        = "sdlc"
+version     = "0.1.0"
+api         = 0
+description = "Intent, spec, plan and execute chain with a status board, roadmaps and ADRs"
+
+[requires]
+packs = ["core"]
+airsl = ">=0.1.5"
+
+[[hooks]]
+kind  = "lua"
+event = "session.start"
+run   = "scripts/attention.lua"
+args  = ["{{skill status}}"]
+[hooks.grants]
+read = ["/"]
+
+[[hooks]]
+kind      = "lua"
+event     = "agent.stop"
+agents    = ["task-briefer", "chain-reader", "artifact-reviewer"]
+run       = "{{root core}}/scripts/handoff_check_hook.lua"
+may_block = true
+[hooks.grants]
+env  = ["HOME", "TMPDIR"]
+read = ["/"]

@@ -10,9 +10,12 @@
 #
 # The five cargo gate steps mirror the canonical command set in the
 # `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
-# file follows. The `lua` step is the project's own addition: it runs the Lua
-# extension tests with `airsl test`. CI is meant to run `cargo make dod`, so the
-# pipeline and a local run are the same command.
+# file follows. The `lua` step is the project's own addition: it compiles and tests
+# the Lua under extensions/ and packs/ with `airsl check` and `airsl test`, runs
+# the sdlc pack's fingerprint shell script against fixed cases, then greps the
+# pack sources for leftover plugin syntax and unprefixed names. CI is
+# meant to run `cargo make dod`, so the pipeline and a local run are the same
+# command.
 #
 # Install: cargo install --locked cargo-make cargo-deny
 #          plus the `airsl` binary on PATH for the `lua` step
@@ -95,9 +98,338 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua extension tests: every *_test.lua under extensions/"
-command = "airsl"
-args = ["test", "extensions"]
+description = "Lua: airsl check and airsl test over extensions/ and packs/, the fingerprint gate, then the pack text gates"
+# A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
+# needs shell expansion. `set -e` stops the run at the first failing step. The text
+# gates at the end fail on any line their grep prints: the `if` form is needed
+# because `set -e` does not fire on a negated command.
+script_runner = "@shell"
+script = '''
+set -e
+airsl check extensions
+airsl check packs
+airsl test extensions
+airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git packs
+
+# The fingerprint gate. `packs/sdlc/scripts/fingerprint.sh` is the one piece of
+# the status board with no Lua test: it exists for machines without airsl. It
+# must print exactly what `lib/fingerprint.lua` computes, and
+# fingerprint_test.lua asserts these same literals on the Lua side.
+FP_SH=packs/sdlc/scripts/fingerprint.sh
+FP_DIR=$(mktemp -d)
+trap 'rm -rf "$FP_DIR"' EXIT
+FM='---\nstatus: approved\ncreated: 2026-10-13\n---\n'
+BODY='# Spec: sample\n\nA line with --- inside it.\n---\nlast line'
+printf '%b' "${FM}${BODY}\n" > "$FP_DIR/lf-final-newline.md"
+printf '%b' "${FM}${BODY}" > "$FP_DIR/lf-no-final-newline.md"
+printf '%b' "${FM}${BODY}\n" | awk '{ printf "%s\r\n", $0 }' > "$FP_DIR/crlf.md"
+printf '%b' "${FM}${BODY}\n" | sed '2s/approved/done/' > "$FP_DIR/status-flipped.md"
+printf '%b' "${FM}${BODY} changed\n" > "$FP_DIR/body-edited.md"
+printf '%b' "${FM}" > "$FP_DIR/empty-body.md"
+printf '%s\n' '# just a heading' > "$FP_DIR/no-frontmatter.md"
+printf '%s\n' '---' 'status: draft' > "$FP_DIR/unterminated.md"
+fail=0
+FP_PATH=$PATH
+check() {
+  got=$(PATH="$FP_PATH" /bin/sh "$FP_SH" "$FP_DIR/$1") && code=0 || code=$?
+  if [ "$got" != "$2" ] || [ "$code" != "$3" ]; then
+    echo "fingerprint gate: $1: want '$2' exit $3, got '$got' exit $code" >&2
+    fail=1
+  fi
+}
+cases() {
+  check lf-final-newline.md    db42cc1eff57 0
+  check lf-no-final-newline.md db42cc1eff57 0
+  check crlf.md                db42cc1eff57 0
+  check status-flipped.md      db42cc1eff57 0
+  check body-edited.md         02746658f17b 0
+  check empty-body.md          e3b0c44298fc 0
+  check no-frontmatter.md      ""           2
+  check unterminated.md        ""           2
+}
+cases
+[ "$fail" = 0 ] || exit 1
+echo "fingerprint gate: 8 cases passed"
+# fingerprint.sh prefers shasum, so where both tools exist the sha256sum
+# branch never runs above. Run the cases again with a PATH holding only what
+# the script needs and no shasum.
+if command -v shasum >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1; then
+  mkdir "$FP_DIR/bin"
+  for tool in awk cut sha256sum; do
+    ln -s "$(command -v "$tool")" "$FP_DIR/bin/$tool"
+  done
+  FP_PATH="$FP_DIR/bin"
+  cases
+  [ "$fail" = 0 ] || exit 1
+  echo "fingerprint gate: 8 cases passed with sha256sum"
+fi
+
+# The pack text gates. A pack is plain text rendered per tool, so the source must hold no
+# Claude Code plugin syntax, no plugin-qualified names, and no bare skill, agent or command
+# names that the rendered `<pack>-` prefix would break. Each grep must print nothing: its
+# exit status is 1 (no match). Status 0 is a hit and status 2 or more is a grep error such as a
+# missing `packs/`, which must not read as "no hit".
+rc=0
+grep -rnE 'CLAUDE_PLUGIN_(ROOT|OPTION)|user_config|claudestacks(-[a-z]+)*:[a-z]' packs/ --exclude=README.md --exclude='*_test.lua' || rc=$?
+if [ "$rc" != 1 ]; then
+  echo "pack text gate 1: plugin syntax or plugin-qualified names in packs/ (grep exit $rc)" >&2
+  exit 1
+fi
+# Gate 2 skips the two guideline reference documents that list workflow words such as
+# `reviewer` as examples of vocabulary to keep out of source comments, not as pack items.
+rc=0
+grep -rnE '(^|[ `"(])/(snapshot-(load|save)|journal-[a-z]+)\b|subagent_type: [a-z]|Namespaced as|`(coder|explorer|reviewer|task-briefer|chain-reader|artifact-reviewer|journal-[a-z]+|context-handoff|enforce-doctor|orchestrate|process-guidelines|snapshot-load|snapshot-save|statusline)`' packs/ --include='*.md' --exclude=README.md --exclude=doc-comment-discipline.md --exclude=docstring-discipline.md || rc=$?
+if [ "$rc" != 1 ]; then
+  echo "pack text gate 2: unprefixed skill, agent or command names in packs/*.md (grep exit $rc)" >&2
+  exit 1
+fi
+# Gate 3 filters the first grep's output, so its status is read before the filter runs.
+rc=0
+found=$(grep -rnE 'journal-(capture|curator|note|recall|helped|link|review|setup)' packs/journal --include='*.md' --exclude=README.md) || rc=$?
+if [ "$rc" -gt 1 ]; then
+  echo "pack text gate 3: grep failed over packs/journal (exit $rc)" >&2
+  exit 1
+fi
+left=$(printf '%s\n' "$found" | grep -vE ':[0-9]+:# |journal-curator-review\.md' || true)
+if [ -n "$left" ]; then
+  printf '%s\n' "$left"
+  echo "pack text gate 3: unprefixed journal names in packs/journal/*.md" >&2
+  exit 1
+fi
+echo "pack text gates: 3 passed"
+'''
+
+# ---------------------------------------------------------------------------
+# claudevs
+# ---------------------------------------------------------------------------
+
+[tasks.claudevs-check]
+category = "Claudevs"
+description = "claudevs check over the fixture plugin corpus, both directions"
+# Not a dependency of `dod`: the gate is the five commands the guideline skill
+# owns plus the project's `lua` step. This lane asserts the checkers
+# still report — a corpus of only-passing fixtures would go green the day they
+# stopped. `claude` is absent on the runner, so the validate stage skips and
+# the deterministic stages carry the gate, which is the documented degradation.
+#
+# `claude plugin validate`, run without `--strict` (the CLI's own default),
+# passes bad-matcher-plugin on a machine that has `claude` installed: with
+# `claude` 2.1.330 `PreToolUseX` is only a warning ("unknown hook event; entry
+# ignored at runtime"), so validate reports ok and wiring is the one stage
+# that FAILs for that fixture. hooks-array-plugin still fails validate there,
+# and a failing stage does not stop the run, so its validate and wiring FAIL
+# lines show up in one report. On the CI runner, where `claude` is absent,
+# validate reports itself skipped and wiring's FAIL is the only one produced.
+# Either way wiring FAILs, and that is the stage this lane asserts — so the
+# deterministic wiring checkers are exercised here and on CI alike, and a
+# local pass is evidence for both.
+#
+# Which wiring checker fails which fixture, and on what — only an Error fails
+# a stage, a warning never does (crates/claudevs/src/wiring/finding.rs):
+#
+#   escape-plugin       refs      `${CLAUDE_PLUGIN_ROOT}/../gate.sh` escapes the plugin root
+#   bad-matcher-plugin  refs      `${CLAUDE_PLUGIN_ROOT}/scripts/absent.sh` does not exist
+#   hooks-array-plugin  matchers  hooks/hooks.json has no `hooks` object at the top level
+#
+# bad-matcher-plugin's other two findings — an unknown hook event and a
+# matcher claudevs cannot compile — are warnings that `matchers` reports and
+# neither fails anything: claudevs' event catalogue can lag a Claude Code
+# release, and a matcher divergence is not proof the runtime would reject it
+# too. So `refs` carries both of the first two FAILs, and without
+# hooks-array-plugin no fixture would make `matchers` report an Error at all —
+# that checker could stop reporting errors entirely and this lane would stay
+# green. Its shape is not invented for the fixture: a `hooks.json` whose
+# top-level `hooks` key holds an array of `{event, command, timeout}` objects
+# rather than an object keyed by event name turned up in the third-party
+# corpus. `matchers` rejects it at crates/claudevs/src/wiring/matchers.rs.
+#
+# `root` is deliberately relative: `claudevs check` resolves `plugin_dir` to
+# an absolute path once, up front, and uses that single value for both the
+# spawned delegate's argv and its cwd (crates/claudevs/src/validate.rs), so a
+# relative path here is no longer doubled. Keeping it relative means that on
+# a machine that has `claude`, this lane also exercises the delegate's path
+# handling, so that defect cannot come back unnoticed.
+script_runner = "@shell"
+script = '''
+set -e
+root="crates/claudevs/tests/fixtures"
+
+# `cargo run -q -p claudevs-cli --` in place of a hardcoded `target/debug/claudevs`
+# path: cargo resolves the target directory itself, so the lane still works under
+# CARGO_TARGET_DIR or a --target-dir override. `-q` suppresses cargo's own build
+# output, so the captured output below is exactly what `claudevs check` printed.
+#
+# `_run` captures output and exit code and asserts the exit code, but is
+# private (leading underscore, never called from the fixture list below) so
+# that the stage assertion always runs in the same breath as the capture —
+# there is no exposed "run" step whose output an assertion could read stale
+# after a previous fixture, because there is no way to call one without the
+# other.
+_run() {
+    plugin="$1"; want_exit="$2"
+    set +e
+    out="$(cargo run -q -p claudevs-cli -- check "$root/$plugin" 2>&1)"
+    got=$?
+    set -e
+    if [ "$got" != "$want_exit" ]; then
+        echo "claudevs check $plugin: expected exit $want_exit, got $got" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+}
+
+# Asserting exit codes alone cannot tell which stage produced them: a
+# regression that fails the wiring check for the wrong reason, or that moves a
+# failure from wiring to validate, keeps exit 1 and this lane would stay
+# green. So beyond the exit code, assert which stage line `claudevs check`
+# printed.
+
+# `claudevs check` indents every top-level stage line by two spaces (`  ok
+# validate`, `  FAIL  wiring`), so the assertions below match on that exact
+# prefix rather than column zero.
+#
+# Each fixture calls exactly one of the three functions below, and each one
+# runs `_run` itself before reading `$out`/`$got` — the two can no longer be
+# invoked separately, so there is no way to assert against a previous
+# fixture's stale output.
+expect_no_fail() {
+    plugin="$1"; want_exit="$2"
+    _run "$plugin" "$want_exit"
+    if echo "$out" | grep -q "^  FAIL  "; then
+        echo "claudevs check $plugin: expected every stage to pass, but a stage reported FAIL:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    # The absence check above cannot tell "every stage passed" from "no stage
+    # line was printed at all" — a silently-broken binary that exits 0 with no
+    # output would sail through it. `wiring` is the positive anchor because it
+    # runs on every machine regardless of whether the `claude` binary is
+    # installed (unlike `validate`, which skips when `claude` is absent), so
+    # asserting its exact line pins that a stage was actually produced without
+    # reintroducing any machine dependence.
+    if ! echo "$out" | grep -q "^  ok    wiring\$"; then
+        echo "claudevs check $plugin: expected \"ok    wiring\" among the stage lines, got:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "ok  $plugin (exit $got, no stage failed)"
+}
+
+expect_stage_fail() {
+    plugin="$1"; want_exit="$2"; stage="$3"
+    _run "$plugin" "$want_exit"
+    if ! echo "$out" | grep -q "^  FAIL  $stage\$"; then
+        echo "claudevs check $plugin: expected \"FAIL  $stage\", got:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "ok  $plugin (FAIL $stage)"
+}
+
+# bad-matcher-plugin and hooks-array-plugin FAIL at wiring on every machine:
+# the wiring checkers are native and run whether or not `claude` is installed.
+# Where `claude` IS installed, validate passes bad-matcher-plugin (its unknown
+# event is a warning) and still fails hooks-array-plugin, whose top-level
+# `hooks` is an array rather than an object. `expect_stage_fail` greps for its
+# own stage's line rather than requiring it to be the only FAIL, so pinning
+# `wiring` here holds in both environments — and, unlike accepting "validate
+# or wiring", it still fails this lane if a wiring checker stops reporting.
+
+expect_no_fail minimal-plugin 0
+expect_no_fail dead-script-plugin 0
+expect_stage_fail escape-plugin 1 wiring
+expect_stage_fail bad-matcher-plugin 1 wiring
+expect_stage_fail hooks-array-plugin 1 wiring
+
+# project-branch-plugin is the paired control for the default project: its
+# one PreToolUse hook only speaks when the payload names a file that exists
+# inside a project carrying a manifest, which is exactly what the default
+# fixtureless project (Project::empty()) now provides. A bare temp directory
+# would take the hook's silent branch and this case would pass whether the
+# hook worked or not.
+expect_no_fail project-branch-plugin 0
+
+# exec-args-plugin is the paired control for `args`-carrying exec handlers: one
+# SessionStart case whose output comes from `command`, one whose output comes
+# only from `args`. Both must pass, or the exec dispatch path has regressed.
+expect_no_fail exec-args-plugin 0
+
+# matcher-routing-plugin is a must-fail fixture on purpose: its two PreToolUse
+# cases target different matcher groups, and the second asserts the `Edit`
+# group's output against a `Bash` payload — a case the runtime would never
+# route there. It FAILs at `test` (and `test --installed`, for the same
+# reason): both stages actually run the case suite, unlike `wiring`, which is
+# static and cannot see a payload/matcher mismatch. A corpus of only-passing
+# fixtures would go green the day this routing check stopped reporting.
+expect_stage_fail matcher-routing-plugin 1 test
+'''
+
+[tasks.corpus-fetch]
+category = "Claudevs"
+description = "Clone the pinned third-party plugin corpus into target/corpus"
+# Clones third-party repositories over the network (`deny` also fetches the
+# advisory database). It is never a dependency of `dod`, never runs in CI, and is run before a release rather
+# than on every commit — the corpus is pinned by commit SHA rather than
+# vendored, which keeps repository weight at zero (vendoring measured 19 MB
+# for all 156 roots) and keeps the published .crate clear of the crates.io
+# size ceiling. The cost of that choice is exactly this: a check nobody is
+# obliged to run guards by convention.
+#
+# A pinned SHA is re-fetchable while the commit stays reachable. A repository
+# that is deleted, made private, or force-pushed makes its row a record of
+# what was tested rather than something re-runnable. That is expected; report
+# such a row as unfetchable rather than repinning it silently.
+#
+# The body is a file, not an inline script, so that its malformed-record guard
+# — the one standing between a shifted manifest record and an `rm -rf` of the
+# whole corpus root — can be pinned by an ordinary test. This lane is in
+# neither `dod` nor CI, so a guard reachable only from here is a guard whose
+# removal nothing would notice; `crates/claudevs/tests/fetch.rs` drives
+# the script against its own scratch manifests under `cargo test`. The script
+# takes the manifest and the destination as optional arguments and defaults
+# both to the values this lane wants, which is why none are passed here.
+command = "./scripts/corpus-fetch.sh"
+
+[tasks.corpus-check]
+category = "Claudevs"
+description = "Sweep the fetched third-party corpus and check it is not short (slow; needs corpus-fetch)"
+# Not a dependency of `dod` and not in CI, for the reason the corpus is
+# pinned rather than vendored: the clones are not in the repository, so this
+# lane cannot run on a checkout alone. It is run before a release.
+#
+# This is the second corpus, not a replacement for the first.
+# `cargo make claudevs-check` runs the hand-authored fixtures in
+# crates/claudevs/tests/fixtures/ in both directions and stays exactly as it
+# is: those fixtures pin the behaviour claudevs intends, and they are cheap
+# and unskippable. This one answers the different question — whether that
+# intent survives contact with plugins nobody here wrote.
+#
+# This lane would run a corpus plugin's case suite if one shipped a case file —
+# Lua confined, a declared native suite through an unconfined shell. None of the
+# 13 pinned repositories carries one today, so no third-party code runs. The
+# module doc in crates/claudevs/tests/corpus.rs carries the detail.
+#
+# A mistyped package or test-target name here is not a silent pass: cargo
+# rejects both outright, exit 101 —
+#   error: package ID specification `claudevs-nonexistent` did not match any packages
+#   error: no test target named `nonexistent` in `claudevs` package
+# What does exit 0 having run nothing is a NAME FILTER that matches no test:
+# appending an unmatched filter to the args below prints "running 0 tests ...
+# 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out" and exits 0, and
+# no flag turns that into a failure.
+#
+# The real silent-pass path, though, is a corpus that is absent or short
+# rather than a mistyped target: the sweep renders one row per manifest root
+# whether or not the clone behind it exists, so nothing cloned would still
+# produce a full-length report. Three guards in tests/corpus.rs carry that
+# weight — the corpus-root helper asserts `target/corpus` is a directory at
+# all; the sweep requires every repository carrying a plugin root to have
+# either a checkout on disk or a slug recorded in `corpus-fetch`'s
+# `.unfetchable` marker; and it fails any root that renders ABSENT while its
+# repository *is* checked out, which is a wrong pin or a moved plugin path
+# rather than an unreachable upstream.
+command = "cargo"
+args = ["test", "-p", "claudevs", "--test", "corpus", "--", "--ignored", "--nocapture"]
 
 # ---------------------------------------------------------------------------
 # Supply chain

@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" \"$TMPDIR/x\" # agentstacks",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" \"${TMPDIR:-/tmp}/x\" # agentstacks",
             "type": "command"
           }
         ],
@@ -25,7 +25,7 @@
       {
         "hooks": [
           {
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \"--allow-read\" \".claude/agentstacks/core\" \"--allow-write\" \"$TMPDIR\" \"--allow-env\" \"HOME\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"1\" \"neutral\" \"--manifest\" \".claude/agentstacks/core/data.json\" # agentstacks",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \"--allow-read\" \".claude/agentstacks/core\" \"--allow-write\" \"${TMPDIR:-/tmp}\" \"--allow-env\" \"HOME\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"1\" \"neutral\" \"--manifest\" \".claude/agentstacks/core/data.json\" # agentstacks",
             "type": "command"
           }
         ],
@@ -47,11 +47,20 @@
       {
         "hooks": [
           {
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\" # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "core-coder"
+      },
+      {
+        "hooks": [
+          {
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && \"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".claude/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"1\" \"native\" # agentstacks",
             "type": "command"
           }
         ],
-        "matcher": "coder"
+        "matcher": "core-coder"
       }
     ]
   }

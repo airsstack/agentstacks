@@ -78,7 +78,7 @@ external-default-features = "allow"
 allow = []
 deny = []
 skip = []
-skip-tree = [{ crate = "airsl@0.1.4", reason = "airsl 0.1.4 pins sha2 0.10 and toml 0.8; agentstacks uses sha2 0.11 and toml 1" }]
+skip-tree = [{ crate = "airsl@0.1.5", reason = "airsl 0.1.5 pins sha2 0.10 and toml 0.8; agentstacks uses sha2 0.11 and toml 1" }]
 
 # ---------------------------------------------------------------------------
 # Sources

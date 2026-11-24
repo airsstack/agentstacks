@@ -41,9 +41,9 @@
 //!
 //! # Non-responsibilities
 //!
-//! A pack's relation to other packs (required packs, targets in other packs, clashing names, airsl
-//! ranges) belongs to the checks over a whole set of packs. Reading the real disk belongs to the
-//! adapter of the [`FileTree`] port that the caller passes in.
+//! A pack's relation to other packs (required packs, targets in other packs, airsl ranges) belongs
+//! to the checks over a whole set of packs. Reading the real disk belongs to the adapter of the
+//! [`FileTree`] port that the caller passes in.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;

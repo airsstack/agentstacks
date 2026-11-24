@@ -56,8 +56,7 @@ Refusals are printed one `Diagnostic` per line, sorted.
 | contains `/` or starts with `.` | a project-relative path, written as `path = "<argument>"` |
 | anything else | an official name |
 
-- Official packs: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`, `cmux`. Official
-  tools: `claude`.
+- Official packs: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`. Official tools: `claude`.
 - An official name expands to `git = "https://github.com/airsstack/agentstacks"`, the latest
   `packs-v*` tag, and `subdir = "packs/<name>"` (a tool: `extensions/<name>`).
 - A path's table key is the `name` in that directory's `pack.toml` or `extension.toml`.
@@ -117,10 +116,10 @@ the plan, runs the confirmation (section 5), and on yes applies that same plan.
 ```text
 agentstacks plan
 
-  create   .claude/skills/status/SKILL.md   core
-  update   .claude/agentstacks/runtime.lua  claude
-  delete   .claude/agents/old.md            team-lint
-  update   .claude/settings.json            shared
+  create   .claude/skills/core-status/SKILL.md   core
+  update   .claude/agentstacks/runtime.lua       claude
+  delete   .claude/agents/team-lint-old.md       team-lint
+  update   .claude/settings.json                 shared
     --- .claude/settings.json
     +++ .claude/settings.json
     @@ -3,5 +3,17 @@
@@ -215,5 +214,5 @@ reconciles that entry as stale and resolves it again, so `update` needs no speci
 ## 8. `doctor`
 
 Prints each finding on stdout, one per line, in the order returned, for example
-`changed: .claude/agents/coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`. With no findings it
+`changed: .claude/agents/core-coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`. With no findings it
 prints `healthy` and exits 0. Any finding exits 1.

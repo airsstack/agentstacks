@@ -147,12 +147,15 @@ The result is a table that says where this tool puts things and what each token 
 ```lua
 -- example: claude extension
 agentstacks.on("values", function(q)
-  local out = { root = ".claude/agentstacks", skills = {}, agents = {}, vars = { tmpdir = "$TMPDIR" } }
+  local out = { root = ".claude/agentstacks", skills = {}, agents = {}, vars = { tmpdir = "${TMPDIR:-/tmp}" } }
   for _, p in ipairs(q.packs) do
     for _, s in ipairs(p.skills) do
-      out.skills[p.name .. "/" .. s] = { invoke = "/" .. s, dir = ".claude/skills/" .. s }
+      out.skills[p.name .. "/" .. s] = {
+        invoke = "/" .. p.name .. "-" .. s,
+        dir = ".claude/skills/" .. p.name .. "-" .. s,
+      }
     end
-    for _, a in ipairs(p.agents) do out.agents[p.name .. "/" .. a] = a end
+    for _, a in ipairs(p.agents) do out.agents[p.name .. "/" .. a] = p.name .. "-" .. a end
   end
   return out
 end)
@@ -216,7 +219,7 @@ extension.
 ```json
 { "api": 0, "tool": "claude", "root": ".claude/agentstacks",
   "packs": [ { "name": "core", "version": "0.3.0",
-    "skills": [ { "id": "core/skill/status", "name": "status", "dir": ".claude/skills/status",
+    "skills": [ { "id": "core/skill/status", "name": "status", "dir": ".claude/skills/core-status",
                   "meta": { "description": "…", "invocation": "user" },
                   "files": [ { "id": "core/skill/status/SKILL.md", "rel": "SKILL.md", "text": "<body after frontmatter>" },
                              { "id": "core/skill/status/logo.png", "rel": "logo.png" } ] } ],
@@ -237,6 +240,8 @@ extension.
 - A native hook always carries `kind` (`lua` or `message`), `event` (named as the tool names it),
   `match` as the list the pack format reader holds (left out when the hook has none), and `may_block`
   with `command` (a lua hook) or `text` (a message hook). It has no `agents`.
+- A native hook's `match` is passed through as written, so one that matches an agent must name it
+  by its installed name, `<pack>-<agent>` (for example `core-coder`), not the name in the pack.
 
 In the example above, the native hook entry is shown shortened. As built, it reads:
 

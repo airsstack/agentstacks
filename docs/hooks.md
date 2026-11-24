@@ -129,6 +129,7 @@ tool's own payload field). A real tool's translator decides the actual output te
 | `event` | always: one of the hook events of the pack format (`session.start`, `session.end`, `prompt.submit`, `tool.before`, `tool.after`, `agent.stop`) |
 | `session_id`, `cwd` | always |
 | `agent` | always; `nil` = the main agent |
+| `agent_id` | optional; the tool's id for the agent instance, `nil` when the tool has none |
 | `args` | always (added by the runtime) |
 | `source` | `session.start`: `startup`, `resume`, `clear` or `compact` |
 | `prompt` | `prompt.submit` |

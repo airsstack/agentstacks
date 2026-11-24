@@ -18,7 +18,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 const REQUIRE_AIRSL: &str = "AGENTSTACKS_REQUIRE_AIRSL";
 
 /// The skill the demo pack writes into the project.
-const SKILL: &str = ".claude/skills/greet/SKILL.md";
+const SKILL: &str = ".claude/skills/demo-greet/SKILL.md";
 
 /// What every run that applies nothing without a terminal prints on stderr.
 const NO_TERMINAL: &str = "stdin is not a terminal; pass --yes to apply";

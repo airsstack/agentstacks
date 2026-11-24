@@ -28,6 +28,9 @@ function M.event(p)
   if type(p.agent_type) == "string" and p.agent_type ~= "" then
     e.agent = p.agent_type
   end
+  if type(p.agent_id) == "string" and p.agent_id ~= "" then
+    e.agent_id = p.agent_id
+  end
   if name == "session.start" then
     if SOURCES[p.source] then
       e.source = p.source

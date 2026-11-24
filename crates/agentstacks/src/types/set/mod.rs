@@ -12,8 +12,8 @@
 //! - [`AirslRange`]: the `requires.airsl` ranges of the packs and the versions they admit
 //!   together.
 //! - [`SetError`]: the refusals with a wording of their own that these checks raise.
-//! - `fetched`, `graph`, `targets`, `runs`, `options`, `interval` and `clash` hold the
-//!   crate-internal checks that [`check()`] runs, one rule each.
+//! - `fetched`, `graph`, `targets`, `runs`, `options` and `interval` hold the crate-internal
+//!   checks that [`check()`] runs, one rule each.
 //!
 //! # Non-responsibilities
 //!
@@ -25,7 +25,6 @@
 
 pub mod airsl;
 pub mod check;
-mod clash;
 pub mod error;
 mod fetched;
 mod graph;

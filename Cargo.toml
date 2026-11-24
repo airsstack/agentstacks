@@ -12,9 +12,11 @@ publish       = false
 
 [workspace.dependencies]
 agentstacks = { path = "crates/agentstacks", version = "0.0.0" }
-airsl = "0.1.4"
+airsl = "0.1.5"
 clap = { version = "4", features = ["derive"] }
+claudevs = { path = "crates/claudevs", version = "0.1.0" }
 globset = "0.4"
+regex = "1"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
@@ -25,6 +27,7 @@ tempfile = "3"
 thiserror = "2"
 toml = "1"
 toml_edit = "0.25"
+walkdir = "2.5"
 
 [workspace.lints.rust]
 unsafe_code        = "forbid"

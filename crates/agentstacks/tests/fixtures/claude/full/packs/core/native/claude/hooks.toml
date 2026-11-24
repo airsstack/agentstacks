@@ -2,7 +2,7 @@
 [[hooks]]
 kind = "lua"
 event = "SubagentStop"
-match = ["coder"]
+match = ["core-coder"]
 run = "hooks/enforce.lua"
 may_block = true
 
