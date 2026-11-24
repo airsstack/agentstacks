@@ -4,6 +4,14 @@ All notable changes to `claudevs` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - Unreleased
+
+### Changed
+
+- The source moved to https://github.com/airsstack/agentstacks, and the documentation to the
+  agentstacks book, https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html.
+  Behaviour is unchanged.
+
 ## [0.1.0] - 2026-10-15
 
 Initial release. Minimum supported Rust version: 1.94. Building it compiles Lua 5.4 from C sources

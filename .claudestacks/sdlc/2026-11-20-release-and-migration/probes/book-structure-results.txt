@@ -1,0 +1,156 @@
+# Book structure facts (`scripts/book-probe4.sh`, 2026-11-24)
+
+$ git -C claudestacks rev-parse --short HEAD
+e099300
+== docs/ paths named in README.md and CLAUDE.md
+README.md:86:| Your own | Write a tool extension against the public API: [`docs/authoring.md`](docs/authoring.md) |
+README.md:115:[`docs/authoring.md`](docs/authoring.md), or its raw link:
+README.md:119:Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authoring.md
+README.md:144:├─ docs/                 contributor docs, until the book exists                     built
+README.md:150:Contributor docs live in [`docs/`](docs/README.md) until the book exists. Start with
+README.md:151:[`docs/architecture.md`](docs/architecture.md): the layers, the dependency rule, where logic lives,
+CLAUDE.md:18:docs/                     contributor docs; docs/architecture.md is the layering contract
+CLAUDE.md:73:**[`docs/architecture.md`](docs/architecture.md) is the contract for `crates/agentstacks`. Read it
+CLAUDE.md:95:[`docs/authoring.md`](docs/authoring.md) step by step. It is written for an agent to follow,
+CLAUDE.md:96:links the API contract (`docs/extensions.md`, `docs/hooks.md`) and uses `extensions/claude/` as
+CLAUDE.md:103:crates/agentstacks/      types · port · app · fs · process · host (see docs/architecture.md)
+CLAUDE.md:108:docs/                    contributor docs until the book exists
+== crates/claudevs/docs: files, and who links them (then a control grep for a known path)
+crates/claudevs/docs/architecture.md
+crates/claudevs/docs/cli/explanation.md
+crates/claudevs/docs/cli/how-to.md
+crates/claudevs/docs/cli/reference.md
+crates/claudevs/docs/cli/tutorial.md
+crates/claudevs/docs/engine/explanation.md
+crates/claudevs/docs/engine/how-to.md
+crates/claudevs/docs/engine/tutorial.md
+crates/claudevs/docs/README.md
+(grep exit 1)
+crates/claudevs/examples/06_native_suite/README.md
+crates/claudevs/examples/03_session_context/README.md
+== claudestacks book: the claudevs part (SUMMARY) and its files
+# claudevs
+
+- [Getting Started](ch05-00-claudevs-getting-started.md)
+  - [Installation](ch05-01-installation.md)
+  - [A First Plugin](ch05-02-first-plugin.md)
+  - [A First Case](ch05-03-first-case.md)
+  - [Running the Gate](ch05-04-running-the-gate.md)
+- [Writing Cases](ch06-00-writing-cases.md)
+  - [Hook Decisions](ch06-01-hook-decisions.md)
+  - [Scripts and Flows](ch06-02-scripts-and-flows.md)
+  - [Cases in Lua](ch06-03-cases-in-lua.md)
+  - [Native Suites](ch06-04-native-suites.md)
+  - [Selecting Cases and Reading Skips](ch06-05-selecting-and-skips.md)
+- [The check Gate](ch07-00-check-gate.md)
+  - [Stages](ch07-01-stages.md)
+  - [Wiring](ch07-02-wiring.md)
+  - [Running in CI](ch07-03-ci.md)
+- [Embedding](ch08-00-embedding.md)
+  - [Your First Suite](ch08-01-first-suite.md)
+  - [Recipes](ch08-02-recipes.md)
+- [Under the Hood](ch09-00-claudevs-under-the-hood.md)
+  - [Why It Works This Way](ch09-01-design.md)
+  - [How the Engine Fits Together](ch09-02-engine.md)
+
+# The Plugin Suite
+      22
+== links from those chapters to chapter files outside the set (expect none), then a control
+(grep exit 1)
+7
+== every claudestacks mention in those chapters
+0
+      19
+== claudestacks book lines the pointer goes next to
+53:Start with [claudevs Getting Started](ch05-00-claudevs-getting-started.md).
+# Getting Started
+== claudevs README book links
+crates/claudevs/README.md:47:- [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html)
+crates/claudevs/README.md:49:- [Writing Cases](https://airsstack.github.io/claudestacks/ch06-00-writing-cases.html) covers hook
+crates/claudevs/README.md:51:- [The check Gate](https://airsstack.github.io/claudestacks/ch07-00-check-gate.html) covers the four
+crates/claudevs/README.md:53:- [Embedding](https://airsstack.github.io/claudestacks/ch08-00-embedding.html) is the chapter for
+crates/claudevs/README.md:55:- [Under the Hood](https://airsstack.github.io/claudestacks/ch09-00-claudevs-under-the-hood.html)
+crates/claudevs/README.md:57:- [claudevs CLI Reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html)
+crates/claudevs-cli/README.md:12:curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh   # prebuilt binary, no Rust needed
+crates/claudevs-cli/README.md:36:- [Installation](https://airsstack.github.io/claudestacks/ch05-01-installation.html)
+crates/claudevs-cli/README.md:37:- [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html)
+crates/claudevs-cli/README.md:39:- [Writing Cases](https://airsstack.github.io/claudestacks/ch06-00-writing-cases.html)
+crates/claudevs-cli/README.md:40:- [The check Gate](https://airsstack.github.io/claudestacks/ch07-00-check-gate.html), including
+crates/claudevs-cli/README.md:41:  [running it in CI](https://airsstack.github.io/claudestacks/ch07-03-ci.html).
+crates/claudevs-cli/README.md:42:- [claudevs CLI Reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html)
+== pack READMEs: excluded from installs; their links today
+packs/core/pack.toml:1:exclude = ["README.md", "**/*_test.lua"]
+packs/guideline-python/pack.toml:2:exclude = ["README.md"]
+packs/guideline-rust/pack.toml:2:exclude = ["README.md"]
+packs/journal/pack.toml:1:exclude = ["README.md", "**/*_test.lua"]
+packs/sdlc/pack.toml:1:exclude = ["README.md", "**/*_test.lua"]
+packs/core/README.md:27:](https://github.com/juliusbrussee/caveman)
+packs/core/README.md:33:](../../LICENSE)
+packs/guideline-python/README.md:20:](skills/guidelines/SKILL.md)
+packs/guideline-python/README.md:21:](skills/guidelines/references/)
+packs/guideline-python/README.md:25:](../../LICENSE)
+packs/guideline-rust/README.md:19:](skills/guidelines/SKILL.md)
+packs/guideline-rust/README.md:20:](skills/guidelines/references/)
+packs/guideline-rust/README.md:24:](../../LICENSE)
+packs/journal/README.md:25:](references/note-schema.md)
+packs/journal/README.md:26:](skills/)
+packs/sdlc/README.md:6:](https://claude.com/blog/the-ai-native-sdlc-playbook)
+packs/sdlc/README.md:22:](references/artifact-chain.md)
+packs/sdlc/README.md:23:](references/templates.md)
+packs/sdlc/README.md:28:](https://claude.com/blog/the-ai-native-sdlc-playbook)
+packs/sdlc/README.md:30:](https://github.com/obra/superpowers)
+packs/sdlc/README.md:34:](../../LICENSE)
+== org README Projects table, Docs column
+27:|---|---|
+99:| Project | Lane | What it is | Status | Docs |
+100:|---|---|---|---|---|
+| [**airsl**](https://github.com/airsstack/airsl) | Foundati
+| [**buildl**](https://github.com/airsstack/buildl) | Run th
+| [**claudestacks**](https://github.com/airsstack/claudestac
+| **airsclaude** (in claudestacks) | Build agentic software 
+| [**openrouter-rs**](https://github.com/airsstack/openroute
+== README.md sections to edit
+| Claude Code | Built (`extensions/claude`), not released |
+| OpenCode | Planned |
+| Your own | Write a tool extension against the public API: [`docs/authoring.md`](docs/authoring.md) |
+
+## Extending agentstacks
+
+Anyone can write a pack (markdown, plus Lua for hooks) or a tool extension (Lua). The official
+Claude Code and OpenCode extensions are built on the same public API, so the API has to be good
+enough for real tools.
+
+Extensions run under [airsl](https://github.com/airsstack/airsl) with no file, network, or process
+access. An extension only *proposes* operations; the Rust core validates them, `plan` shows them,
+and the executor applies them. A third-party command never runs unannounced. The extension API is
+unstable (`api = 0`) until both official tools run on it.
+
+To write a tool extension, give your coding agent the guide
+[`docs/authoring.md`](docs/authoring.md), or its raw link:
+
+```text
+Build an agentstacks extension for <tool>.
+Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authoring.md
+```
+
+## Layout
+
+```text
+agentstacks/
+├─ crates/
+│  ├─ agentstacks/       core library: types · port · app · fs · process · host     built
+│  ├─ agentstacks-cli/   init · plan · apply · doctor · update                       built
+│  ├─ claudevs/          deterministic test engine for Claude Code setups            built (moved from claudestacks)
+│  └─ claudevs-cli/      the claudevs binary                                         built
+├─ extensions/           official tool extensions: claude/ built · opencode/ planned
+├─ packs/                official packs: core · sdlc · journal · guideline-*         built
+├─ docs/                 contributor docs, until the book exists                     built
+└─ book/                                                                             planned
+```
+
+## Documentation
+
+Contributor docs live in [`docs/`](docs/README.md) until the book exists. Start with
+[`docs/architecture.md`](docs/architecture.md): the layers, the dependency rule, where logic lives,
+and how it is tested.
+

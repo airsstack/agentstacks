@@ -1,0 +1,32 @@
+[workspace]
+members = ["cargo:."]
+
+# Config for 'dist'
+[dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.33.1"
+# CI backends to support
+ci = "github"
+# Shell only: agentstacks and claudevs run on Unix, not Windows.
+installers = ["shell"]
+# macOS and Linux on both architectures, plus a musl build of each Linux one.
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+# Not CARGO_HOME: the prebuilt binaries exist for engineers who have no Rust toolchain.
+install-path = "~/.local/bin"
+hosting = "github"
+install-updater = false
+# An attestation ties each archive's digest to this repository, commit and workflow.
+github-attestations = true
+# `host` waits for this workflow, so an archive that fails its smoke test is never published.
+global-artifacts-jobs = ["./smoke"]
+# agentstacks-cli and claudevs-cli carry their own versions. An untagged plan that builds
+# ("upload") refuses two apps with different versions, so pull requests run `dist plan` only.
+pr-run-mode = "plan"
+# release.yml's tag trigger is edited by hand (see the comment there). Without this, dist
+# reports the edit as out of date and fails its plan step.
+allow-dirty = ["ci"]
+
+# GitHub retired every macOS 14 image on 2026-11-02, and dist's default runner for
+# aarch64-apple-darwin is still macos-14. Keep this entry whenever this file is rewritten.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
