@@ -9,7 +9,7 @@ This crate is the `claudevs` binary. The engine it calls is the
 ## Install
 
 ```bash
-curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh   # prebuilt binary, no Rust needed
+curl -LsSf https://airsstack.github.io/agentstacks/claudevs.sh | sh   # prebuilt binary, no Rust needed
 cargo install claudevs-cli                                            # or build from source
 ```
 
@@ -33,13 +33,13 @@ nothing was wrong, `1` for verdict failures or findings, `2` when claudevs itsel
 
 The book takes you from install to a passing gate.
 
-- [Installation](https://airsstack.github.io/claudestacks/ch05-01-installation.html)
-- [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html)
+- [Installation](https://airsstack.github.io/agentstacks/ch08-01-installation.html)
+- [Getting Started](https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html)
   writes a first plugin and a first case, then runs the gate.
-- [Writing Cases](https://airsstack.github.io/claudestacks/ch06-00-writing-cases.html)
-- [The check Gate](https://airsstack.github.io/claudestacks/ch07-00-check-gate.html), including
-  [running it in CI](https://airsstack.github.io/claudestacks/ch07-03-ci.html).
-- [claudevs CLI Reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html)
+- [Writing Cases](https://airsstack.github.io/agentstacks/ch09-00-writing-cases.html)
+- [The check Gate](https://airsstack.github.io/agentstacks/ch10-00-check-gate.html), including
+  [running it in CI](https://airsstack.github.io/agentstacks/ch10-03-ci.html).
+- [claudevs CLI Reference](https://airsstack.github.io/agentstacks/appendix-01-claudevs-cli.html)
   lists every command, flag and exit code.
 
 ## License

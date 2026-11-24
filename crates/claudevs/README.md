@@ -44,17 +44,17 @@ part of the report, not an error.
 
 The book covers the binary and the crate.
 
-- [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html)
+- [Getting Started](https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html)
   installs the binary and takes you to a passing `claudevs check`.
-- [Writing Cases](https://airsstack.github.io/claudestacks/ch06-00-writing-cases.html) covers hook
+- [Writing Cases](https://airsstack.github.io/agentstacks/ch09-00-writing-cases.html) covers hook
   decisions, scripts and flows, Lua cases and native suites.
-- [The check Gate](https://airsstack.github.io/claudestacks/ch07-00-check-gate.html) covers the four
+- [The check Gate](https://airsstack.github.io/agentstacks/ch10-00-check-gate.html) covers the four
   stages, the wiring checkers and running the gate in CI.
-- [Embedding](https://airsstack.github.io/claudestacks/ch08-00-embedding.html) is the chapter for
+- [Embedding](https://airsstack.github.io/agentstacks/ch11-00-embedding.html) is the chapter for
   Rust callers of this crate.
-- [Under the Hood](https://airsstack.github.io/claudestacks/ch09-00-claudevs-under-the-hood.html)
+- [Under the Hood](https://airsstack.github.io/agentstacks/ch12-00-claudevs-under-the-hood.html)
   explains the design and how the engine fits together.
-- [claudevs CLI Reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html)
+- [claudevs CLI Reference](https://airsstack.github.io/agentstacks/appendix-01-claudevs-cli.html)
   lists every command, flag and exit code.
 
 The API reference is the rustdoc.
