@@ -127,6 +127,10 @@ its own pull request. claudevs 0.1.1 is the last claudestacks release.
 
 - `cargo publish` is irreversible: a version can be yanked, never replaced. Only step 6 and later
   are past the point of undoing.
+- After a binary release is published, the release workflow's `release-title` job renames it to
+  `<app> <version> - <date>` (for example `agentstacks 0.1.0 - 2026-11-24`). If that job fails, the
+  release stays published under the plain title: run
+  `gh release edit <tag> --title "<app> <version> - <date>"`.
 - The installers' release lookup reads one page of 100 releases, and the GitHub API states no
   order for them, so the newest could be missed. Revisit the lookup when this repository passes 100
   releases.

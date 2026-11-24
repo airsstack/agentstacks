@@ -1,0 +1,57 @@
+name: Release title
+
+# Puts the app's name in front of each GitHub Release title, so a reader can tell the
+# agentstacks releases from the claudevs ones: "0.1.0 - 2026-11-24" becomes
+# "agentstacks 0.1.0 - 2026-11-24". dist takes the title from the CHANGELOG heading, and
+# that heading has to start with the version, so the name cannot come from there.
+#
+# Never triggered on its own: the release workflow calls it through dist's
+# `post-announce-jobs` hook, after the GitHub Release is published. A failure here leaves
+# the release published under its plain title; rename it by hand with `gh release edit`.
+#
+# This file is written by hand, unlike the release workflow, so `dist generate` never
+# touches it.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: The dist manifest the release's plan step produced
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rename:
+    name: Name the app in the release title
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      PLAN: ${{ inputs.plan }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # Each binary tag plans exactly one app (agentstacks-cli or claudevs-cli); the name
+      # shown is the binary's, so the "-cli" package suffix is dropped. When dist found no
+      # CHANGELOG entry its title is the tag itself, and the version is used instead.
+      - name: Rename the release
+        run: |
+          count=$(jq '.releases | length' <<<"$PLAN")
+          if [ "$count" != 1 ]; then
+            echo "release-title: expected one app in the plan, found $count" >&2
+            exit 1
+          fi
+          tag=$(jq -r '.announcement_tag' <<<"$PLAN")
+          title=$(jq -r '.announcement_title' <<<"$PLAN")
+          app=$(jq -r '.releases[0].app_name' <<<"$PLAN")
+          version=$(jq -r '.releases[0].app_version' <<<"$PLAN")
+          app=${app%-cli}
+          if [ "$title" = "$tag" ]; then
+            title=$version
+          fi
+          new="$app $title"
+          echo "release-title: $tag -> $new"
+          gh release edit "$tag" --title "$new"
