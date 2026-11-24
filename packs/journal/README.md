@@ -22,6 +22,6 @@ agentstacks init --tool claude --pack core --pack journal
 
 ## Documentation
 
-The note format is in [`references/note-schema.md`](references/note-schema.md). Each command that
-captures, recalls or reviews notes is a skill under [`skills/`](skills/), rendered as
+The note format is in [`references/note-schema.md`](https://github.com/airsstack/agentstacks/blob/main/packs/journal/references/note-schema.md). Each command that
+captures, recalls or reviews notes is a skill under [`skills/`](https://github.com/airsstack/agentstacks/tree/main/packs/journal/skills/), rendered as
 `/journal-<name>`.

@@ -16,9 +16,9 @@ what run the Definition of Done. On its own the skill still loads on request.
 
 ## Documentation
 
-The gate and the index of rules are in [`skills/guidelines/SKILL.md`](skills/guidelines/SKILL.md);
-each rule is a file under [`skills/guidelines/references/`](skills/guidelines/references/).
+The gate and the index of rules are in [`skills/guidelines/SKILL.md`](https://github.com/airsstack/agentstacks/blob/main/packs/guideline-rust/skills/guidelines/SKILL.md);
+each rule is a file under [`skills/guidelines/references/`](https://github.com/airsstack/agentstacks/tree/main/packs/guideline-rust/skills/guidelines/references/).
 
 ## License
 
-Apache-2.0. See [LICENSE](../../LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/airsstack/agentstacks/blob/main/LICENSE).

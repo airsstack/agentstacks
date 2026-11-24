@@ -19,8 +19,8 @@ agents from the `core` pack, so install that too.
 ## Documentation
 
 The artifact layout, states and frontmatter keys are in
-[`references/artifact-chain.md`](references/artifact-chain.md); the file shapes are in
-[`references/templates.md`](references/templates.md).
+[`references/artifact-chain.md`](https://github.com/airsstack/agentstacks/blob/main/packs/sdlc/references/artifact-chain.md); the file shapes are in
+[`references/templates.md`](https://github.com/airsstack/agentstacks/blob/main/packs/sdlc/references/templates.md).
 
 ## Attribution
 
@@ -31,4 +31,4 @@ execution discipline descends from `claudestacks-sdd`, adapted from
 
 ## License
 
-Apache-2.0. See [LICENSE](../../LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/airsstack/agentstacks/blob/main/LICENSE).

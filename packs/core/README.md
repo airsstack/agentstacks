@@ -30,4 +30,4 @@ more; it can be deleted.
 
 ## License
 
-Apache-2.0. See [LICENSE](../../LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/airsstack/agentstacks/blob/main/LICENSE).
