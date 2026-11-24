@@ -136,3 +136,38 @@ jobs:
       # and every suppression live in deny.toml.
       - name: cargo deny check
         run: cargo deny check
+
+  installers:
+    name: Installer scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      # All offline. For each script: it parses; with no tools on PATH it stops at
+      # the missing-downloader message alone (that check runs first, and `command -v`
+      # and `printf` are shell builtins, so no external tool is needed to reach it);
+      # and a bad version stops at the not-a-version message. The expected text is
+      # written out here, so a message that drifts from the documented one fails.
+      - name: Check the installer scripts
+        run: |
+          check() {
+            script=$1
+            prefix=$2
+            var=$3
+
+            sh -n "$script"
+
+            status=0
+            env -i PATH=/nonexistent /bin/sh "$script" 2>"$RUNNER_TEMP/m1.err" || status=$?
+            test "$status" -eq 1
+            printf '%s: error: neither curl nor wget is installed\n' "$prefix" | diff - "$RUNNER_TEMP/m1.err"
+
+            status=0
+            env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" "$var=a/b" /bin/sh "$script" 2>"$RUNNER_TEMP/m2.err" || status=$?
+            test "$status" -eq 1
+            printf "%s: error: %s='a/b' is not a version (expected MAJOR.MINOR.PATCH or latest)\n" "$prefix" "$var" | diff - "$RUNNER_TEMP/m2.err"
+          }
+
+          check install/install.sh agentstacks-install AGENTSTACKS_VERSION
+          check install/claudevs.sh claudevs-install CLAUDEVS_VERSION
