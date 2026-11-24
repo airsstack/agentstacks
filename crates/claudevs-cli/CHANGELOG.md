@@ -4,6 +4,15 @@ All notable changes to `claudevs-cli` (the `claudevs` binary) are recorded here.
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - Unreleased
+
+Built on `claudevs` 0.1.1.
+
+### Changed
+
+- Built and released from https://github.com/airsstack/agentstacks. The prebuilt installer is
+  `curl -LsSf https://airsstack.github.io/agentstacks/claudevs.sh | sh`.
+
 ## [0.1.1] - 2026-11-04
 
 First release with prebuilt binaries, still built on `claudevs` 0.1.0. No source file in this crate
