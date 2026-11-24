@@ -19,6 +19,8 @@ install-updater = false
 github-attestations = true
 # `host` waits for this workflow, so an archive that fails its smoke test is never published.
 global-artifacts-jobs = ["./smoke"]
+# Runs after the release is published and puts the app's name in its title.
+post-announce-jobs = ["./release-title"]
 # agentstacks-cli and claudevs-cli carry their own versions. An untagged plan that builds
 # ("upload") refuses two apps with different versions, so pull requests run `dist plan` only.
 pr-run-mode = "plan"
