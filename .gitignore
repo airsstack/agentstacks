@@ -34,3 +34,6 @@ rustc-ice-*.txt
 
 # Agent context-handoff scratch (claudestacks). Ephemeral, per-worktree.
 .airsstack/
+
+# The book's build output. Pages builds its own copy; nothing built is committed.
+book/book/
