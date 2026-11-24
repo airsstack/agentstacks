@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [07, 08, 11]
 built-on: 0f89fdb3ebb3
@@ -217,3 +217,28 @@ packs/core/pack.toml                  — modify: rearm table (index 1), enforce
 
 - `cargo make dod` green. `packs/core/pack.toml` equals the spec §6.2 core text byte for byte (`diff`
   against the spec block).
+
+## Review findings
+
+Reviewer re-ran `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`; lua `11 file(s) compiled` + `67 file(s) compiled`, 0 failed; `71 passed, 0 failed` and `640 passed, 0 failed (25 files)`; `enforce_test` 34, `globs_test` 12, `rearm_test` 2). `packs/core/pack.toml` diffed against the spec §6.2 core block: identical. Orchestrator proofs: core-only `plan` → exactly one skip, `core/hook/3: claude shows no hook output to the model at session end`; core + guideline-rust `init` exit 0, 50 written; the rendered `PreToolUse` `Read|Edit|Write` command piped a `Read` of `src/main.rs` → `{"hookSpecificOutput":{"additionalContext":"rust work is in play. The /guideline-rust-guidelines skill is MANDATORY …"}}`; the same event again → no output (sentinel); `SessionStart` `compact` (rearm) → the next `Read` points again; the rendered `.claude/skills/core-enforce-doctor/SKILL.md` command run by hand → `packs:    <project>/.claude/agentstacks`, `packs: 1 with enforcement.json under …`, `guideline-rust: EMIT /guideline-rust-guidelines`, `outcome: 1 pointer(s)`, exit 0; the §6.4 gate greps over `packs/core` print nothing.
+
+- 🟡 declined — `skills/enforce-doctor/SKILL.md:14,19` (named blocking): "`${CLAUDE_PROJECT_DIR}` is empty in the Bash tool, so the command runs `/.claude/…`". Spec §1 proves Claude Code substitutes `${CLAUDE_PROJECT_DIR}` in a project skill's text with the absolute path (`probes/claude-projdir-results.md`), and that the Bash tool lacks the variable (`probes/claude-handback-results.md` R3); the §6.4 SKILL.md row is built on exactly that. The model receives an absolute literal, so the guard paragraph's `${TMPDIR:-/tmp}` advice covers the only variable left. No change.
+- 🟡 open — `hooks/enforce_test.lua:296`: the trace labels enforce-doctor reads back (`GATE 2 no detect marker`, `already claimed`, `STOP: no manifest declares phase`, `sentinel claimed concurrently`, `match path:`) are not asserted; only `GATE 3 no match glob hit` is.
+- 🔵 open — `hooks/enforce.lua:9`, `hooks/lib/enforce.lua:79`: rationale names "a worktree-isolated Claude Code session" in a tool-neutral pack.
+- 🔵 open — `hooks/enforce.lua:26`: the `args[1]` missing/empty guard has no test.
+- 🔵 open — `hooks/enforce_test.lua:168,703`: history narrative ("an earlier version of this guard", "a previous version of this test").
+- 🔵 open — `hooks/enforce_test.lua:543`: no test now covers `toplevel`/`path_for_matching` in a linked worktree (`.git` file).
+- 🔵 open — `hooks/lib/enforce.lua:83`: `dot_git` now returns the directory holding `.git`; `toplevel` is an alias.
+- 🔵 open — `hooks/lib/enforce.lua:353`: `table.sort(names)` repeats the sort airsl 0.1.5 `fs.list` already does.
+- 🔵 open — `hooks/lib/enforce.lua:458`: the `M.home` `HOME` fallback is untested.
+- 🔵 open — `hooks/lib/enforce.lua:468`: "The framework" is plugin wording.
+
+## Deviations
+
+- 2026-11-24 — Tasks 1–3 share files, so one coder ran them in order; plan 13 ran in parallel on disjoint files. The coder ran file-local checks; the orchestrator ran `dod` and the proofs once.
+- 2026-11-24 — Task 1: `globs.lua` ("plugin authors" → "pack authors") and `globs_test.lua` (usage line → `cargo make lua`) are not byte-identical to the plugin; comment-only.
+- 2026-11-24 — Task 1: dropped the lib tests of removed code (`every_worktree_of_one_repository_shares_a_key`, `a_hand_built_linked_worktree_shares_the_key_without_git`, `a_malformed_dot_git_file_stops_the_ascent`, and the registry-only cases); the plugin's `enforce_test.lua:404-438` range holds two of them, which test `project_key`, removed by this plan. `dot_git` returns only the root (its `.git` path fed only `common_dir`).
+- 2026-11-24 — Task 1: the `packs: N` count includes directories whose `enforcement.json` fails to load (they also get the `no usable` line). Extra tests: `trace_has_no_registry_or_gate_one_lines`, `a_missing_packs_root_resolves_to_nothing`, `a_manifest_missing_required_fields_skips_that_pack`, `hook_returns_nil_when_no_pack_matches`, `hook_ignores_an_event_without_a_path`, `doctor_trace_names_the_stop_when_no_pack_ships_a_manifest`, `rearm_without_a_session_id_leaves_other_sessions_alone`.
+- 2026-11-24 — Task 3: `M.home(env)` added to the lib so the hook and the doctor share the `AIRSSTACK_HOME` / `HOME` rule.
+- 2026-11-24 — Comments naming the plugin layout (registry, cache, `scripts/lib` paths, the plugin protocol path) were rewritten.
+- 2026-11-24 — Not committed (per-task commits held for the author).

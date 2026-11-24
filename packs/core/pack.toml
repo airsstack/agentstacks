@@ -28,6 +28,16 @@ text  = "Reminder: run {{skill snapshot-load}} for the current git branch to reh
 [[hooks]]
 kind  = "lua"
 event = "session.start"
+match = ["compact"]
+run   = "hooks/rearm.lua"
+[hooks.grants]
+env   = ["TMPDIR"]
+read  = ["{{var tmpdir}}"]
+write = ["{{var tmpdir}}"]
+
+[[hooks]]
+kind  = "lua"
+event = "session.start"
 run   = "scripts/style.lua"
 args  = ["{{skill_dir discuss}}/references/protocol.md"]
 [hooks.grants]
@@ -45,6 +55,17 @@ run   = "scripts/style.lua"
 args  = ["{{skill_dir discuss}}/references/protocol.md", "{{option style_reinject}}"]
 [hooks.grants]
 read = ["{{skill_dir discuss}}"]
+
+[[hooks]]
+kind  = "lua"
+event = "tool.before"
+match = ["read", "edit", "write"]
+run   = "hooks/enforce.lua"
+args  = ["{{root}}"]
+[hooks.grants]
+env   = ["HOME", "TMPDIR", "AIRSSTACK_HOME"]
+read  = ["/"]
+write = ["{{var tmpdir}}"]
 
 [[hooks]]
 kind      = "lua"

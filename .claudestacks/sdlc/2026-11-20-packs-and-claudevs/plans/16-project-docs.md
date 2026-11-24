@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [02, 04, 15]
 built-on: 0f89fdb3ebb3
@@ -71,3 +71,22 @@ CLAUDE.md   — modify: Status, Planned layout, the porting section
 ## Proof
 
 - `cargo make dod` green.
+
+## Review findings
+
+Reviewer: no blocking findings; every "built" claim checked against the tree (`crates/claudevs{,-cli}` exist with tests, `packs/` holds exactly the five packs, `extensions/` only claude, no `book/`; `Makefile.toml` `dod` depends on `lua`; `claudevs-check` not in `dod`). Greps: `grep -n 'have not landed\|still lives in' CLAUDE.md` prints nothing (line 24 reads "`book/` has not landed"); `grep -n 'claudevs-check' CLAUDE.md` → `133:cargo make claudevs-check      # claudevs fixture corpus; deliberately not part of dod`; `grep -n cmux CLAUDE.md` prints nothing. Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (24 `test result: ok`).
+
+- 🟡 open — `CLAUDE.md:129`: the `dod` comment lists five steps without `lua`, while `:134` says `lua` is part of `dod`.
+- 🟡 open — `CLAUDE.md:20,138`: CI is said to run `dod` and `cargo deny check`; `ci.yml` also has a `claudevs-check` job (lines predate the diff).
+- 🔵 open — `CLAUDE.md:130`: "dod-crate … the same steps" — `dod-crate` runs no `lua` (predates the diff).
+- 🔵 open — `CLAUDE.md:23`: "not a description of existing files" no longer fits the Porting paragraph and the "(built)" marks.
+- 🔵 open — `CLAUDE.md:106`: "claude is built" added beyond the plan (accurate).
+- 🔵 open — `CLAUDE.md:121`: the "(spec §13)" cite does not mention archiving claudestacks (copied from the plan).
+- 🔵 open — outside scope: `README.md:140-141` still lists `claudevs`/`claudevs-cli` as planned.
+
+## Deviations
+
+- 2026-11-24 — Started while plan 15 (its `depends-on`) was in review, after its test was green; it touches only `CLAUDE.md`.
+- 2026-11-24 — The `cargo make lua` line says "(part of dod)" (`Makefile.toml` `dod` depends on `lua`); the existing `dod` comment was left as is (see the open 🟡).
+- 2026-11-24 — No org docs touched (spec §12: status moves at release).
+- 2026-11-24 — Not committed.

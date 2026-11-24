@@ -2,24 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: core, CLI commands and claude extension built
+## Status: core, CLI commands, claude extension, packs and claudevs built
 
 The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
-hook runtime, the five CLI commands and the claude extension are built and tested.
+hook runtime, the five CLI commands, the claude extension, the five official packs and the claudevs
+crates are built and tested.
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built
 crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doctor · update
+crates/claudevs/          deterministic Claude Code setup test engine, moved from claudestacks
+crates/claudevs-cli/      the claudevs binary
 extensions/claude/        the official claude tool extension (adapter.lua under airsl)
+packs/                    the five official packs: core, sdlc, journal, guideline-rust, guideline-python
 docs/                     contributor docs; docs/architecture.md is the layering contract
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
 .github/workflows/ci.yml  CI: `cargo make dod` and `cargo deny check`
 ```
 
 Everything below the Status section except Commands describes the agreed design. Treat it as the
-contract to build toward, not a description of existing files. `packs/`, `book/` and the claudevs
-move have not landed, and the code that will move here still lives in
-[claudestacks](https://github.com/airsstack/claudestacks) (`../claudestacks` in the org workspace).
+contract to build toward, not a description of existing files. `book/` has not landed.
 `/claudestacks-sdlc:status` shows progress.
 
 ## What agentstacks is
@@ -100,9 +102,9 @@ the worked example. Keep it in step with the API: when `extensions.md` or `hooks
 ```text
 crates/agentstacks/      types · port · app · fs · process · host (see docs/architecture.md)
 crates/agentstacks-cli/  init · plan · apply · doctor · update
-crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (keep the crate names)
-extensions/{claude,opencode}/   official tool extensions (Lua)
-packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python
+crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (built; same crate names)
+extensions/{claude,opencode}/   official tool extensions (Lua); claude is built
+packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python (built)
 docs/                    contributor docs until the book exists
 book/                    mdBook, published to airsstack.github.io/agentstacks/
 ```
@@ -112,18 +114,11 @@ extension on the same API · **M3** freeze `api = 1`, authoring docs, `ext add` 
 
 ## Porting claudestacks plugins into packs
 
-The plugins in `../claudestacks/plugins/` don't map 1:1 onto the pack content model. Settle these in
-the pack format spec before you convert anything:
+The claudestacks plugins are converted to the five packs in `packs/`. The mapping, renames, hook
+table and text rules are in `.claudestacks/sdlc/2026-11-20-packs-and-claudevs/spec.md` §6–§7.
 
-| Issue | Where it shows up today |
-|---|---|
-| Namespaced cross-references (`claudestacks-sdlc:status`, `claudestacks:coder`) | ~60 references across skills and agents. Project-level `.claude/` items have no plugin namespace, so packs need a tool-neutral reference syntax that the extension renders. |
-| `${CLAUDE_PLUGIN_ROOT}` paths | ~42 files. No plugin root exists once content is written into `.claude/`, so packs need an install-root abstraction. |
-| Content types beyond the README list | `scripts/*.lua` (invoked by skills, not hooks), `references/`, `enforcement.json` (guideline packs) |
-| Hook runtime | Hooks are `sh` wrappers that locate an **unpinned** `airsl` binary. Reconcile that with the lock's determinism, for example with a require-binary operation. |
-
-When the move lands, archive claudestacks (never delete it: releases, `install.sh` and the old
-marketplace still point there).
+Archiving claudestacks (never delete it: releases, `install.sh` and the old marketplace still point
+there) is `release-and-migration` work (spec §13).
 
 ## Commands
 
@@ -135,6 +130,8 @@ cargo make dod                 # Definition of Done: fmt-check, clippy, rustdoc,
 cargo make dod-crate <crate>   # the same steps scoped with -p
 cargo make fmt                 # rewrite formatting (clippy-fix is the other task that edits sources)
 cargo make deny                # cargo-deny; deliberately not part of dod
+cargo make claudevs-check      # claudevs fixture corpus; deliberately not part of dod
+cargo make lua                 # airsl check + airsl test over extensions/ and packs/, then the fingerprint gate (part of dod)
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
 

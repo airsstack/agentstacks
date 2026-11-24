@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [03, 10, 11, 13]
 built-on: 0f89fdb3ebb3
@@ -155,3 +155,23 @@ hooks`.
 ## Proof
 
 - `cargo make dod` green; a core + sdlc + journal `init` exits 0.
+
+## Review findings
+
+Reviewer: no blocking findings. `cargo make lua` exit 0 (`640 passed, 0 failed (25 files)`, all 7 journal test files; fingerprint gate 8+8); gate greps 1–3 over `packs/journal` print nothing; `pack.toml` byte-identical to the spec §6.2 journal text. Orchestrator: `init` core + journal in a temp git project exit 0, `68 written`, 1 skip; 7 `journal-*` skills, 4 `journal-*` agents, each frontmatter `name` equal to its dir/file name; no `{{` or `CLAUDE_PLUGIN_ROOT` left (`${CLAUDE_SESSION_ID}` is the rendered `{{var session_id}}`); `SubagentStop` matcher `journal-curator` → `core.scripts.handoff_check_hook`; `SessionStart` `startup|resume|clear` → `journal.scripts.session-start`; piped with an empty `AIRSSTACK_HOME` → no output, vault provisioned (`daily mocs notes sessions .index`); with one note `project: p14proj` → `{"hookSpecificOutput":{"additionalContext":"## Journal — recent activity (p14proj)\n\n**Notes:**\n- [[sample]] — a sample note for the card\n",…}}` (the idiom loads `journal.scripts.lib.index` under the runtime); `plan` 0 to write; `doctor` healthy; core + sdlc + journal `init` exit 0, `94 written`, both `.claude/skills/sdlc-setup` and `.claude/skills/journal-setup` written.
+
+- 🟡 open — `scripts/lib/index.lua:11-13`, `lib/orientation.lua:9-11`, `session-start.lua:10-14,71`: the §3 idiom and the `{ context = card }` shape are guarded only by the manual piped run (`airsl test` loads with an empty prefix). Same class as plans 11 and 13.
+- 🟡 open — first-line comments of `build-index.lua`, `graph-health.lua`, `journal-backup.lua`, `provision.lua`, `lib/index.lua`, `lib/vault.lua`, `session-start.lua` say "journal" where the source said "claudestacks-journal"; the Markdown keeps "the claudestacks-journal vault".
+- 🔵 open — `scripts/journal-backup.lua:1`: names `/journal-review` (the rendered command) in a pack file.
+- 🔵 open — `scripts/lib/vault.lua:3-4`: "the confined `require` resolves against the requiring script's own directory" is untrue under the hook runtime (module-name load).
+- 🔵 open — `scripts/lib/vault.lua:59`: cites `lib/enforce.lua`'s `common_dir`, which no longer exists.
+- 🔵 open — `scripts/session-start.lua:2-3`: names Claude Code in a tool-neutral module.
+
+## Deviations
+
+- 2026-11-24 — Started while plan 13 (a `depends-on`) was in review, after its tasks and `init` proof were green; plan 14 touches only `packs/journal`, and its Task 3 core + sdlc + journal proof ran after plan 13's files were final.
+- 2026-11-24 — Tasks ran as two parallel coders on disjoint files (Tasks 1+3: `pack.toml`, `scripts/**`; Task 2: agents, skills, references, README). Coders ran file-local checks; the orchestrator ran the `init` proofs.
+- 2026-11-24 — Task 1: carried files got comment-only edits: six moved `*_test.lua` headers → `cargo make lua`; `lib/vault.lua` protocol citation → the core pack's context-handoff skill, and its "required by every script" line; "claudestacks-journal" → "journal" in seven first-line comments; helper `stale` takes `(root, marker)` since the body moved into the returned function.
+- 2026-11-24 — Task 2: README lines beyond the install block rewritten (plugin and marketplace text); `capture/SKILL.md` "the plugin's agents" → "the pack's agents"; `agents/curator.md` H2 "(from the journal-review skill)" → `{{skill review}}` (grep 3 exempts only H1); agent `tools`/`model` mapped to pack words; `setup` → `invocation: user`.
+- 2026-11-24 — Task 3's piped-card proof seeded one note (`project: p14proj`) in a temp `AIRSSTACK_HOME`; an empty vault returns no output by design.
+- 2026-11-24 — Not committed (per-task commits held for the author).

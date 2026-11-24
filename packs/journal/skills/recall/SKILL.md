@@ -1,0 +1,52 @@
+---
+name: recall
+description: >
+  Recall prior journal notes as cheap ranked pointers instead of re-deriving
+  them. Resolves the project floor, then spawns the isolated {{agent recall}}
+  subagent (mode=recall) to read ONLY the derived index and return pointers
+  (stem · summary · path · why). Use BEFORE re-deriving something you may have
+  noted before, or when the user says "recall X" / "{{skill recall}} X". The
+  main thread reads at most the one note it picks.
+---
+
+# journal-recall
+
+Recall what the vault already knows about a query, cheaply. Do the deterministic
+project resolution here, then hand the index read and ranking to the isolated
+`{{agent recall}}` subagent. You never read a note body until — and unless — you
+pick one pointer afterward.
+
+## Steps
+
+1. Take the user's `query` (the recall subject, e.g. "tokio cancellation
+   safety"). If the user gave no query, ask for one before proceeding.
+
+2. Resolve the project floor:
+
+   ```sh
+   airsl run --policy confined \
+  --allow-read . \
+  "{{var project_dir}}/{{root}}/scripts/project-key.lua"
+   ```
+
+   Capture stdout as `project`.
+
+   In a worktree-isolated session the guard refuses **any** `airsl` command in this skill
+   that carries a variable it cannot resolve — `$TMPDIR`, `$PWD`
+   and `$HOME_ROOT` each come back as "a value computed at runtime"; `$HOME` is accepted.
+   That covers every block below, not only this one. Resolve each with a plain `echo`
+   first — plain commands may use variables — and paste the absolute paths in.
+
+3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
+   `subagent_type: {{agent recall}}`), passing `query`, `project`, and
+   `mode=recall`. The subagent reads only the derived index and returns a
+   capped ranked pointer list.
+
+4. Relay the subagent's pointer list to the user. If a pointer is worth acting
+   on, read THAT note's `path` (the first and only note-body read), and — if it
+   aided the work — confirm it with `{{skill helped}} <stem>`.
+
+## If the agent is unavailable
+
+If the `{{agent recall}}` subagent cannot be spawned, tell the user and stop. Do
+nothing destructive; never fabricate a recall result.

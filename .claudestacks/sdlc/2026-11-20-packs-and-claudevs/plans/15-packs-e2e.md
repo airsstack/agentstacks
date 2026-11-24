@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-23
 depends-on: [06, 07, 08, 12, 13, 14]
 built-on: 0f89fdb3ebb3
@@ -94,3 +94,21 @@ crates/agentstacks-cli/tests/packs.rs   — create: the five-pack install and th
 ## Proof
 
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green locally; CI `dod` green (it sets the variable).
+
+## Review findings
+
+Reviewer: no blocking findings; every Proof assertion present and exact, reproduced by hand on a scratch copy. `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks-cli --test packs` 4 passed (airsl 0.1.5). Workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0: 24 `test result: ok` (`five_packs_install … ok`, `agent_stop_matchers_are_pack_prefixed … ok`, `read_hook_points_at_the_rust_guideline … ok`), lua `67 file(s) compiled, 0 failed`, `640 passed, 0 failed (25 files)`, fingerprint gate 8+8, `Build Done in 31.52 seconds`. Real values: 28 skill dirs (8 `core-`, 11 `sdlc-`, 7 `journal-`, 2 guideline), 10 agent files, one `skip` line `core/hook/3: claude shows no hook output to the model at session end`, the three named `SubagentStop` matchers, `PreToolUse` `Read|Edit|Write` → `additionalContext` with `/guideline-rust-guidelines`.
+
+- 🔵 open — `packs.rs:3`: "Each test copies…" is false for `tests::parses_the_version_line`.
+- 🔵 open — `packs.rs:28,50,59,63`: `0.1.5` hard-coded in names and messages beside `MIN_AIRSL`.
+- 🔵 open — `packs.rs:41`: "a `airsl 0.1.5`"; a pre-release (`0.1.5-rc1`) parses to None and skips as too old, undocumented.
+- 🔵 open — `packs.rs:166`: `plan`'s exit status is not asserted.
+- 🔵 open — `packs.rs:250`: event JSON built with `format!` from an unescaped path (`serde_json::json!` would not be).
+- 🔵 open — `packs.rs:275`: the "not JSON" failure shows only stdout; include stderr (`--fail-open`).
+- 🔵 open — `packs.rs:296`: `parses_the_version_line` is beyond the plan (it guards the version check); `#[cfg(test)]` is redundant in an integration test.
+
+## Deviations
+
+- 2026-11-24 — Started while plans 12–14 (its `depends-on`) were in review, after their tasks and proofs were green; it touches only `crates/agentstacks-cli/tests/packs.rs`. Cargo.toml unchanged (`serde_json`, `tempfile` already dev-deps).
+- 2026-11-24 — The plan's "`core-*` x7, `core-statusline`" is read as 8 `core-` directories (28 in total); the test asserts 8. Extra test `tests::parses_the_version_line`; matcher assertions split into `agent_stop_matchers_are_pack_prefixed` and the hook pipe into `read_hook_points_at_the_rust_guideline`.
+- 2026-11-24 — Not committed.
