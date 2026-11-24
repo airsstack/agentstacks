@@ -1,7 +1,7 @@
 -- Pure formatting for the Claude Code status line: paths, token counts, the context bar,
 -- segment joining, and the full two-line render.
 --
--- NOT plugin content. Claude Code cannot load a status line from a plugin — `statusLine` is a
+-- Not loaded by the pack. Claude Code cannot load a status line from a pack — `statusLine` is a
 -- settings key, and this file is installed into ~/.claude by statusline-install.lua. It lives
 -- here for the same reason install-airsl.sh does: the repository is its source of truth.
 --

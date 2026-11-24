@@ -1,7 +1,7 @@
 ---
 name: review
 description: >
-  Tidy the claudestacks-journal vault in one command. Backs the vault up, runs a
+  Tidy the journal vault in one command. Backs the vault up, runs a
   deterministic graph-health report, then spawns the isolated opus
   {{agent curator}} to apply additive-only tidying (MOCs, TL;DR layers, daily
   narrative, typed edges, missing links), and rebuilds the index. Use when the

@@ -69,11 +69,11 @@ end
 -- nothing to resolve it against.
 --
 -- A relative path with no `cwd` is refused rather than falling back to the process's own working
--- directory: that fallback is defect C — the same relative handoff path validated from one
--- directory and failed to open from another, because nothing passed the payload's `cwd` through.
--- `protocol.md:90-92` requires a session-tree path to be returned relative to the worktree root,
--- so resolving against the caller's own notion of "here" is the specified normal case, not an
--- edge case to approximate.
+-- directory: with that fallback the same relative handoff path would validate from one directory
+-- and fail to open from another. The "Return & routing contract" section of
+-- `skills/context-handoff/references/protocol.md` requires a session-tree path to be returned
+-- relative to the worktree root, so resolving against the caller's `cwd` is the specified normal
+-- case, not an edge case to approximate.
 local function resolve_against(file, cwd)
   if type(file) ~= "string" or file == "" then
     return nil
@@ -92,12 +92,12 @@ end
 -- empty `file` is false, never an error — `resolve_against` already answers nil for both, and
 -- for a relative path with no `cwd` to resolve against.
 --
--- This is the fix for defects A and B. The hooks previously matched on shape (the last `.md`
--- path in the text, or a `.md` extension alone) rather than location, so a trailing citation
--- (`hooks.md:1011`), a documentation URL, or an ordinary project file (a plan, a spec,
--- `CLAUDE.md`) was taken for a report path or validated as one. Location, unlike name shape,
--- covers both tiers: the session tree is a known relative segment and the exception tier is by
--- definition a temp path, so neither a citation nor a project file qualifies under either.
+-- The test is location, not name shape (the last `.md` path in the text, or a `.md` extension
+-- alone): a trailing citation (`hooks.md:1011`), a documentation URL, or an ordinary project
+-- file (a plan, a spec, `CLAUDE.md`) must not be taken for a report path or validated as one.
+-- Location covers both tiers: the session tree is a known relative segment and the exception
+-- tier is by definition a temp path, so neither a citation nor a project file qualifies under
+-- either.
 function M.under_handoff_root(file, cwd)
   local resolved = resolve_against(file, cwd)
   if not resolved then
@@ -107,9 +107,8 @@ function M.under_handoff_root(file, cwd)
   -- A report is a Markdown file in every tier the protocol defines, so the extension is part of
   -- the root test rather than a separate filter at one call site. `M.path_in_root` only ever
   -- offers `.md` candidates, so this is a no-op for the `agent.stop` and native legs; it is
-  -- load-bearing for `tool.after`, which is handed an arbitrary `event.path`. Dropping it there
-  -- was defect B's second half: the fix round replaced the `%.md$` filter with the root test instead
-  -- of requiring both, so every file written anywhere under `/tmp` was checked as a report.
+  -- load-bearing for `tool.after`, which is handed an arbitrary `event.path`. Without it, every
+  -- file written anywhere under `/tmp` would be checked as a report.
   if resolved:sub(-3) ~= ".md" then
     return false
   end
@@ -142,7 +141,7 @@ function M.under_handoff_root(file, cwd)
 end
 
 -- `file`, resolved and root-qualified, or nil. Shared by `M.path_in_root` and
--- `M.file_from_payload` so both apply exactly the same test to exactly the same resolved path.
+-- `M.report_path` so both apply exactly the same test to exactly the same resolved path.
 local function qualifying(candidate, cwd)
   local resolved = resolve_against(candidate, cwd)
   if resolved and M.under_handoff_root(resolved, nil) then
@@ -301,14 +300,11 @@ end
 -- There is no matching strip for trailing punctuation: `(%S+%.md)` captures a run ending in the
 -- literal characters `md`, and Lua's greedy-then-backtrack matching already stops the capture at
 -- the earliest point where `.md` closes it — so a token like `a-report.md.` or `` `a-report.md` ``
--- never leaves trailing punctuation inside the match for a second pass to remove. Confirmed by
--- deleting the gsub this comment used to sit above and watching this function's own six fixture
--- tests (`a_trailing_period_is_not_part_of_the_path` among them) stay green.
+-- never leaves trailing punctuation inside the match for a second pass to remove.
 --
--- This is a raw tokeniser, nothing more — it does not know where a handoff root is, which is why
--- defect A (a trailing citation like `hooks.md:1011` winning over the real path) lived here.
--- `M.path_in_root` is the root-aware replacement the hook entry calls; this stays only because
--- its own behaviour and tests are unchanged by that fix.
+-- This is a raw tokeniser, nothing more — it does not know where a handoff root is, so a
+-- trailing citation like `hooks.md:1011` wins over the real path here. `M.path_in_root` is the
+-- root-aware form the hook entry calls; use it to find a report path.
 function M.path_in(text)
   if type(text) ~= "string" then
     return nil
@@ -355,14 +351,15 @@ end
 --   `tool.after`   `event.path`, tested against the handoff root directly — an ordinary Markdown
 --                  write must not qualify, so the extension alone is not enough.
 --   `agent.stop`   the LAST qualifying `.md` path in `event.last_message`.
---   native         (`event.payload ~= nil`, a `SubagentHandback` call) the LAST qualifying `.md`
+--   native         (`event.payload` is a table, a `SubagentHandback` call) the LAST qualifying `.md`
 --                  path in `event.payload.tool_input.message`.
 --
 -- `event.cwd` (`event.payload.cwd` for a native event) is threaded through to the root test and
 -- the path resolution: a session-tree path returned relative to the worktree root (the specified
--- normal case, `protocol.md:90-92`) needs it to resolve to the right file rather than to
--- whatever directory the hook process happens to be standing in.
-function M.file_from_payload(event)
+-- normal case, the "Return & routing contract" section of
+-- `skills/context-handoff/references/protocol.md`) needs it to resolve to the right file rather
+-- than to whatever directory the hook process happens to be standing in.
+function M.report_path(event)
   if type(event) ~= "table" then
     return nil
   end

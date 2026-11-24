@@ -226,13 +226,12 @@ return {
     assert(report.path_in("read plans/01-foo.md; report at /tmp/out.md") == "/tmp/out.md")
   end,
 
-  -- The two false positives the live gate caught on its first day, both at `tool.after`, which
-  -- is handed an arbitrary `event.path` rather than a `.md` candidate.
+  -- `tool.after` is handed an arbitrary `event.path` rather than a `.md` candidate, so the root
+  -- test must reject a non-Markdown file and an ordinary project file.
 
   a_non_markdown_file_in_the_temp_root_is_not_a_report = function()
-    -- Measured: a commit-message `.txt` under the session scratchpad was validated as a handoff
-    -- report and its violations attached to the write. The fix round had replaced the `%.md$`
-    -- filter with the root test instead of requiring both.
+    -- A commit-message `.txt` under the session scratchpad is not a report: the root test needs
+    -- the `.md` extension as well as the location.
     assert(report.under_handoff_root("/tmp/msgs3/9.txt", nil) == false)
     assert(report.under_handoff_root("/private/tmp/claude-501/s/scratchpad/m/9.txt", nil) == false)
   end,
@@ -251,7 +250,7 @@ return {
       "/tmp/claude-501/sess/scratchpad/handoff/03-reviewer-diff.md", nil) == true)
   end,
 
-  -- `under_handoff_root` — defect A/B/C's fix. A file qualifies only when it resolves (against
+  -- `under_handoff_root` — a file qualifies only when it resolves (against
   -- `cwd`, if relative) under the session tree's `HANDOFF_REL` segment or under the temp root.
 
   a_session_tree_absolute_path_is_under_the_root = function()
@@ -260,8 +259,8 @@ return {
   end,
 
   an_ordinary_project_file_is_not_under_the_root = function()
-    -- Defect B: a plan file, a spec, CLAUDE.md — none of these sits under a handoff root, so
-    -- the `tool.after` leg must leave them alone rather than validating them as reports.
+    -- A plan file, a spec, CLAUDE.md — none of these sits under a handoff root, so the
+    -- `tool.after` leg must leave them alone rather than validating them as reports.
     assert(report.under_handoff_root("/repo/CLAUDE.md", nil) == false)
     assert(report.under_handoff_root(
       "/repo/.claudestacks/sdlc/chain/plans/01-foo.md", nil) == false)
@@ -295,8 +294,8 @@ return {
   end,
 
   a_relative_path_with_no_cwd_does_not_qualify = function()
-    -- There is nothing to resolve it against; guessing the process's own working directory is
-    -- the bug being fixed (defect C), not a fallback to keep.
+    -- There is nothing to resolve it against; guessing the process's own working directory
+    -- would validate the same text differently from one directory to the next.
     local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
     assert(report.under_handoff_root(relative, nil) == false)
   end,
@@ -307,10 +306,10 @@ return {
     assert(report.under_handoff_root("", "/repo") == false)
   end,
 
-  -- `path_in_root` — the root-aware replacement for the bare last-`.md` rule.
+  -- `path_in_root` — the root-aware form of the bare last-`.md` rule.
 
   a_trailing_citation_does_not_become_the_path = function()
-    -- Defect A, bare form: a conforming hand-back that correctly states its handoff path and
+    -- Bare form: a conforming hand-back that correctly states its handoff path and
     -- then cites `file:line` evidence, as CLAUDE.md's "Never assert what you have not checked"
     -- requires. The citation is not under any handoff root, so it must not override the real
     -- path.
@@ -320,7 +319,7 @@ return {
   end,
 
   a_trailing_doc_url_does_not_become_the_path = function()
-    -- Defect A, URL form.
+    -- URL form of the same rule.
     local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
     local text = "wrote the report at " .. real
       .. ". See https://code.claude.com/docs/en/hooks.md for the table."
@@ -341,8 +340,8 @@ return {
   end,
 
   an_ordinary_project_path_alone_yields_nil_through_path_in_root = function()
-    -- Defect B via the matcher: a plan file is the only `.md` mentioned, and it is not under any
-    -- handoff root, so there is no qualifying path at all.
+    -- A plan file is the only `.md` mentioned, and it is not under any handoff root, so there is
+    -- no qualifying path at all.
     assert(report.path_in_root("see /repo/plans/01-foo.md for context", nil) == nil)
   end,
 
@@ -357,10 +356,9 @@ return {
   end,
 
   a_relative_path_does_not_silently_collapse_two_different_cwds_to_one_file = function()
-    -- Defect C: the matcher used to ignore `cwd` entirely, so the same relative text resolved to
-    -- whatever the hook process's own working directory happened to be, wherever that was. The
-    -- fix makes resolution depend on `cwd`: the same text against two different directories must
-    -- name two different absolute files, not collapse to one.
+    -- Resolution depends on `cwd`, not on the hook process's own working directory: the same
+    -- text against two different directories must name two different absolute files, not
+    -- collapse to one.
     local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
     local text = "report at " .. relative
     local first = report.path_in_root(text, "/repo-a")
@@ -370,88 +368,88 @@ return {
     assert(first ~= second, "two different cwds must not resolve to the same file")
   end,
 
-  -- `file_from_payload` — the dispatch over a neutral event, exercised directly rather than only
+  -- `report_path` — the dispatch over a neutral event, exercised directly rather than only
   -- through the hook module.
 
-  file_from_payload_reads_tool_after_from_path = function()
+  report_path_reads_tool_after_from_path = function()
     local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
     local event = { event = "tool.after", tool = "write", path = real }
-    assert(report.file_from_payload(event) == real)
+    assert(report.report_path(event) == real)
   end,
 
-  file_from_payload_ignores_a_tool_after_write_outside_any_handoff_root = function()
-    -- Defect B at the dispatch level: an ordinary markdown write must not qualify.
+  report_path_ignores_a_tool_after_write_outside_any_handoff_root = function()
+    -- An ordinary markdown write must not qualify.
     local event = {
       event = "tool.after",
       tool = "write",
       path = "/repo/.claudestacks/sdlc/chain/plans/01-foo.md",
     }
-    assert(report.file_from_payload(event) == nil)
+    assert(report.report_path(event) == nil)
   end,
 
-  file_from_payload_reads_a_native_event_from_the_handback_message = function()
+  report_path_reads_a_native_event_from_the_handback_message = function()
     local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
     local event = {
       payload = { tool_input = { message = "report at " .. real .. ". See hooks.md:1011." } },
     }
-    assert(report.file_from_payload(event) == real)
+    assert(report.report_path(event) == real)
   end,
 
-  file_from_payload_reads_agent_stop_from_last_message = function()
+  report_path_reads_agent_stop_from_last_message = function()
     local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
     local event = { event = "agent.stop", last_message = "report at " .. real }
-    assert(report.file_from_payload(event) == real)
+    assert(report.report_path(event) == real)
   end,
 
-  file_from_payload_resolves_a_relative_path_against_event_cwd = function()
+  report_path_resolves_a_relative_path_against_event_cwd = function()
     local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
     local event = {
       event = "agent.stop",
       last_message = "report at " .. relative,
       cwd = "/repo",
     }
-    assert(report.file_from_payload(event) == "/repo/" .. relative)
+    assert(report.report_path(event) == "/repo/" .. relative)
   end,
 
-  file_from_payload_resolves_a_native_relative_path_against_the_payload_cwd = function()
+  report_path_resolves_a_native_relative_path_against_the_payload_cwd = function()
     local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
     local event = {
       payload = { tool_input = { message = "report at " .. relative }, cwd = "/repo" },
     }
-    assert(report.file_from_payload(event) == "/repo/" .. relative)
+    assert(report.report_path(event) == "/repo/" .. relative)
   end,
 
-  file_from_payload_is_nil_on_a_tool_after_with_no_path = function()
+  report_path_is_nil_on_a_tool_after_with_no_path = function()
     local event = { event = "tool.after", tool = "write" }
-    assert(report.file_from_payload(event) == nil)
+    assert(report.report_path(event) == nil)
   end,
 
-  file_from_payload_is_nil_on_a_non_string_native_message = function()
+  report_path_is_nil_on_a_non_string_native_message = function()
     local event = { payload = { tool_input = { message = 42 } } }
-    assert(report.file_from_payload(event) == nil)
+    assert(report.report_path(event) == nil)
   end,
 
-  file_from_payload_is_nil_on_a_native_event_with_no_tool_input = function()
-    assert(report.file_from_payload({ payload = {} }) == nil)
+  report_path_is_nil_on_a_native_event_with_no_tool_input = function()
+    assert(report.report_path({ payload = {} }) == nil)
   end,
 
-  file_from_payload_is_nil_on_an_absent_last_message = function()
+  report_path_is_nil_on_an_absent_last_message = function()
     local event = { event = "agent.stop" }
-    assert(report.file_from_payload(event) == nil)
+    assert(report.report_path(event) == nil)
   end,
 
-  file_from_payload_is_nil_on_an_unknown_event = function()
+  report_path_is_nil_on_an_unknown_event = function()
     local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
     local event = {
       event = "tool.before",
       path = real,
       last_message = real,
     }
-    assert(report.file_from_payload(event) == nil)
+    assert(report.report_path(event) == nil)
   end,
 
-  file_from_payload_is_nil_on_a_non_table_event = function()
-    assert(report.file_from_payload(nil) == nil)
-    assert(report.file_from_payload("not a table") == nil)
+  report_path_is_nil_on_a_non_table_event = function()
+    assert(report.report_path(nil) == nil)
+    assert(report.report_path("not a table") == nil)
   end,
 }

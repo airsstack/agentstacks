@@ -14,12 +14,12 @@ local report = require(base .. "lib.handoff_report")
 local comm = require(base .. "lib.comm_report")
 
 return function(event)
-  local file = report.file_from_payload(event)
+  local file = report.report_path(event)
   if not file then
     return nil
   end
 
-  local reason = comm.hook_output(event, comm.check(file))
+  local reason = comm.hook_output(comm.check(file))
   if not reason then
     return nil
   end

@@ -1,11 +1,11 @@
 ---
 name: orchestrate
-description: Use when driving a scoped implementation task through the review pipeline — runs coder → reviewer (with explorer to locate code first) from the main thread and holds the user commit gate. Invoke when a change is substantial enough to warrant test-driven implementation plus an independent review before commit. Soft-coupled to the claudestacks agents; if they are not installed, fall back to doing the work inline and tell the user.
+description: Use when driving a scoped implementation task through the review pipeline — runs coder → reviewer (with explorer to locate code first) from the main thread and holds the user commit gate. Invoke when a change is substantial enough to warrant test-driven implementation plus an independent review before commit. Soft-coupled to the core pack agents; if they are not installed, fall back to doing the work inline and tell the user.
 ---
 
 # Orchestrate
 
-The driver for the `coder → reviewer` pipeline. Plugin agents are **leaves** — they have no `Agent` tool and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
+The driver for the `coder → reviewer` pipeline. The pack agents are **leaves** — they have no `Agent` tool and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
 
 ## The three agents
 
@@ -129,7 +129,7 @@ Delegation trades total token spend for main-context longevity — each spawn re
 
 ## Soft coupling / fallback
 
-This skill assumes the `claudestacks` agents are installed. If they are not (the agents don't resolve), degrade gracefully: do the implementation + verification inline on the main thread, follow the same discipline (TDD, DoD from the guidelines skill, user commit gate), and tell the user the agent pipeline was unavailable. Never fail hard for want of the agents.
+This skill assumes the core pack agents are installed. If they are not (the agents don't resolve), degrade gracefully: do the implementation + verification inline on the main thread, follow the same discipline (TDD, DoD from the guidelines skill, user commit gate), and tell the user the agent pipeline was unavailable. Never fail hard for want of the agents.
 
 ## Anti-patterns
 

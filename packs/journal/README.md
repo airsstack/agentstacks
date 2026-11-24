@@ -1,8 +1,9 @@
-# claudestacks-journal
+# journal
 
-A memory for Claude Code that you can read. Notes are plain Markdown files in one
-Obsidian-compatible vault on your machine. Claude writes them, you read and edit them, and Claude
-recalls them later instead of working the same thing out again.
+The `journal` pack: a memory for coding agents that you can read. Notes are plain Markdown files in
+one Obsidian-compatible vault on your machine (`~/.airsstack/journal` by default). The agent writes
+them, you read and edit them, and the agent recalls them later instead of working the same thing
+out again.
 
 ## Install
 
@@ -21,7 +22,6 @@ agentstacks init --tool claude --pack core --pack journal
 
 ## Documentation
 
-The vault, the commands that capture, recall and review notes, and the session-start card are
-described in
-[the claudestacks-journal chapter](https://airsstack.github.io/claudestacks/ch14-00-journal-plugin.html)
-of the book.
+The note format is in [`references/note-schema.md`](references/note-schema.md). Each command that
+captures, recalls or reviews notes is a skill under [`skills/`](skills/), rendered as
+`/journal-<name>`.

@@ -72,7 +72,7 @@ a report under this protocol with `agent: main`, at the path
 
 ## What enforces this
 
-`scripts/lib/comm_report.lua` checks the additions. The plugin's hooks run it on the same three
+`scripts/lib/comm_report.lua` checks the additions. The core pack's hooks run it on the same three
 events as the Context Handoff validator, and it acts only on a report carrying `protocol:`, so
 reports from every other agent are untouched. `scripts/discuss.lua add` runs it too, with
 `protocol:` required.

@@ -10,8 +10,8 @@ working on now." Operates the timestamped snapshot store written by `{{skill sna
 for the layout, filename, and schema). Pulls the relevant snapshots into context and reports where
 work stands.
 
-This reads the **claudestacks** snapshot store only — **not** Claude's native memory tool. The native
-store has size limits we are working around; the claudestacks store lives outside the repo at the path
+This reads the project **snapshot** store only — **not** Claude's native memory tool. The native
+store has size limits we are working around; the snapshot store lives outside the repo at the path
 below.
 
 ## Snapshot store
@@ -66,7 +66,7 @@ the selection **mode**:
 
 ## Must NOT do
 
-- Read Claude's native memory store. Only this claudestacks store.
+- Read Claude's native memory store. Only this snapshot store.
 - Read every snapshot file unconditionally (token waste). Select by branch/topic + recency.
 - In **no-topic** mode, load snapshots from other branches (stay on the current branch).
 - In **topic** mode, ignore a strong cross-branch topic match just because it is off the current

@@ -6,7 +6,7 @@
 --
 --   airsl run --policy confined --allow-read . scripts/project-key.lua
 --
--- No `--allow-exec git`: a worktree-isolated Claude Code session cannot pass that flag — its guard
+-- No `--allow-exec git`: a worktree-isolated agent session cannot pass that flag — its guard
 -- refuses the whole command over the `git` operand — and this script must work there. See
 -- `lib/vault.lua`'s `common_dir`.
 

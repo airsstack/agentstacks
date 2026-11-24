@@ -1,9 +1,9 @@
-# claudestacks
+# core
 
-The core plugin of the claudestacks suite for Claude Code. It gives Claude three agents (`coder`,
-`reviewer`, `explorer`) and an `orchestrate` skill that runs them in order, so a task is coded,
-checked and reviewed before it reaches you. It also holds the suite's hooks: reply rules, project
-snapshots and the dispatcher that points Claude at the right guideline.
+The `core` pack. It adds three agents (`coder`, `reviewer`, `explorer`) and an
+`orchestrate` skill that runs them in order, so a task is coded, checked and reviewed before it
+reaches you. It also carries the pack's hooks: reply rules, project snapshots and the dispatcher
+that points the agent at the right guideline.
 
 ## Install
 
@@ -19,13 +19,7 @@ Then, in your project:
 agentstacks init --tool claude --pack core
 ```
 
-Every skill is namespaced `claudestacks:`, so `discuss` runs as `/claudestacks:discuss`.
-
-## Documentation
-
-The agents, skills, hooks, options, snapshots and the enforcement dispatcher are described in
-[the claudestacks chapter](https://airsstack.github.io/claudestacks/ch11-00-claudestacks-plugin.html)
-of the book.
+Every skill is prefixed with the pack name, so `discuss` runs as `/core-discuss`.
 
 ## Attribution
 

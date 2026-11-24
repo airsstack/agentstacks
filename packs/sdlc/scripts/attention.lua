@@ -1,5 +1,5 @@
 -- Session-start hook module for claudestacks-sdlc: returns the board rows that need attention,
--- which Claude Code adds to the session's context. `event.args[1]` names the command that shows
+-- which the host adds to the session's context. `event.args[1]` names the command that shows
 -- the full board.
 --
 -- The chain root is taken from the event's `cwd` — the session's directory, which in a

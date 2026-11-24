@@ -1,8 +1,8 @@
-# claudestacks-sdlc
+# sdlc
 
-An AI-native software development lifecycle for Claude Code. A change goes from intent to design
-to plan to execute, each step leaves its result in a committed Markdown file, and a status board
-reads those files and tells you which step is next. It follows Anthropic's
+The `sdlc` pack: an AI-native software development lifecycle for coding agents. A change goes from
+intent to design to plan to execute, each step leaves its result in a committed Markdown file, and
+a status board reads those files and tells you which step is next. It follows Anthropic's
 [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) at the scale of one
 author. Roadmaps, milestones and architecture decision records are optional layers above the chains.
 
@@ -12,15 +12,15 @@ author. Roadmaps, milestones and architecture decision records are optional laye
 agentstacks init --tool claude --pack core --pack sdlc
 ```
 
-Skills are namespaced `claudestacks-sdlc:`, so `design` runs as `/claudestacks-sdlc:design`. The
-plugin works without `airsl`, but its status board and session-start summary come from it. Some
-steps use the agents from the `core` pack, so install that too.
+Every skill is prefixed with the pack name, so `design` runs as `/sdlc-design`. The pack works
+without `airsl`, but its status board and session-start summary come from it. Some steps use the
+agents from the `core` pack, so install that too.
 
 ## Documentation
 
-The flow, every skill, the agents and the artifact layout are described in
-[the claudestacks-sdlc chapter](https://airsstack.github.io/claudestacks/ch12-00-sdlc-plugin.html)
-of the book.
+The artifact layout, states and frontmatter keys are in
+[`references/artifact-chain.md`](references/artifact-chain.md); the file shapes are in
+[`references/templates.md`](references/templates.md).
 
 ## Attribution
 
@@ -31,4 +31,4 @@ execution discipline descends from `claudestacks-sdd`, adapted from
 
 ## License
 
-Apache-2.0. See [LICENSE](./LICENSE).
+Apache-2.0. See [LICENSE](../../LICENSE).

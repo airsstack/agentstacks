@@ -2,7 +2,7 @@
 name: capture
 description: >
   Manually capture the current session as a grounded storytelling note in the
-  claudestacks-journal vault. Resolves the session id, transcript path, and
+  journal vault. Resolves the session id, transcript path, and
   project floor, then spawns the isolated {{agent capture}} subagent to write
   sessions/session-<id8>.md by full overwrite. Re-run anytime to refresh the
   story. Use when the user says "capture this session" / "{{skill capture}}".

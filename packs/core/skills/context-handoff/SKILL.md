@@ -25,7 +25,7 @@ By the time you read this file the placeholder is already an absolute path — c
 cannot compute it: the project directory is not a variable in the environment of a `Bash` tool
 call.
 
-`{{agent coder}}`, `{{agent explorer}}` and `{{agent reviewer}}` live in this plugin and cite the path in their own
+`{{agent coder}}`, `{{agent explorer}}` and `{{agent reviewer}}` live in the core pack and cite the path in their own
 definitions, so they do not need the second field. Passing it anyway is harmless.
 
 ## Choose the tier
@@ -68,7 +68,7 @@ own slice and the detail never transits you.
 
 ## Check a report by hand
 
-Reports are validated automatically by this plugin's hooks. To check one yourself:
+Reports are validated automatically by the core pack's hooks. To check one yourself:
 
 ```
 airsl run --policy confined --allow-read / \

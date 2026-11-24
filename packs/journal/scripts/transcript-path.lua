@@ -1,9 +1,9 @@
--- Resolve the Claude Code transcript JSONL path for a session id.
+-- Resolve the transcript JSONL path for a session id, in the claude host's store layout.
 --
 -- Usage: transcript-path.lua <session_id>
 -- Prints the transcript path and exits 0 when it exists; prints nothing and exits 1 when no
 -- transcript can be located. The store slug is the working directory with every non-alphanumeric
--- character replaced by '-' (the same munge Claude Code uses for ~/.claude/projects/<slug>/).
+-- character replaced by '-' (the same munge the claude host uses for ~/.claude/projects/<slug>/).
 -- Tries the logical working directory first, then the symlink-resolved one. Honours
 -- CLAUDE_CONFIG_DIR.
 --

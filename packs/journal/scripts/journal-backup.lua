@@ -1,4 +1,4 @@
--- Snapshot the journal vault before a /journal-review run so any curator edit is
+-- Snapshot the journal vault before a review run so any curator edit is
 -- reversible.
 --
 -- Tars daily/ sessions/ notes/ mocs/ into .backups/<timestamp>.tar.gz and prunes to the newest

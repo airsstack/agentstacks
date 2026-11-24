@@ -11,8 +11,9 @@
 # The five cargo gate steps mirror the canonical command set in the
 # `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
 # file follows. The `lua` step is the project's own addition: it compiles and tests
-# the Lua under extensions/ and packs/ with `airsl check` and `airsl test`, then
-# runs the sdlc pack's fingerprint shell script against fixed cases. CI is
+# the Lua under extensions/ and packs/ with `airsl check` and `airsl test`, runs
+# the sdlc pack's fingerprint shell script against fixed cases, then greps the
+# pack sources for leftover plugin syntax and unprefixed names. CI is
 # meant to run `cargo make dod`, so the pipeline and a local run are the same
 # command.
 #
@@ -97,9 +98,11 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua: airsl check and airsl test over extensions/ and packs/, then the fingerprint gate"
+description = "Lua: airsl check and airsl test over extensions/ and packs/, the fingerprint gate, then the pack text gates"
 # A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
-# needs shell expansion. `set -e` stops the run at the first failing step.
+# needs shell expansion. `set -e` stops the run at the first failing step. The text
+# gates at the end fail on any line their grep prints: the `if` form is needed
+# because `set -e` does not fire on a negated command.
 script_runner = "@shell"
 script = '''
 set -e
@@ -160,6 +163,40 @@ if command -v shasum >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1; th
   [ "$fail" = 0 ] || exit 1
   echo "fingerprint gate: 8 cases passed with sha256sum"
 fi
+
+# The pack text gates. A pack is plain text rendered per tool, so the source must hold no
+# Claude Code plugin syntax, no plugin-qualified names, and no bare skill, agent or command
+# names that the rendered `<pack>-` prefix would break. Each grep must print nothing: its
+# exit status is 1 (no match). Status 0 is a hit and status 2 or more is a grep error such as a
+# missing `packs/`, which must not read as "no hit".
+rc=0
+grep -rnE 'CLAUDE_PLUGIN_(ROOT|OPTION)|user_config|claudestacks(-[a-z]+)*:[a-z]' packs/ --exclude=README.md --exclude='*_test.lua' || rc=$?
+if [ "$rc" != 1 ]; then
+  echo "pack text gate 1: plugin syntax or plugin-qualified names in packs/ (grep exit $rc)" >&2
+  exit 1
+fi
+# Gate 2 skips the two guideline reference documents that list workflow words such as
+# `reviewer` as examples of vocabulary to keep out of source comments, not as pack items.
+rc=0
+grep -rnE '(^|[ `"(])/(snapshot-(load|save)|journal-[a-z]+)\b|subagent_type: [a-z]|Namespaced as|`(coder|explorer|reviewer|task-briefer|chain-reader|artifact-reviewer|journal-[a-z]+|context-handoff|enforce-doctor|orchestrate|process-guidelines|snapshot-load|snapshot-save|statusline)`' packs/ --include='*.md' --exclude=README.md --exclude=doc-comment-discipline.md --exclude=docstring-discipline.md || rc=$?
+if [ "$rc" != 1 ]; then
+  echo "pack text gate 2: unprefixed skill, agent or command names in packs/*.md (grep exit $rc)" >&2
+  exit 1
+fi
+# Gate 3 filters the first grep's output, so its status is read before the filter runs.
+rc=0
+found=$(grep -rnE 'journal-(capture|curator|note|recall|helped|link|review|setup)' packs/journal --include='*.md' --exclude=README.md) || rc=$?
+if [ "$rc" -gt 1 ]; then
+  echo "pack text gate 3: grep failed over packs/journal (exit $rc)" >&2
+  exit 1
+fi
+left=$(printf '%s\n' "$found" | grep -vE ':[0-9]+:# |journal-curator-review\.md' || true)
+if [ -n "$left" ]; then
+  printf '%s\n' "$left"
+  echo "pack text gate 3: unprefixed journal names in packs/journal/*.md" >&2
+  exit 1
+fi
+echo "pack text gates: 3 passed"
 '''
 
 # ---------------------------------------------------------------------------

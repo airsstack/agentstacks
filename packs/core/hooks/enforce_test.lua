@@ -165,8 +165,9 @@ end
 -- line comment and a `--[[ ... ]]` block comment (which may open and close on the same line, or
 -- span several). Aware of `'` and `"` string literals so a `--` embedded in one — for example
 -- the `"--show-toplevel"` argument in `scripts/lib/handoff.lua` — is not mistaken for a comment
--- opener, which is how an earlier version of this guard missed code written after such a string
--- on the same line. Long bracket strings are tracked for the same reason, and they are not
+-- opener, which would hide code written after such a string on the same line. Long bracket
+-- strings are
+-- tracked for the same reason, and they are not
 -- hypothetical: `scripts/lib/comm_report.lua` builds its topic pattern with one
 -- (`regex.compile([[^([0-9]+)\. (\S.*)$]])`), so a `--` inside one would truncate a real line.
 --
@@ -536,9 +537,9 @@ return {
   end,
 
   -- Resolution without `--allow-exec git`. The production path must not need the grant: a
-  -- worktree-isolated Claude Code session cannot pass it, its guard refusing the whole command
-  -- over the `git` operand. This fixture is built by hand rather than by `git init`, so it
-  -- exercises the read-only path whether or not the grant is present.
+  -- worktree-isolated agent session cannot pass it, its guard refusing the whole command over
+  -- the `git` operand. These fixtures are built by hand rather than by `git init`, so they
+  -- exercise the read-only path whether or not the grant is present.
 
   the_toplevel_of_a_hand_built_checkout_is_found_without_git = function()
     local project = fs.tempdir()
@@ -548,6 +549,20 @@ return {
 
     assert(enforce.path_for_matching(path.join(project, "src", "main.rs"), project)
       == "src/main.rs")
+  end,
+
+  a_linked_worktree_whose_dot_git_is_a_file_is_its_own_toplevel = function()
+    -- A linked worktree holds `.git` as a file (`gitdir: ...`), not a directory.
+    local project = fs.tempdir()
+    fs.write(path.join(project, ".git"), "gitdir: /elsewhere/.git/worktrees/w\n")
+    fs.mkdir(path.join(project, "src"))
+    fs.write(path.join(project, "src", "main.rs"), "fn main() {}\n")
+
+    assert(enforce.toplevel(path.join(project, "src")) == enforce.realpath(project),
+      tostring(enforce.toplevel(path.join(project, "src"))))
+    assert(enforce.path_for_matching(path.join(project, "src", "main.rs"),
+      path.join(project, "src")) == "src/main.rs")
+    assert(enforce.path_for_matching(project, project) == ".")
   end,
 
   a_sentinel_is_claimed_exactly_once = function()
@@ -646,6 +661,153 @@ return {
     end)
   end,
 
+  the_trace_names_a_missing_detect_marker = function()
+    local project = fs.tempdir()
+    fs.mkdir(path.join(project, "src"))
+    fs.write(path.join(project, "src", "main.rs"), "fn main() {}\n")
+    local _, pack_root = packs({ ["guideline-rust"] = MANIFEST })
+    local trace = {}
+    resolve({
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+    }, trace)
+    assert(position(trace, "guideline-rust: GATE 2 no detect marker"), table.concat(trace, "\n"))
+  end,
+
+  the_trace_names_the_match_path = function()
+    local project = repo()
+    local _, pack_root = packs({ ["guideline-rust"] = MANIFEST })
+    local trace = {}
+    resolve({
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+    }, trace)
+    assert(position(trace, "match path: src/main.rs"), table.concat(trace, "\n"))
+  end,
+
+  the_trace_names_a_phase_no_manifest_declares = function()
+    local project = repo()
+    local _, pack_root = packs({
+      ["guideline-rust"] = {
+        stack = "rust", skill = "s", detect = { "Cargo.toml" },
+        match = { "**/*.rs" }, phase = { "design" },
+      },
+    })
+    local trace = {}
+    resolve({
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+    }, trace)
+    assert(trace[#trace] == "STOP: no manifest declares phase code", table.concat(trace, "\n"))
+  end,
+
+  the_trace_names_an_already_claimed_context = function()
+    local project = repo()
+    local _, pack_root = packs({ ["guideline-rust"] = MANIFEST })
+    local context = {
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+      session_id = "s1",
+      agent = "main",
+      home = fs.tempdir(),
+      sentinel_dir = fs.tempdir(),
+    }
+    enforce.resolve(context)
+    local trace = {}
+    assert(#enforce.resolve(context, trace) == 0)
+    assert(trace[#trace] == "STOP: every candidate stack:phase already claimed this context",
+      table.concat(trace, "\n"))
+  end,
+
+  the_trace_names_a_sentinel_claimed_concurrently = function()
+    -- A competing hook winning the claim between the cheap gate and the claim itself is not
+    -- reproducible with real files, so the claim is made to lose.
+    local project = repo()
+    local _, pack_root = packs({ ["guideline-rust"] = MANIFEST })
+    local real = enforce.claim
+    enforce.claim = function()
+      return false
+    end
+    local trace = {}
+    local ok, pointers = pcall(resolve, {
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+    }, trace)
+    enforce.claim = real
+    assert(ok, tostring(pointers))
+    assert(#pointers == 0, "a lost claim must not emit")
+    assert(position(trace, "guideline-rust: sentinel claimed concurrently"),
+      table.concat(trace, "\n"))
+  end,
+
+  packs_are_visited_in_name_order = function()
+    -- Creation order and table iteration order are both arbitrary; only the listing's own order
+    -- can put these in name order.
+    local project = repo()
+    local _, pack_root = packs({
+      ["pack-d"] = "{", ["pack-b"] = "{", ["pack-e"] = "{", ["pack-a"] = "{", ["pack-c"] = "{",
+    })
+    local trace = {}
+    resolve({
+      file_path = path.join(project, "src", "main.rs"),
+      cwd = project,
+      pack_root = pack_root,
+    }, trace)
+    local last = 0
+    for _, name in ipairs({ "pack-a", "pack-b", "pack-c", "pack-d", "pack-e" }) do
+      local at = position(trace, name .. ": no usable enforcement.json")
+      assert(at and at > last, name .. " out of order:\n" .. table.concat(trace, "\n"))
+      last = at
+    end
+  end,
+
+  the_home_prefers_airsstack_home = function()
+    local env = {
+      get = function(name)
+        return ({ AIRSSTACK_HOME = "/custom/home", HOME = "/users/me" })[name]
+      end,
+    }
+    assert(enforce.home(env) == "/custom/home", enforce.home(env))
+  end,
+
+  the_home_falls_back_to_dot_airsstack_under_home = function()
+    for _, airsstack_home in ipairs({ "", "unset" }) do
+      local env = {
+        get = function(name)
+          if name == "AIRSSTACK_HOME" then
+            return airsstack_home ~= "unset" and airsstack_home or nil
+          end
+          return ({ HOME = "/users/me" })[name]
+        end,
+      }
+      assert(enforce.home(env) == "/users/me/.airsstack", enforce.home(env))
+    end
+  end,
+
+  the_home_without_either_variable_is_a_relative_dot_airsstack = function()
+    local env = {
+      get = function()
+        return nil
+      end,
+    }
+    assert(enforce.home(env) == ".airsstack", enforce.home(env))
+  end,
+
+  hook_ignores_an_event_without_a_pack_root = function()
+    local project = repo()
+    local _, pack_root = packs({ ["guideline-rust"] = MANIFEST })
+    with_env({ TMPDIR = fs.tempdir() }, function()
+      assert(hook(read_event(project, pack_root, { args = false })) == nil, "no arguments")
+      assert(hook(read_event(project, pack_root, { args = {} })) == nil, "no pack root argument")
+      assert(hook(read_event(project, pack_root, { args = { "" } })) == nil, "an empty pack root")
+    end)
+  end,
+
   doctor_prints_packs_header_and_trace = function()
     local project = repo()
     local root, pack_root = packs({ ["guideline-rust"] = MANIFEST })
@@ -699,8 +861,8 @@ return {
     -- call it fired on outright — no `tool_result` at all — when the session is non-interactive,
     -- the tool batch is solo, and the abort signal is not already set: a subagent's run ends
     -- reported `completed` having done nothing. Hooks return `{ context = ... }` or
-    -- `{ block = ... }` instead, and this sweeps every Lua file under `packs/` rather than the
-    -- one path a previous version of this test named.
+    -- `{ block = ... }` instead, and this sweeps every Lua file under `packs/`, not one named
+    -- hook.
     local root = packs_root()
     assert(root, "could not resolve the packs root from this test file's own path "
       .. "(arg[0] = " .. tostring(arg[0]) .. "): no ancestor directory holds "

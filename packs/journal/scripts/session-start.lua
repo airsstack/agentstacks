@@ -1,6 +1,6 @@
 -- Session-start hook module for journal: provisions the vault, rebuilds the derived index only
--- when it is stale or absent, then returns a project-scoped orientation card, which Claude Code
--- adds to the session's context.
+-- when it is stale or absent, then returns a project-scoped orientation card for the host to add
+-- to the session's context.
 --
 -- Fail-open throughout: never block the session, never invoke a model. Each fallible step is
 -- wrapped, so a failure in one leaves the others to run.

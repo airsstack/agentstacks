@@ -1,9 +1,9 @@
-# claudestacks-guideline-rust
+# guideline-rust
 
-Rust engineering rules and a Definition of Done for Claude Code, in one skill:
-`claudestacks-guideline-rust:rust-guidelines`. The skill loads when Claude reads or edits a Rust file
-or `Cargo.toml` in a project with a `Cargo.toml`, and the `coder` and `reviewer` agents of the
-`claudestacks` plugin run its Definition of Done. The plugin has no hooks and no scripts.
+The `guideline-rust` pack: Rust engineering rules and a Definition of Done in one skill, rendered as
+`/guideline-rust-guidelines`. The `core` pack's enforcement hook points the agent at it when it reads
+or edits a Rust file or `Cargo.toml` in a project with a `Cargo.toml`, and the `core` pack's `coder`
+and `reviewer` agents run its Definition of Done. The pack has no hooks and no scripts.
 
 ## Install
 
@@ -16,9 +16,8 @@ what run the Definition of Done. On its own the skill still loads on request.
 
 ## Documentation
 
-The rules and how the plugin fits with the others are described in
-[the guidelines chapter](https://airsstack.github.io/claudestacks/ch13-00-guideline-plugins.html)
-of the book.
+The gate and the index of rules are in [`skills/guidelines/SKILL.md`](skills/guidelines/SKILL.md);
+each rule is a file under [`skills/guidelines/references/`](skills/guidelines/references/).
 
 ## License
 

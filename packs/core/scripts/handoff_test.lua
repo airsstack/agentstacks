@@ -3,8 +3,8 @@
 --   airsl test --allow-read "$TMPDIR" --allow-write "$TMPDIR" --allow-read . packs/core/scripts
 --
 -- The header command grants no `--allow-exec git`, matching the shipped invocation (see
--- `handoff.lua`). `cargo make lua` runs the whole tree WITH the grant, for the sibling
--- `enforce_test.lua` fixtures — these tests pass either way, because `fs.tempdir()` sits outside
+-- `handoff.lua`). `cargo make lua` runs the whole tree WITH the grant, for the
+-- `hooks/enforce_test.lua` fixtures — these tests pass either way, because `fs.tempdir()` sits outside
 -- any repository, so the probe finds nothing whether or not it is allowed to run.
 
 local handoff = require("lib.handoff")

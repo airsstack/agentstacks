@@ -1,7 +1,7 @@
 -- Install, inspect, or remove the Claude Code status line — machine-wide (global) or scoped to
 -- one project.
 --
--- NOT plugin content — see statusline.lua. Driven by native/claude/skills/core-statusline/SKILL.md.
+-- Not loaded by the pack — see statusline.lua. Driven by native/claude/skills/core-statusline/SKILL.md.
 --
 --   airsl run --allow-env HOME --allow-read "$HOME/.claude" --allow-write "$HOME/.claude" \
 --     packs/core/scripts/statusline-install.lua <dry-run|apply|uninstall> \

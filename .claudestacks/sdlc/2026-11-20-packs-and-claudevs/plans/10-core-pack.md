@@ -202,19 +202,19 @@ native claude skill`.
 
 Reviewer: no blocking findings. Re-ran `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`; lua `11 file(s) compiled`, `17 file(s) compiled`, `71 passed, 0 failed (5 files)`, `216 passed, 0 failed (7 files)`); core-only `init` in a temp git project exit 0, 26 written, 7 skill dirs (`core-context-handoff`, `core-discuss`, `core-orchestrate`, `core-process-guidelines`, `core-snapshot-load`, `core-snapshot-save`, `core-statusline`), 3 agents, no `{{` or `CLAUDE_PLUGIN_ROOT` left under `.claude`; `plan` `0 to write`; `doctor` `healthy`; the two §6.4 gate greps over `packs/core` print nothing; `core-statusline` renders `${CLAUDE_PROJECT_DIR}/.claude/agentstacks/core` (16 lines).
 
-- 🟡 open — `packs/core/README.md:22` "Every skill is namespaced `claudestacks:`, so `discuss` runs as `/claudestacks:discuss`" is false (init renders `/core-discuss`); `:1-9` ("# claudestacks", "core plugin", "holds the suite's hooks") stale too. Task 1 says other README text stays.
-- 🟡 open — only `discuss/SKILL.md` is pinned by a test; reverting any other conversion (a `${CLAUDE_PLUGIN_ROOT}` in orchestrate/context-handoff/statusline, a bare `` `coder` ``, `name: statusline` in the native skill) passes `dod` and `init`. The §6.4 greps are a one-off proof, not a gate.
-- 🔵 open — `Makefile.toml:97`: reverting `[tasks.lua]` to `airsl test extensions` fails nothing; pack tests would drop out of `dod` silently.
-- 🔵 open — `core-statusline/SKILL.md:16,50,52-53`: prose still says "plugin root", `plugins/claudestacks/scripts/`, and an out-of-tree branch `{{var project_dir}}/{{root}}` can no longer reach.
-- 🔵 open — `discuss_skill_test.lua:23` test name `every_user_config_placeholder_is_single_quoted` names the retired `${user_config…}` form.
-- 🔵 open — `handoff_test.lua:6` names sibling `enforce_test.lua` fixtures (arrives plan 12).
-- 🔵 open — `install-airsl.sh:79` echo "Plugin hooks still find airsl there" and `:154` "the plugin tests" while `:2` says "every pack hook".
-- 🔵 open — `lib/discuss.lua:3` "this chain's spec" (workflow vocabulary); `:28` cites `hooks/lib/enforce.lua:35-174` by line (absent until plan 12; cite `M.project_key`).
-- 🔵 open — `statusline-install.lua:4` keeps "NOT plugin content".
-- 🔵 open — "plugin" wording mixed: `context-handoff/SKILL.md:28,71`, `discuss/references/protocol.md:75` vs `context-handoff/references/protocol.md:187` "the core pack".
-- 🔵 open — `context-handoff/references/protocol.md:145` "run the block above with that absolute literal in place of the variable" points at no variable any more.
-- 🔵 open — `context-handoff/references/protocol.md:187` "the core pack registers it as a hook on three events" is false until plan 11 lands.
-- 🔵 open — `snapshot-save/SKILL.md:74` cites `hooks/lib/enforce.lua` `M.project_key` (plan 12) and other plugin-era paths.
+- 🟡 fixed — `packs/core/README.md:22` "Every skill is namespaced `claudestacks:`, so `discuss` runs as `/claudestacks:discuss`" is false (init renders `/core-discuss`); `:1-9` ("# claudestacks", "core plugin", "holds the suite's hooks") stale too. Task 1 says other README text stays.
+- 🟡 fixed — only `discuss/SKILL.md` is pinned by a test; reverting any other conversion (a `${CLAUDE_PLUGIN_ROOT}` in orchestrate/context-handoff/statusline, a bare `` `coder` ``, `name: statusline` in the native skill) passes `dod` and `init`. The §6.4 greps are a one-off proof, not a gate.
+- 🔵 fixed — `Makefile.toml:97`: reverting `[tasks.lua]` to `airsl test extensions` fails nothing; pack tests would drop out of `dod` silently.
+- 🔵 fixed — `core-statusline/SKILL.md:16,50,52-53`: prose still says "plugin root", `plugins/claudestacks/scripts/`, and an out-of-tree branch `{{var project_dir}}/{{root}}` can no longer reach.
+- 🔵 fixed — `discuss_skill_test.lua:23` test name `every_user_config_placeholder_is_single_quoted` names the retired `${user_config…}` form.
+- 🔵 fixed — `handoff_test.lua:6` names sibling `enforce_test.lua` fixtures (arrives plan 12).
+- 🔵 fixed — `install-airsl.sh:79` echo "Plugin hooks still find airsl there" and `:154` "the plugin tests" while `:2` says "every pack hook".
+- 🔵 fixed — `lib/discuss.lua:3` "this chain's spec" (workflow vocabulary); `:28` cites `hooks/lib/enforce.lua:35-174` by line (absent until plan 12; cite `M.project_key`).
+- 🔵 fixed — `statusline-install.lua:4` keeps "NOT plugin content".
+- 🔵 fixed — "plugin" wording mixed: `context-handoff/SKILL.md:28,71`, `discuss/references/protocol.md:75` vs `context-handoff/references/protocol.md:187` "the core pack".
+- 🔵 fixed — `context-handoff/references/protocol.md:145` "run the block above with that absolute literal in place of the variable" points at no variable any more.
+- 🔵 fixed — `context-handoff/references/protocol.md:187` "the core pack registers it as a hook on three events" is false until plan 11 lands.
+- 🔵 fixed — `snapshot-save/SKILL.md:74` cites `hooks/lib/enforce.lua` `M.project_key` (plan 12) and other plugin-era paths.
 
 ## Deviations
 
@@ -226,3 +226,5 @@ Reviewer: no blocking findings. Re-ran `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make d
 - 2026-11-23 — Task 4: the plan lists `:41,81,91,115,126` but the source also has `${CLAUDE_PLUGIN_ROOT}` at `:69,82-83,92-93,116-117,127-128,153,162`; all were converted ("Every" governs).
 - 2026-11-23 — The worktree guard refuses a Bash command whose text holds the git exec grant of the pack test command; it was run from a scratch script (`sh <script>`). `cargo make lua` is unaffected.
 - 2026-11-23 — Not committed.
+- 2026-11-24 — Follow-up after the chain closed: every open finding above was fixed in one pass (five parallel coders, one review, one fix round). Evidence: `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0, 24 `test result: ok`, `packs` 14 passed, lua `651 passed, 0 failed (25 files)`, fingerprint gate 8+8, `pack text gates: 3 passed`. Not committed.
+- 2026-11-24 — Follow-up: the §6.4 text greps are now a gate in `Makefile.toml` `[tasks.lua]` (a grep error fails too); gate 2 excludes `doc-comment-discipline.md` and `docstring-discipline.md`, whose backticked `reviewer` is example vocabulary. Each gate was shown to exit 1 on an injected hit and on a missing `packs/`. `packs.rs` asserts that `[tasks.lua]` checks and tests `packs` and holds the three gates.

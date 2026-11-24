@@ -160,12 +160,12 @@ hooks`.
 
 Reviewer: no blocking findings. `cargo make lua` exit 0 (`640 passed, 0 failed (25 files)`, all 7 journal test files; fingerprint gate 8+8); gate greps 1–3 over `packs/journal` print nothing; `pack.toml` byte-identical to the spec §6.2 journal text. Orchestrator: `init` core + journal in a temp git project exit 0, `68 written`, 1 skip; 7 `journal-*` skills, 4 `journal-*` agents, each frontmatter `name` equal to its dir/file name; no `{{` or `CLAUDE_PLUGIN_ROOT` left (`${CLAUDE_SESSION_ID}` is the rendered `{{var session_id}}`); `SubagentStop` matcher `journal-curator` → `core.scripts.handoff_check_hook`; `SessionStart` `startup|resume|clear` → `journal.scripts.session-start`; piped with an empty `AIRSSTACK_HOME` → no output, vault provisioned (`daily mocs notes sessions .index`); with one note `project: p14proj` → `{"hookSpecificOutput":{"additionalContext":"## Journal — recent activity (p14proj)\n\n**Notes:**\n- [[sample]] — a sample note for the card\n",…}}` (the idiom loads `journal.scripts.lib.index` under the runtime); `plan` 0 to write; `doctor` healthy; core + sdlc + journal `init` exit 0, `94 written`, both `.claude/skills/sdlc-setup` and `.claude/skills/journal-setup` written.
 
-- 🟡 open — `scripts/lib/index.lua:11-13`, `lib/orientation.lua:9-11`, `session-start.lua:10-14,71`: the §3 idiom and the `{ context = card }` shape are guarded only by the manual piped run (`airsl test` loads with an empty prefix). Same class as plans 11 and 13.
-- 🟡 open — first-line comments of `build-index.lua`, `graph-health.lua`, `journal-backup.lua`, `provision.lua`, `lib/index.lua`, `lib/vault.lua`, `session-start.lua` say "journal" where the source said "claudestacks-journal"; the Markdown keeps "the claudestacks-journal vault".
-- 🔵 open — `scripts/journal-backup.lua:1`: names `/journal-review` (the rendered command) in a pack file.
-- 🔵 open — `scripts/lib/vault.lua:3-4`: "the confined `require` resolves against the requiring script's own directory" is untrue under the hook runtime (module-name load).
-- 🔵 open — `scripts/lib/vault.lua:59`: cites `lib/enforce.lua`'s `common_dir`, which no longer exists.
-- 🔵 open — `scripts/session-start.lua:2-3`: names Claude Code in a tool-neutral module.
+- 🟡 fixed — `scripts/lib/index.lua:11-13`, `lib/orientation.lua:9-11`, `session-start.lua:10-14,71`: the §3 idiom and the `{ context = card }` shape are guarded only by the manual piped run (`airsl test` loads with an empty prefix). Same class as plans 11 and 13.
+- 🟡 fixed — first-line comments of `build-index.lua`, `graph-health.lua`, `journal-backup.lua`, `provision.lua`, `lib/index.lua`, `lib/vault.lua`, `session-start.lua` say "journal" where the source said "claudestacks-journal"; the Markdown keeps "the claudestacks-journal vault".
+- 🔵 fixed — `scripts/journal-backup.lua:1`: names `/journal-review` (the rendered command) in a pack file.
+- 🔵 fixed — `scripts/lib/vault.lua:3-4`: "the confined `require` resolves against the requiring script's own directory" is untrue under the hook runtime (module-name load).
+- 🔵 fixed — `scripts/lib/vault.lua:59`: cites `lib/enforce.lua`'s `common_dir`, which no longer exists.
+- 🔵 fixed — `scripts/session-start.lua:2-3`: names Claude Code in a tool-neutral module.
 
 ## Deviations
 
@@ -175,3 +175,4 @@ Reviewer: no blocking findings. `cargo make lua` exit 0 (`640 passed, 0 failed (
 - 2026-11-24 — Task 2: README lines beyond the install block rewritten (plugin and marketplace text); `capture/SKILL.md` "the plugin's agents" → "the pack's agents"; `agents/curator.md` H2 "(from the journal-review skill)" → `{{skill review}}` (grep 3 exempts only H1); agent `tools`/`model` mapped to pack words; `setup` → `invocation: user`.
 - 2026-11-24 — Task 3's piped-card proof seeded one note (`project: p14proj`) in a temp `AIRSSTACK_HOME`; an empty vault returns no output by design.
 - 2026-11-24 — Not committed (per-task commits held for the author).
+- 2026-11-24 — Follow-up after the chain closed: every open finding above was fixed in one pass (five parallel coders, one review, one fix round). Evidence: `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0, 24 `test result: ok`, `packs` 14 passed, lua `651 passed, 0 failed (25 files)`, fingerprint gate 8+8, `pack text gates: 3 passed`. Not committed.

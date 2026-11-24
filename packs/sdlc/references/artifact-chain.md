@@ -8,7 +8,7 @@ Normative. Every skill resolves paths and states from this file. The Lua under
 
 - `.claudestacks/sdlc/` at the consuming repository's root. Everything under it is
   committed; no worktree-local or HOME-global split.
-- The plugin never writes or edits a `.gitignore`; nothing under `.claudestacks/` is
+- The pack never writes or edits a `.gitignore`; nothing under `.claudestacks/` is
   excluded from git.
 
 ## 2. Chain directory naming
@@ -55,7 +55,7 @@ Normative. Every skill resolves paths and states from this file. The Lua under
 
 - PRD = product input, seeds `intent`. RFC = technical input, seeds `design`.
 - Optional always: empty or absent, they prompt and block nothing.
-- Read-only to the plugin: no skill creates, edits, moves or deletes a file in them.
+- Read-only to the pack: no skill creates, edits, moves or deletes a file in them.
 - No state machine: no frontmatter requirement, no lifecycle, no board row. They appear
   only as `⤷ inputs:` annotations under chains that cite them (§9).
 - Flat inboxes, no per-intent subfolders; grouping is via `derived-from-prd` /

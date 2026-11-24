@@ -125,7 +125,7 @@ An unsettled edge case makes the spec unapprovable.
 ## Principles
 
 - **Stack guideline:** detect via each guideline pack's `enforcement.json` `detect` markers
-  (`Cargo.toml` → Rust), invoke its skill (the stack's guideline skill; for Rust, the guideline-rust pack's skill),
+  (`Cargo.toml` → Rust), invoke its skill (for Rust, the guideline-rust pack's skill),
   apply its architecture rules, not only its Definition of Done. None installed: say so.
 - **Isolation:** small units, one purpose, clear interfaces, testable alone.
 - **YAGNI:** every component traces to the intent. **Flexible:** follow redirects, don't defend.

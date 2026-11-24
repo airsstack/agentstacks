@@ -43,7 +43,7 @@ edit shown in full: a line for the target repo's `CLAUDE.md`, or a specific chan
 Ask accept / edit / skip. Edit means the user reshapes it.
 
 On accept, apply it exactly as agreed to the one file named; the user commits. If the file is under
-`plugins/`, remind them to run `cargo make claudevs-check` and `cargo make plugins` first.
+`packs/`, remind them to run `cargo make lua` first.
 
 ## Never
 

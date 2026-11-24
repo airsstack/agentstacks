@@ -9,7 +9,7 @@
 --                              tool result so the agent can rewrite it.
 --   `agent.stop`               the agent's final message names the report.
 --   native                     a `SubagentHandback` call about to deliver the report
---                              (`event.payload ~= nil`).
+--                              (`event.payload` is a table).
 --
 -- Returns `{ block = reason }` for a report that breaks the protocol, `nil` otherwise.
 
@@ -20,7 +20,7 @@ local base = (...):match("^(.-)[^.]*$")
 local report = require(base .. "lib.handoff_report")
 
 return function(event)
-  -- `report.file_from_payload` is the one place that decides which file, if any, this event
+  -- `report.report_path` is the one place that decides which file, if any, this event
   -- points at: it reads the right field for the event, applies the handoff-root test
   -- (`report.under_handoff_root`) to reject a trailing citation, a documentation URL, or an
   -- ordinary project file that merely sits in the report text, and resolves a relative path
@@ -28,7 +28,7 @@ return function(event)
   -- without one (the standalone case the protocol's error handling allows) must never be held,
   -- and an agent that owed a path and omitted it has already broken the return contract where
   -- the orchestrator can see it.
-  local file = report.file_from_payload(event)
+  local file = report.report_path(event)
   if not file then
     return nil
   end

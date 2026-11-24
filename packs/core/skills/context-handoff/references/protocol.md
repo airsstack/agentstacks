@@ -144,13 +144,15 @@ before `airsl` starts. That is what made `init` unusable in an isolated session.
 
 The same guard also rejects most variables in an `airsl` command line — `$TMPDIR` and `$PWD`
 both come back as "a value computed at runtime". `$HOME` resolves and is accepted; nothing else
-here should be relied on. So in an isolated session, resolve the value in a separate plain
-command first (plain commands may use variables freely), then run the block above with that
-absolute literal in place of the variable.
+here should be relied on. The block above uses none, so run it as written. If a grant ever needs
+one, resolve the value in a separate plain command first (plain commands may use variables
+freely), then write the absolute literal into the `airsl` command in place of the variable.
 
 Without the git grant the root comes from the working directory, which is correct
 whenever the caller stands at the repository root — Claude Code resets the shell there on
-every call. From anywhere else, pass an absolute literal path:
+every call, and the script path above is relative to that directory. From anywhere else,
+change to the project root before running it. If the tree belongs somewhere other than the
+working directory, name it with `--root` as an absolute literal path (a variable is refused):
 
 ```
   "{{root}}/scripts/handoff.lua" init --root /abs/path/to/worktree

@@ -33,6 +33,23 @@ return {
     assert(first == want, first)
   end,
 
+  attention_falls_back_to_the_process_directory_without_a_cwd = function()
+    local want = status.attention(path.join(path.absolute("."), status.ROOT), "/sdlc-status")
+    local expected = want ~= "" and { context = want } or nil
+    for _, event in ipairs({
+      { args = { "/sdlc-status" } },
+      { cwd = "", args = { "/sdlc-status" } },
+      { cwd = 7, args = { "/sdlc-status" } },
+    }) do
+      local result = attention(event)
+      if expected == nil then
+        assert(result == nil, "want nil")
+      else
+        assert(type(result) == "table" and result.context == expected.context, "want the process directory's board")
+      end
+    end
+  end,
+
   attention_returns_nil_without_a_chain_root = function()
     local cwd = fs.tempdir()
     assert(attention({ cwd = cwd, args = { "/sdlc-status" } }) == nil)

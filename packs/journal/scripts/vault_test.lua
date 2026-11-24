@@ -132,7 +132,7 @@ return {
   end,
 
   -- The project floor without git. `--allow-exec git` cannot be passed from a worktree-isolated
-  -- Claude Code session — the guard refuses the whole command over that operand — so the floor has
+  -- agent session — the guard refuses the whole command over that operand — so the floor has
   -- to come from `.git` itself, which carries the same answer `rev-parse --git-common-dir` gives.
 
   the_common_dir_of_a_plain_checkout_is_its_own_dot_git = function()

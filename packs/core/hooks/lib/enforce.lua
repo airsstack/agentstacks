@@ -74,13 +74,14 @@ function M.is_file(target)
   return ok and found
 end
 
--- The nearest ancestor holding `.git`, or nil outside a repository.
+-- The worktree root: the nearest ancestor holding `.git`, or nil outside a repository. What
+-- `rev-parse --show-toplevel` answers, without running git.
 --
--- Read rather than run: `--allow-exec git` cannot be passed from a worktree-isolated Claude Code
+-- Read rather than run: `--allow-exec git` cannot be passed from a worktree-isolated agent
 -- session (the core pack's context-handoff skill gives the full account in its
 -- `references/protocol.md`), and this runs on every hook dispatch. Ascends because the hook's
 -- cwd is rarely the repository root.
-local function dot_git(cwd)
+function M.toplevel(cwd)
   local current = M.realpath(cwd) or cwd
   while true do
     local candidate = path.join(current, ".git")
@@ -96,11 +97,6 @@ local function dot_git(cwd)
     end
     current = parent
   end
-end
-
--- The worktree root: what `rev-parse --show-toplevel` answers, without running git.
-function M.toplevel(cwd)
-  return dot_git(cwd)
 end
 
 -- The path `match` globs are tested against.
@@ -350,7 +346,6 @@ local function listed_packs(packs_root)
   if not ok then
     return {}
   end
-  table.sort(names)
   local listed = {}
   for _, name in ipairs(names) do
     if M.is_file(path.join(packs_root, name, "enforcement.json")) then
@@ -465,7 +460,7 @@ end
 
 -- The doctor: a human-readable trace of the resolution pipeline for one path.
 --
--- Drives the same `resolve` the hook drives, with a trace collector attached. The framework has
+-- Drives the same `resolve` the hook drives, with a trace collector attached. The pack has
 -- several paths that end in silence and are mutually indistinguishable from outside; this names
 -- the one that was taken. `pack_root` is the core pack's own root, as the hook receives it.
 --

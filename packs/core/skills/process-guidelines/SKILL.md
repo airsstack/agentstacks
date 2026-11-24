@@ -10,7 +10,7 @@ load-bearing one-liners; the detail lives in `references/` and is read on demand
 
 > Spec and plan artifact conventions (one objective per plan, the chain-root layout, and a state
 > model where nothing is ever deleted, only marked superseded or dropped) live with the workflow
-> that produces them — see the `claudestacks-sdlc` plugin.
+> that produces them — see the `sdlc` pack.
 
 ## The essentials
 

@@ -1,6 +1,6 @@
 -- The per-session topic index behind the core pack's discuss skill.
 --
--- Prose authority: `skills/discuss/references/protocol.md` and this chain's spec. Every value a
+-- Prose authority: `skills/discuss/references/protocol.md`. Every value a
 -- test varies arrives as an argument; `scripts/discuss.lua` alone reads the environment.
 
 local comm = require("lib.comm_report")
@@ -25,9 +25,8 @@ function M.keep(value)
   return M.DEFAULT_KEEP
 end
 
--- The per-repository key, ported from `hooks/lib/enforce.lua:35-174`, whose reference form is
--- the shell block in `skills/snapshot-save/SKILL.md`. A port rather than a `require` because
--- `airsl` resolves `require` only beside the running script. Keep the copies in sync.
+-- The per-repository key, the Lua form of the reference shell block in
+-- `skills/snapshot-save/SKILL.md`. Keep the two in sync.
 
 -- Every character outside [A-Za-z0-9._-] becomes '-'.
 function M.sanitize(text)

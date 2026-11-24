@@ -1,7 +1,11 @@
 -- Shared vault helpers for the journal scripts.
 --
--- Required by every script in this directory and by the other libraries; the confined `require`
--- resolves against the requiring script's own directory. Nothing here reaches outside the
+-- Required by every script in this directory and by the other libraries, in two forms. A script
+-- run directly with `airsl run` uses a bare `require("lib.vault")`, which resolves against the
+-- script's directory. A module loaded by the hook runtime under a prefixed name (session-start,
+-- and the libraries it loads) finds its siblings from its own name instead:
+-- `(...):match("^(.-)[^.]*$")` yields that prefix, and `require(base .. "lib.vault")` (or
+-- `base .. "vault"` from inside `lib/`) resolves under it. Nothing here reaches outside the
 -- capabilities the calling script was granted: each function raises the runtime's own denial
 -- message when the policy did not grant what it needs.
 
@@ -27,7 +31,7 @@ end
 -- Names the same directory `rev-parse --git-common-dir` does, without the `--allow-exec git`
 -- grant — the same directory, not necessarily the same spelling: a relative `gitdir:` pointer
 -- yields an uncanonicalised path here, which `project_base` canonicalises before it is used. A
--- worktree-isolated Claude Code session cannot pass that flag (the core pack's
+-- worktree-isolated agent session cannot pass that flag (the core pack's
 -- `context-handoff` skill, `references/protocol.md`, has the full account). The answer is
 -- on disk either way — `.git` is a directory in a plain checkout, and in a linked
 -- worktree a file holding `gitdir: <main>/.git/worktrees/<name>`, whose `worktrees/<name>` tail is
@@ -55,8 +59,7 @@ function M.common_dir(dir)
       end
       -- A `.git` file that is not a readable gitdir pointer ends the search rather than passing
       -- it upwards: git itself refuses here (`fatal: invalid gitfile format`, exit 128), and the
-      -- repository above is a different repository from the one the caller stands in. Matches
-      -- `lib/enforce.lua`'s `common_dir`.
+      -- repository above is a different repository from the one the caller stands in.
       return M.gitdir_pointer(current, candidate)
     end
     local parent = path.dirname(current)

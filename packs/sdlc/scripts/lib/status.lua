@@ -805,7 +805,8 @@ end
 -- chains and the rows needing attention, then those rows exactly as the
 -- board prints them, each followed by its problem notes. The text is held
 -- under M.ATTENTION_LIMIT bytes; when rows are left out, a last line says how
--- many. `command` names the command that shows the full board and ends the first line.
+-- many. `command` names the command that shows the full board and ends the first line; the
+-- " — full board: …" suffix is left off when it is nil or empty.
 -- Empty when the chain root does not exist.
 function M.attention(rootdir, command)
   if not (fs.exists(rootdir) and fs.is_dir(rootdir)) then
@@ -826,9 +827,11 @@ function M.attention(rootdir, command)
     end
   end
 
-  local out = { string.format(
-    "claudestacks-sdlc: %d open, %d need attention — full board: %s",
-    board.open, #blocks, command) }
+  local head = string.format("claudestacks-sdlc: %d open, %d need attention", board.open, #blocks)
+  if type(command) == "string" and command ~= "" then
+    head = head .. " — full board: " .. command
+  end
+  local out = { head }
   local size = #out[1]
   for i, block in ipairs(blocks) do
     if size + 1 + #block > M.ATTENTION_LIMIT - ATTENTION_RESERVE then

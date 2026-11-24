@@ -7,8 +7,8 @@
 -- Never blocks: it returns `{ context = ... }` or nothing.
 --
 -- No `--allow-exec git`: the repository root is read off `.git` (`lib/enforce.lua`'s `toplevel`)
--- rather than asked of git, so this runs unchanged in a worktree-isolated Claude Code session,
--- whose guard refuses any command carrying a `git` operand it cannot see through.
+-- rather than asked of git, so this runs unchanged in a worktree-isolated agent session, whose
+-- guard refuses any command carrying a `git` operand it cannot see through.
 
 -- The requires start from this module's own name so the module loads under any prefix the
 -- caller's runtime gives it.

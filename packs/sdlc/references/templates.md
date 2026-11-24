@@ -27,7 +27,7 @@ solution]
 
 ## Affected systems
 
-[the code, plugins, or repos this problem touches]
+[the code, packs, or repos this problem touches]
 
 ## Desired outcome
 

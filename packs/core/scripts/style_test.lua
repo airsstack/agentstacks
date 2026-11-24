@@ -65,7 +65,7 @@ return {
 
   an_unreadable_value_keeps_the_default = function()
     -- A placeholder or junk is not an instruction to stop; on is the default.
-    assert(style.reinject_enabled("${user_config.style_reinject}") == true)
+    assert(style.reinject_enabled("{{option style_reinject}}") == true)
     assert(style.reinject_enabled("") == true)
   end,
 

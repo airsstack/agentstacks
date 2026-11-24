@@ -20,7 +20,7 @@ return {
       "model invocation not disabled")
   end,
 
-  every_user_config_placeholder_is_single_quoted = function()
+  every_option_placeholder_is_single_quoted = function()
     local body = text()
     local count = 0
     for before, after in body:gmatch("(.){{option archive_keep}}(.)") do
@@ -30,7 +30,7 @@ return {
     assert(count >= 1, "the start line does not pass --keep")
   end,
 
-  command_lines_carry_the_session_and_the_plugin_root = function()
+  command_lines_carry_the_session_and_the_pack_root = function()
     local body = text()
     assert(body:find("--session {{var session_id}}", 1, true))
     assert(body:find('"{{var project_dir}}/{{root}}/scripts/discuss.lua"', 1, true))

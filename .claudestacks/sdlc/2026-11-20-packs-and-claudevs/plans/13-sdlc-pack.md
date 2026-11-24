@@ -167,15 +167,15 @@ hooks`.
 
 Reviewer: no blocking findings. `cargo make lua` exit 0 (`640 passed, 0 failed (25 files)`; `fingerprint gate: 8 cases passed`, `… with sha256sum`); `pack.toml` byte-identical to the spec §6.2 sdlc block; gate code matches `../claudestacks/Makefile.toml:176-228` except `FP_SH`, 8 fingerprints unchanged; carried scripts unchanged; 37 `${CLAUDE_PLUGIN_ROOT}` lines → 37 `{{root}}`; 21 namespaced references → 19 tokens + 2 guideline-prose rewrites; §6.4 greps 1–2 print nothing; no other frontmatter with an unquoted `: `. Orchestrator: workspace `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0 (23 `test result: ok`, lua `559 passed, 0 failed (18 files)`, fingerprint gate 8+8); `init` core (HEAD) + sdlc in a temp git project exit 0, `59 written`, 1 skip; 11 `sdlc-*` skills, 3 `sdlc-*` agents; no `{{` or `CLAUDE_PLUGIN_ROOT` under `.claude`; `SubagentStop` matcher `sdlc-task-briefer|sdlc-chain-reader|sdlc-artifact-reviewer` → module `core.scripts.handoff_check_hook`; `SessionStart` → `sdlc.scripts.attention` `/sdlc-status`, piped with a chain root → `{"hookSpecificOutput":{"additionalContext":"claudestacks-sdlc: 1 open, 0 need attention — full board: /sdlc-status",…}}`; `plan` 0 to write; `doctor` healthy.
 
-- 🟡 open — `scripts/attention.lua:10-12`, `lib/status.lua:13-17`, `lib/adr.lua:12-14`: nothing catches the §3 idiom being reverted (the tests load with an empty prefix; reverting `base .. "adr"` keeps 264 passed while the hook fails "module `lib.adr` not found"). Same class as plan 11's open finding.
-- ❓ open — backticked stage names (`adr`, `plan`, `setup`, `execute`, e.g. `design/SKILL.md:24,37,95,123`, `review-policy.md:10`, `templates.md:146,219`) stay plain; the plan lists only `execute/SKILL.md:50,61`. Read as stage labels.
-- 🔵 open — `README.md:39`: `[LICENSE](./LICENSE)` is dead; core uses `../../LICENSE`.
-- 🔵 open — "plugin" wording left in `agents/artifact-reviewer.md:5,64`, `references/artifact-chain.md:11,58`, `references/templates.md:30`, `skills/distill/SKILL.md:46` (`cargo make plugins` does not exist here).
-- 🔵 open — `scripts/attention.lua:1-2`: names Claude Code in a tool-neutral pack.
-- 🔵 open — `attention_test.lua`: no case for the process-directory fallback when `cwd` is absent.
-- 🔵 open — `lib/status.lua:808-810`: a nil `command` would print "full board: nil" (harmless: `args` is always present, `docs/hooks.md`).
-- 🔵 open — `design/SKILL.md:128`, `plan/SKILL.md:68`: prose reads "(the stack's guideline skill; for Rust, …)", redundant in design.
-- 🔵 open — `plan/SKILL.md:3`: the quoting fix (see Deviations) is guarded only by plan 15's `init`.
+- 🟡 fixed — `scripts/attention.lua:10-12`, `lib/status.lua:13-17`, `lib/adr.lua:12-14`: nothing catches the §3 idiom being reverted (the tests load with an empty prefix; reverting `base .. "adr"` keeps 264 passed while the hook fails "module `lib.adr` not found"). Same class as plan 11's open finding.
+- ❓ no change — backticked stage names (`adr`, `plan`, `setup`, `execute`, e.g. `design/SKILL.md:24,37,95,123`, `review-policy.md:10`, `templates.md:146,219`) stay plain; the plan lists only `execute/SKILL.md:50,61`. Read as stage labels. Kept: §6.4 says labels stay.
+- 🔵 fixed — `README.md:39`: `[LICENSE](./LICENSE)` is dead; core uses `../../LICENSE`.
+- 🔵 fixed — "plugin" wording left in `agents/artifact-reviewer.md:5,64`, `references/artifact-chain.md:11,58`, `references/templates.md:30`, `skills/distill/SKILL.md:46` (`cargo make plugins` does not exist here).
+- 🔵 fixed — `scripts/attention.lua:1-2`: names Claude Code in a tool-neutral pack.
+- 🔵 fixed — `attention_test.lua`: no case for the process-directory fallback when `cwd` is absent.
+- 🔵 fixed — `lib/status.lua:808-810`: a nil `command` would print "full board: nil" (harmless: `args` is always present, `docs/hooks.md`).
+- 🔵 fixed — `design/SKILL.md:128`, `plan/SKILL.md:68`: prose reads "(the stack's guideline skill; for Rust, …)", redundant in design.
+- 🔵 fixed — `plan/SKILL.md:3`: the quoting fix (see Deviations) is guarded only by plan 15's `init`.
 
 ## Deviations
 
@@ -184,3 +184,4 @@ Reviewer: no blocking findings. `cargo make lua` exit 0 (`640 passed, 0 failed (
 - 2026-11-24 — Task 1: the `attention` parameter is `command` (a local `board` already exists in `lib/status.lua`); the attention test expects `1 open, 0 need attention`; `lib/status.lua` header drops the spec-section parenthetical; moved test usage comments say `cargo make lua`; `scripts/status.lua` keeps its `airsl run` usage comment (carried unchanged). `Makefile.toml` `[tasks.lua]` description and the file header comment were updated with the gate.
 - 2026-11-24 — Task 2: `design/SKILL.md:127` "guideline plugin's" → "guideline pack's"; README drops the `claudestacks-sdd` paragraph and says "the `core` pack"; agent frontmatter `tools` → `[read, grep, glob, shell, write]`, models `deep`/`fast`/`balanced`; `setup` `disable-model-invocation` → `invocation: user`.
 - 2026-11-24 — Not committed (per-task commits held for the author).
+- 2026-11-24 — Follow-up after the chain closed: every open finding above was fixed in one pass (five parallel coders, one review, one fix round). Evidence: `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0, 24 `test result: ok`, `packs` 14 passed, lua `651 passed, 0 failed (25 files)`, fingerprint gate 8+8, `pack text gates: 3 passed`. Not committed.

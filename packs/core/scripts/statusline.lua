@@ -1,6 +1,6 @@
 -- Claude Code status line driver: stdin payload → git → two lines on stdout.
 --
--- NOT plugin content. `statusLine` is a settings key, not a plugin component type; this file is
+-- Not loaded by the pack. `statusLine` is a settings key, not a pack component type; this file is
 -- installed into ~/.claude/statusline/ by statusline-install.lua and invoked by Claude Code.
 --
 --   airsl run --fail-open --allow-exec git --allow-env HOME \

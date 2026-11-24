@@ -1558,6 +1558,16 @@ return {
       status.attention(dir, BOARD))
   end,
 
+  attention_omits_the_board_suffix_without_a_command = function()
+    local dir = root()
+    member(dir, "2026-10-13-mfa", "approved", nil)
+    local want = "claudestacks-sdlc: 1 open, 0 need attention"
+    local nil_text = status.attention(dir, nil)
+    assert(nil_text == want, nil_text)
+    local empty_text = status.attention(dir, "")
+    assert(empty_text == want, empty_text)
+  end,
+
   attention_lists_each_chain_row_that_needs_it = function()
     local dir = root()
     fs.mkdir(path.join(dir, "2026-10-01-invalid"))

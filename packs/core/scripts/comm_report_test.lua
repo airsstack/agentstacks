@@ -130,26 +130,12 @@ return {
     assert(#comm.check(file) == 0)
   end,
 
-  hook_output_is_the_block_reason_on_tool_after_and_agent_stop = function()
-    for _, name in ipairs({ "tool.after", "agent.stop" }) do
-      local reason = comm.hook_output({ event = name }, { { id = "topics-missing", line = "x" } })
-      assert(reason and reason:find("topics-missing: x", 1, true), name)
-    end
-  end,
-
-  hook_output_is_the_block_reason_on_a_native_event = function()
-    local event = { payload = { tool_input = {} } }
-    local reason = comm.hook_output(event, { { id = "topics-missing", line = "x" } })
+  hook_output_is_the_block_reason = function()
+    local reason = comm.hook_output({ { id = "topics-missing", line = "x" } })
     assert(reason and reason:find("topics-missing: x", 1, true))
   end,
 
-  hook_output_is_nil_on_an_unknown_event = function()
-    assert(comm.hook_output({ event = "tool.before" }, { { id = "topics-missing", line = "x" } })
-      == nil)
-  end,
-
   no_violations_means_no_output = function()
-    assert(comm.hook_output({ event = "agent.stop" }, {}) == nil)
-    assert(comm.hook_output({ payload = {} }, {}) == nil)
+    assert(comm.hook_output({}) == nil)
   end,
 }

@@ -65,7 +65,7 @@ states; anything more means run `design`.
   inline, say so); deciding what changes stays here.
 - **Tasks** are the order of work: one sitting, a handful of named tests, ends in a commit.
 - **Guideline:** detect the stack (`Cargo.toml` → Rust), load its skill
-  (the stack's guideline skill; for Rust, the guideline-rust pack's skill), conform to its architecture rules, put its
+  (for Rust, the guideline-rust pack's skill), conform to its architecture rules, put its
   Definition of Done in every done-check. DRY / YAGNI.
 - **Checkpoints** only where the spec asks; `execute` ends a batch there and never stops.
 - A fact living in a type being built is read from there, never copied into a task.

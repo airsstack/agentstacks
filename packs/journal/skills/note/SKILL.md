@@ -2,7 +2,7 @@
 name: note
 description: >
   Manually capture one atomic, standalone topic note (insight|decision) into
-  the claudestacks-journal vault. Resolves session id, transcript path, and
+  the journal vault. Resolves session id, transcript path, and
   project floor, then spawns the isolated {{agent note}} subagent to write/update
   notes/<kebab>.md, stamping the session join field. Update-in-place on a
   repeated topic. Use when the user says "save a note on X" / "{{skill note}} X".

@@ -1,7 +1,7 @@
 ---
 name: core-statusline
 description: >
-  Install, inspect, or remove the claudestacks Lua status line for Claude Code — a two-line
+  Install, inspect, or remove the Lua status line for Claude Code — a two-line
   status line showing path, git branch, context meter, output tokens, model, and rate limits.
   Installs machine-wide into ~/.claude, or for one project only via .claude/settings.local.json.
   Gates on the airsl binary, refuses to overwrite a status line it does not own, and backs up
@@ -13,7 +13,7 @@ disable-model-invocation: true
 # statusline
 
 Point Claude Code's `statusLine` setting at the Lua status line. `statusLine` is a settings key,
-not a plugin component type, which is why this is an installer rather than something the plugin
+not a pack component type, which is why this is an installer rather than something the pack
 loads on its own.
 
 ## Pick the scope first
@@ -26,7 +26,7 @@ applies.
 | Renders in | every project on this machine | one project |
 | Writes to | `~/.claude/settings.json` | `<project>/.claude/settings.local.json` |
 | Copies files | yes, into `~/.claude/statusline/` | **no** — points at the source in place |
-| Re-apply after editing the source | required | never |
+| Re-apply after `agentstacks update` brings a new source | required | never |
 | Committed to the repo | n/a | no — `settings.local.json` is the personal settings file |
 
 **Ask the user which one, with `AskUserQuestion`.** Do not guess, and do not default silently:
@@ -37,8 +37,6 @@ which scope they want.
 Gather the context first, so the recommendation is grounded rather than assumed:
 
 ```sh
-# Does the status line source live inside this project?
-case "{{var project_dir}}/{{root}}" in "$PWD"/*) echo "source in-tree" ;; *) echo "source out-of-tree" ;; esac
 # What is already installed, if anything?
 grep -l statusLine "$HOME/.claude/settings.json" 2>/dev/null && echo "global install present"
 grep -l statusLine .claude/settings.local.json 2>/dev/null && echo "project install present"
@@ -46,11 +44,12 @@ grep -l statusLine .claude/settings.local.json 2>/dev/null && echo "project inst
 
 Then ask, marking the recommendation from what you found:
 
-- **source in-tree** (the user is working in the repository that contains
-  `plugins/claudestacks/scripts/`) → recommend **project**. Nothing is copied, so there is no
-  installed second copy to drift, and editing the source takes effect on the next render.
-- **source out-of-tree** → recommend **global**. Project mode would point at a plugin directory
-  outside the project, which works but buys nothing over installing once machine-wide.
+- **nothing installed** → recommend **project**. The status line source ships inside this project
+  (the pack root), so project mode copies nothing: there is no installed second copy to drift.
+  Do not edit that source in place: agentstacks wrote and locked it, so `doctor` reports an edit
+  as drift and `apply` will not overwrite it. Changes arrive from the pack through
+  `agentstacks update` and `apply`. Offer **global** for a user who wants
+  it in every project on the machine.
 - **something already installed** → say so in the question. Re-running the same scope converges;
   choosing the other scope adds a second, independent install rather than replacing the first.
 
@@ -70,7 +69,7 @@ invocations or the `--project` ones — never mix them within one run.
 
 2. Show what would change, without changing it. No write grant: the whole point of the
    read-only mode is that it *cannot* write, and granting write erases that guarantee. It does
-   need to **read** the plugin root, because it compares the installed files against the source
+   need to **read** the pack root, because it compares the installed files against the source
    ones — pass the same base and source arguments `apply` takes, or the comparison is skipped.
 
    Global:
@@ -102,7 +101,7 @@ invocations or the `--project` ones — never mix them within one run.
    | `would install the status line at …` | Go to step 3; nothing is installed yet. |
    | `a statusLine is already set and is not ours: …` | Stop. See the refusal note below. |
 
-3. On user confirmation, apply. Both need a **read** grant on the plugin root — global copies the
+3. On user confirmation, apply. Both need a **read** grant on the pack root — global copies the
    source files and compares them with `fs.same_content`, project points at them — and without it
    the run fails with `outside the granted read roots`.
 

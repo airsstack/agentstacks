@@ -143,15 +143,12 @@ function M.check(file, opts)
   return M.check_lines(lines, opts)
 end
 
--- The block reason for `violations` on a neutral hook `event`, or nil for nothing to block.
+-- The block reason for `violations`, or nil for nothing to block.
 --
--- `tool.after` and `agent.stop` events and a native event (`event.payload ~= nil`) are the three
--- the check hook receives; any other event, and no violations, return nil.
-function M.hook_output(event, violations)
+-- Which events qualify is decided before this runs: the check hook only calls it for an event
+-- `report.report_path` resolved to a report file.
+function M.hook_output(violations)
   if #violations == 0 then
-    return nil
-  end
-  if event.payload == nil and event.event ~= "tool.after" and event.event ~= "agent.stop" then
     return nil
   end
   local found = {}

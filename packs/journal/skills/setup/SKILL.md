@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Provision the claudestacks-journal vault and force a full rebuild of its derived recall index. Idempotent. Use when the user says "{{skill setup}}" or asks to set up or rebuild the journal vault.
+description: Provision the journal vault and force a full rebuild of its derived recall index. Idempotent. Use when the user says "{{skill setup}}" or asks to set up or rebuild the journal vault.
 invocation: user
 ---
 

@@ -76,7 +76,7 @@ report() {
   "$found" doctor 2>/dev/null || true
   if ! on_path "$directory"; then
     echo
-    echo "WARNING: $directory is not on this shell's PATH. Plugin hooks still find airsl there, but skills that run airsl directly need it on PATH. Open a new shell, or add $directory to PATH."
+    echo "WARNING: $directory is not on this shell's PATH. Pack hooks still find airsl there, but skills that run airsl directly need it on PATH. Open a new shell, or add $directory to PATH."
   fi
   if [ "$found" != "$installed" ] && ! location_chosen; then
     echo
@@ -151,7 +151,7 @@ else
   # --locked builds it against the Cargo.lock that release shipped with. Without it cargo
   # re-resolves every dependency to the newest semver-compatible version available today, which
   # for `mlua`'s `vendored` feature means the C sources of the Lua interpreter itself can change
-  # between two installs of the same airsl-cli. That is not a difference the plugin tests would
+  # between two installs of the same airsl-cli. That is not a difference the pack tests would
   # attribute correctly.
   if [ "$force" -eq 1 ]; then
     cargo install "$CRATE" --locked --force || exit 1

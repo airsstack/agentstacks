@@ -17,11 +17,11 @@ extensions/claude/        the official claude tool extension (adapter.lua under 
 packs/                    the five official packs: core, sdlc, journal, guideline-rust, guideline-python
 docs/                     contributor docs; docs/architecture.md is the layering contract
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
-.github/workflows/ci.yml  CI: `cargo make dod` and `cargo deny check`
+.github/workflows/ci.yml  CI: `cargo make dod`, `cargo make claudevs-check` and `cargo deny check`
 ```
 
-Everything below the Status section except Commands describes the agreed design. Treat it as the
-contract to build toward, not a description of existing files. `book/` has not landed.
+Everything below the Status section except Commands describes the agreed design: the contract to
+build toward. Parts marked "built" exist today. `book/` has not landed.
 `/claudestacks-sdlc:status` shows progress.
 
 ## What agentstacks is
@@ -118,7 +118,7 @@ The claudestacks plugins are converted to the five packs in `packs/`. The mappin
 table and text rules are in `.claudestacks/sdlc/2026-11-20-packs-and-claudevs/spec.md` §6–§7.
 
 Archiving claudestacks (never delete it: releases, `install.sh` and the old marketplace still point
-there) is `release-and-migration` work (spec §13).
+there) is `2026-11-20-release-and-migration` work (see that chain's `intent.md`).
 
 ## Commands
 
@@ -126,8 +126,8 @@ These run today. The workspace uses the airsstack gate shared by every Rust proj
 (`cargo install --locked cargo-make cargo-deny`):
 
 ```bash
-cargo make dod                 # Definition of Done: fmt-check, clippy, rustdoc, tests, doctests (warnings = errors)
-cargo make dod-crate <crate>   # the same steps scoped with -p
+cargo make dod                 # Definition of Done: fmt-check, clippy, rustdoc, tests, doctests, lua (warnings = errors)
+cargo make dod-crate <crate>   # the five cargo steps scoped with -p (no lua)
 cargo make fmt                 # rewrite formatting (clippy-fix is the other task that edits sources)
 cargo make deny                # cargo-deny; deliberately not part of dod
 cargo make claudevs-check      # claudevs fixture corpus; deliberately not part of dod
@@ -135,8 +135,8 @@ cargo make lua                 # airsl check + airsl test over extensions/ and p
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
 
-CI runs `cargo make dod` and `cargo deny check` on push to `main`, on pull requests and on manual
-dispatch.
+CI runs `cargo make dod`, `cargo make claudevs-check` and `cargo deny check` on push to `main`, on
+pull requests and on manual dispatch.
 
 A run short of `cargo make dod` counts as iteration, not a green result. The source of truth for the
 gate is the `claudestacks-guideline-rust:rust-guidelines` skill. Workspace lints: `unsafe_code =

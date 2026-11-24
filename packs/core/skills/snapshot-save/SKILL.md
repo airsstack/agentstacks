@@ -8,7 +8,7 @@ description: Use when ending a work session, before /clear, or when the user say
 Codifies the snapshot-save ceremony so it runs the same way every time. A **snapshot** is a short
 capture of the current conversation — a curated session summary plus a few key snippets — written as
 one timestamped file in the project-local snapshot store **outside the repo**. This is the
-claudestacks memory; it is **deliberately separate from Claude's native memory tool**, whose store has
+project snapshot memory; it is **deliberately separate from Claude's native memory tool**, whose store has
 size limits we are working around.
 
 ## Argument
@@ -70,13 +70,10 @@ Compute it the same way every time so all worktrees of one repo map to one store
    `<cwd-basename>-<hash8>`.
 
 Concretely (this block is the reference form, and it is ported elsewhere — keep them in sync).
-`hooks/lib/enforce.lua`'s `M.project_key` computes the identical key in Lua, down to the same
-`sanitize` character class and an 8-hex-digit hash; `scripts/lib/discuss.lua`'s `M.project_key`
-is a second Lua copy, kept because `airsl` cannot `require` across `hooks/` and `scripts/`;
-`claudestacks-journal`'s
-`scripts/lib/vault.lua` `M.project_base` repeats the worktree-collapsing half without the hash.
-`snapshot-load/SKILL.md` and [the claudestacks chapter](https://airsstack.github.io/claudestacks/ch11-00-claudestacks-plugin.html)
-describe this key in prose rather than restating it:
+`scripts/lib/discuss.lua`'s `M.project_key` computes the identical key in Lua, down to the same
+`sanitize` character class and an 8-hex-digit hash. The journal pack's `scripts/lib/vault.lua`
+`M.project_base` repeats the worktree-collapsing half without the hash. `snapshot-load/SKILL.md`
+defers to this section for the key rather than restating it:
 
 ```sh
 if common_dir=$(git rev-parse --git-common-dir 2>/dev/null); then
@@ -156,7 +153,7 @@ Omit this section if nothing is worth quoting.>
 ## Must NOT do
 
 - Write to Claude's native memory store (`~/.claude/projects/.../memory/` or any `MEMORY.md`). This
-  skill owns the claudestacks store only.
+  skill owns the snapshot store only.
 - Dump the raw session transcript — capture a curated summary + key snippets, not everything.
 - Save what the repo already records (code structure, fixes already in git, project docs).
 - Put snapshot content in `index.md` beyond its one-line entries.

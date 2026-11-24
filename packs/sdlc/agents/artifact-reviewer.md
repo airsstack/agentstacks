@@ -2,7 +2,7 @@
 name: artifact-reviewer
 description: >
   Reviews a draft claudestacks-sdlc artifact — a spec, a set of plans, or an ADR —
-  against its upstream authority and the plugin's artifact-review criteria.
+  against its upstream authority and the pack's artifact-review criteria.
   Severity-tagged findings, report-only: never edits the artifact, never flips a
   status, never commits. Spawned by the design and plan skills at the intent→spec
   and spec→plan hops, and by the adr skill on a draft ADR.
@@ -61,7 +61,7 @@ blocking set exactly (its count, or `none`); the calling skill closes the round 
 SPEC: 2 blocking, 1 risk, 1 nit
 
 spec.md §4: 🔴 blocking: "error handling TBD" is a placeholder; the intent names three failure modes this section has to decide.
-spec.md §6: 🔴 blocking: the intent's constraint on cross-plugin degradation has no section.
+spec.md §6: 🔴 blocking: the intent's constraint on cross-pack degradation has no section.
 ```
 
 For `adr`: `ADR: <n> blocking, <n> risk, <n> nit`.
