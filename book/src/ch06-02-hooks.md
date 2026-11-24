@@ -9,8 +9,8 @@ extension makes the tool run that command, and a runtime the core ships calls th
 The tool-specific parts, turning the tool's payload into a neutral event and the hook's result back
 into the tool's output, belong to the extension's `translate.lua`.
 
-Written for extension authors in [extensions.md](extensions.md). The core's side of planning is in
-[plan-and-apply.md](plan-and-apply.md).
+Written for extension authors in [extensions.md](ch06-01-extensions.md). The core's side of planning is in
+[plan-and-apply.md](ch05-00-plan-and-apply.md).
 
 ## 1. Layout
 
@@ -185,5 +185,5 @@ Hook commands run on the `airsl` binary found on `PATH`. When a locked pack decl
 the core adds a `require_binary` for `airsl` with the range the packs need, and records the installed
 version in the lock's `[airsl]` table (the pin). After install, `doctor` is the check that airsl is
 still there and still the pinned version. The tables and messages are in
-[plan-and-apply.md](plan-and-apply.md#11-binaries-and-the-airsl-pin) and
-[plan-and-apply.md](plan-and-apply.md#8-doctor).
+[plan-and-apply.md](ch05-00-plan-and-apply.md#11-binaries-and-the-airsl-pin) and
+[plan-and-apply.md](ch05-00-plan-and-apply.md#8-doctor).

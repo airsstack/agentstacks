@@ -1,10 +1,10 @@
-# Build an agentstacks tool extension
+# Writing a Tool Extension
 
 This page is written for an AI coding agent to follow, step by step. A human can hand it over with
 one line:
 
 > Build an agentstacks extension for `<tool>`. Follow
-> https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/authoring.md
+> https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-00-authoring.md
 
 Everything here is `api = 0`: the extension API is unstable and may change until it is frozen as
 `api = 1`. Pin the agentstacks version you build against.
@@ -15,8 +15,8 @@ Fetch these before writing code. They are the contract; this page only tells you
 
 | Document | What it gives you |
 |---|---|
-| [extensions.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/extensions.md) | the `api = 0` Lua surface: manifest, events, operations, coverage, validation, every refusal |
-| [hooks.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/docs/hooks.md) | the hook command line, the shared runtime, the neutral event and result, the translator contract |
+| [ch06-01-extensions.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-01-extensions.md) | the `api = 0` Lua surface: manifest, events, operations, coverage, validation, every refusal |
+| [ch06-02-hooks.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-02-hooks.md) | the hook command line, the shared runtime, the neutral event and result, the translator contract |
 | [adapter.lua](https://raw.githubusercontent.com/airsstack/agentstacks/main/extensions/claude/adapter.lua) | the official Claude Code extension, a complete worked example |
 | [demo pack](https://raw.githubusercontent.com/airsstack/agentstacks/main/crates/agentstacks-cli/tests/fixtures/project/packs/demo/pack.toml) | a small pack (one skill, one agent, one lua hook, one message hook) to test with |
 

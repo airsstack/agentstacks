@@ -1,9 +1,9 @@
-# CLI
+# The Command Line
 
 What the `agentstacks` commands do, what they print and which exit code each outcome gives. The
 binary is a composition root and a presentation layer: every rule and flow lives in the library
-(see [architecture.md](architecture.md)), and the planning and apply steps behind the commands are in
-[plan-and-apply.md](plan-and-apply.md).
+(see [architecture.md](ch07-00-architecture.md)), and the planning and apply steps behind the commands are in
+[plan-and-apply.md](ch05-00-plan-and-apply.md).
 
 ## 1. Commands
 

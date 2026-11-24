@@ -1,9 +1,9 @@
-# Plan, apply, doctor and update
+# Plan, Apply and the Lock
 
 How the core turns a project into a plan a human reads, applies it as the only writer, and checks
 it later. This guide is for core contributors. The layering it sits in is
-[architecture.md](architecture.md). What an extension proposes is in [extensions.md](extensions.md),
-and how hooks run is in [hooks.md](hooks.md).
+[architecture.md](ch07-00-architecture.md). What an extension proposes is in [extensions.md](ch06-01-extensions.md),
+and how hooks run is in [hooks.md](ch06-02-hooks.md).
 
 The core is tool-neutral: it knows no tool's file shapes. Where a message names a tool
 (`claude/adapter.lua`, `.claude/settings.json`), it is an example: claude extension.
@@ -65,8 +65,8 @@ messages:
 
 ## 2. Operations
 
-The kinds and their fields are in [extensions.md](extensions.md#7-operations), and their validation
-in [extensions.md](extensions.md#9-validation). In short:
+The kinds and their fields are in [extensions.md](ch06-01-extensions.md#7-operations), and their validation
+in [extensions.md](ch06-01-extensions.md#9-validation). In short:
 
 | Kind | Proposed by | Effect |
 |---|---|---|

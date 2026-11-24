@@ -1,4 +1,4 @@
-# Architecture
+# Under the Hood
 
 `crates/agentstacks` follows a ports-and-adapters (hexagonal) layout. All logic sits inside, behind
 ports, and is tested with fakes. Only the adapters touch the disk, `git`, the `airsl` binary or Lua.

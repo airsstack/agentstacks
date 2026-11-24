@@ -1,4 +1,4 @@
-# Writing a tool extension
+# The Extension API
 
 A tool extension is the Lua that turns packs into one tool's files. This guide is the contract an
 extension author codes against. Everything in it is `api = 0`: unstable until both official
@@ -7,9 +7,9 @@ extensions run on it, and free to change until then.
 Every message below is shown with the claude extension as the example (`claude/adapter.lua`), the
 way the core prints it for that tool. Another tool prints its own name and file in its place.
 
-How the pieces fit together is in [architecture.md](architecture.md). The core's side of planning
-and applying is in [plan-and-apply.md](plan-and-apply.md). The hook runtime an extension feeds is in
-[hooks.md](hooks.md).
+How the pieces fit together is in [architecture.md](ch07-00-architecture.md). The core's side of planning
+and applying is in [plan-and-apply.md](ch05-00-plan-and-apply.md). The hook runtime an extension feeds is in
+[hooks.md](ch06-02-hooks.md).
 
 ## 1. What an extension is and is not
 
@@ -116,7 +116,7 @@ succeeds.
 - An I/O failure reading a `reads` path is `<path>: <io::Error Display>`. It is reported only when
   the extension reads that path, and it sticks like the other `read` refusals.
 - The core records what each read returned (the hash, or "absent"). The record decides whether a
-  file is shared ([plan-and-apply.md](plan-and-apply.md#3-steps)).
+  file is shared ([plan-and-apply.md](ch05-00-plan-and-apply.md#3-steps)).
 
 ## 6. Events
 
@@ -236,7 +236,7 @@ extension.
   `native` limited to this tool's entry.
 - `match` and `agents` are given as lists, as the pack hook format holds them. A hook that has none
   has no `match` or `agents` key.
-- `command` is the argv of the hook command line ([hooks.md](hooks.md#3-command-line)).
+- `command` is the argv of the hook command line ([hooks.md](ch06-02-hooks.md#3-command-line)).
 - A native hook always carries `kind` (`lua` or `message`), `event` (named as the tool names it),
   `match` as the list the pack format reader holds (left out when the hook has none), and `may_block`
   with `command` (a lua hook) or `text` (a message hook). It has no `agents`.
@@ -277,7 +277,7 @@ extension later skips it.
 - a core write of a root file is owned by its pack;
 - any other write (no `covers`, `covers` spanning several packs, `runtime.lua`) is owned by the tool.
 
-A shared file ([plan-and-apply.md](plan-and-apply.md#3-steps)) is never locked, so it has no `by`.
+A shared file ([plan-and-apply.md](ch05-00-plan-and-apply.md#3-steps)) is never locked, so it has no `by`.
 
 ## 8. Item ids and coverage
 
@@ -294,7 +294,7 @@ Ids are strings the `plan` payload hands out. The extension copies them and neve
 
 Every item the extension receives must be covered by an operation (write, copy or skip), otherwise
 the plan is refused. Root files are not items, because the core writes them. Items the core already
-skipped ([section 6](#missing-values)) are left out of the payload and need no cover.
+skipped ([section 6](#values)) are left out of the payload and need no cover.
 
 | Case | Result |
 |---|---|
@@ -307,7 +307,7 @@ skipped ([section 6](#missing-values)) are left out of the payload and need no c
 "Already covered at" names the first covering op.
 
 The `translate.lua` rule applies when `runtime.lua` is written and at least one lua hook is covered
-by a write. The contract for that file is in [hooks.md](hooks.md#6-translator-contract).
+by a write. The contract for that file is in [hooks.md](ch06-02-hooks.md#6-translator-contract).
 
 Two more refusals keep ids to their kind:
 
@@ -505,7 +505,7 @@ Where a refusal is located (the first three rows of the core's locations table):
 | `<tool>/<entry>`, no line | coverage, missing handler, Lua failure | `claude/adapter.lua: core/agent/coder got no operation (copy it, write it, or skip it with a reason)` |
 
 `<extension file>` is the file's path inside the extension, for example `claude/lib/settings.lua:3`.
-The full table is in [plan-and-apply.md](plan-and-apply.md#12-where-a-refusal-is-located).
+The full table is in [plan-and-apply.md](ch05-00-plan-and-apply.md#12-where-a-refusal-is-located).
 
 ## 13. `require_binary`
 
@@ -524,10 +524,10 @@ tool knows its own config:
 - **Run the hook argv from the project directory.** Make the tool run the hook's argv with the
   project directory as its working directory, and turn the argv into the tool's command string with
   its own quoting. Example: claude extension, `cd "$CLAUDE_PROJECT_DIR" && …`. See
-  [hooks.md](hooks.md#3-command-line).
-- **Write `<root>/translate.lua`** to the translator contract in [hooks.md](hooks.md#6-translator-contract).
+  [hooks.md](ch06-02-hooks.md#3-command-line).
+- **Write `<root>/translate.lua`** to the translator contract in [hooks.md](ch06-02-hooks.md#6-translator-contract).
 - **Filter by `match` and `agents`** in the tool's own config. The runtime does not filter.
 - **Render message hooks natively.** A message hook never reaches the runtime.
 - **Write a shim with `write`** when the tool demands another hook language. Example: OpenCode
   plugins are TypeScript, so the extension writes a thin TypeScript shim that only runs the argv and
-  forwards the payload and result ([hooks.md](hooks.md#9-shims-for-other-hook-languages)).
+  forwards the payload and result ([hooks.md](ch06-02-hooks.md#9-shims-for-other-hook-languages)).
