@@ -45,6 +45,7 @@ Proof convention:
 | D14 | Each skill's `SKILL.md` and its command are written; `invocation = "user"` writes `disable-model-invocation: true` (hidden from the model's list, still loadable by id) | `probes/skills-results.md` P2 |
 | D15 | prompt.submit and session.start run only for top-level sessions; tool hooks run in every session, with the subagent named on the event | a subagent's first prompt is the parent's instruction, sent with the prefix `You are a subagent spawned by another session.`, not a user prompt (`probes/plugin-session-results.md` P7); `ctx.session.get` gives `parentID` (`probes/followup-results.md` P7, `probes/docs/build-plugins/server.mdx:777`) |
 | D16 | The mock model and the check scenarios are Node scripts under `crates/agentstacks-cli/tests/opencode-check/`. They are test tooling, never installed into a project | the harness is the one proven here (`probes/harness/`); Node runs on the CI runner (§8.4) |
+| D17 | When a hook process exits 127 (sh could not find airsl), the shim adds one notice to the next top-level prompt of this OpenCode process: `agentstacks: airsl is not on PATH, so the agentstacks Lua hooks are not running. Install airsl, then run agentstacks doctor.` It stays fail-open | the shim discards stderr (§4.5 **Process**), so without it a missing airsl is silent at run time. Every Lua hook command starts with `airsl` (ch06-02 §3); `sh` exits 127 for a missing command and airsl exits 0 under `--fail-open` even for a missing script (`probes/review-results.md` R1). Proven in OpenCode: one notice after two failed hooks, session goes on (R1, ms-01); no change with airsl present (ms-02); not repeated for a later prompt or a new session of the same process, and a failure first seen in a tool hook told at the next prompt (R4) |
 
 ## 2. Architecture
 
@@ -275,7 +276,11 @@ Shape, values, key order and native keys follow claude §9.2 exactly: `---\n`, o
 per key with `airsstack.json.encode(value)`, `---\n`, then the body. Generated keys come in the
 order below; `meta.native` (only this tool's entry) replaces a generated key of the same name, and
 other native keys follow sorted by name. A native key that is not `^[A-Za-z0-9_-]+$` skips the item
-(§4.6). OpenCode decodes JSON-quoted scalars, escapes and flow lists in this frontmatter
+(§4.6). A value that is an empty table, generated or native, is written as `[]`: `encode` writes an
+empty table as `{}` (`probes/review-results.md` R2), and Lua cannot tell an empty list from an empty
+map, so the list form is chosen (`permissions: []` is the V2 form OpenCode reads,
+`probes/followup-results.md` P3). An empty table nested inside a value is written as `encode` gives
+it. OpenCode decodes JSON-quoted scalars, escapes and flow lists in this frontmatter
 (`probes/skills-results.md` P3, `probes/agents-results.md` P2).
 
 | Skill (`SKILL.md`) | Key | Proof |
@@ -290,8 +295,8 @@ other native keys follow sorted by name. A native key that is not `^[A-Za-z0-9_-
 | name | not written: the id comes from the file name; a frontmatter `name` is ignored | `probes/agents-results.md` P1 |
 | `description` | `description` | P1 |
 | (always) | `mode: "subagent"` | callable by the `subagent` tool, hidden from default selection (P1) |
-| `tools` | `permissions`: `{"action":"*","resource":"*","effect":"deny"}`, then one `{"action":<a>,"resource":"*","effect":"allow"}` per mapped tool in written order, duplicates dropped. Map: read→`read`, write→`edit`, edit→`edit`, grep→`grep`, glob→`glob`, shell→`shell`, skill→`skill` | P3 (a deny-all plus read and grep left exactly `grep, read, skill`); write and edit share the `edit` action |
-| no `tools` | `permissions: []` | keeps the file V2 and keeps the default rules (`probes/followup-results.md` P3) |
+| `tools` | `permissions`: the deny-all rule, then one allow rule per mapped tool in written order, duplicates dropped, encoded as one list with sorted keys: `[{"action":"*","effect":"deny","resource":"*"},{"action":"read","effect":"allow","resource":"*"}]` for `["read"]`. Map: read→`read`, write→`edit`, edit→`edit`, grep→`grep`, glob→`glob`, shell→`shell`, skill→`skill` | P3 (a deny-all plus read and grep left exactly `grep, read, skill`); the same list in `encode`'s sorted, unspaced bytes gave the same (`probes/review-results.md` R2); write and edit share the `edit` action |
+| no `tools` | `permissions: []` (the empty-table rule above) | keeps the file V2 and keeps the default rules (`probes/followup-results.md` P3) |
 | `tools = []` (empty, kept apart from absent, `src/types/frontmatter/agent/meta.rs:396`) | `permissions` holds only the deny-all rule | the same rule with no allow; the agent gets no tool it can use |
 | `model`, `effort` | not written; the subagent uses the parent's model | OpenCode has no tier; effort is a variant of one pinned model (`probes/agents-results.md` P4) |
 
@@ -352,9 +357,17 @@ index) becomes one entry or one skip. An entry is a table with these keys:
 
 | Native event (as written in `native/opencode/hooks.toml`) | `on` | `tools` |
 |---|---|---|
-| `tool.execute.before`, `tool.execute.after` | same name | the native `match` as written (OpenCode tool names); none → absent |
-| `session.prompt` | `session.prompt` | — (a native `match` here is skipped, §4.6) |
+| `tool.execute.before`, `tool.execute.after` | same name | the native `match` as written (OpenCode tool names); none or empty → absent (every tool) |
+| `session.prompt` | `session.prompt` | — (a non-empty native `match` here is skipped, §4.6) |
 | any other | skipped (§4.6) | — |
+
+A hook is native when it comes from the pack's `native.hooks` list, never by its event name: the
+adapter passes that to `lib/hooks`, since a native hook's event is free text and can equal a neutral
+name (`src/types/hooks/native/hook.rs:1-19`). The core refuses an empty neutral `match`
+(`src/types/hooks/neutral.rs:184`) but passes an empty native one; an empty native `match` counts as
+none, as the claude extension renders it `"matcher": ""` (`probes/review-results.md` R3), which
+Claude Code reads as every tool (`2026-11-20-cli-and-claude-extension/probes/docs/hooks.md:281`).
+So an entry's `tools` and `match`, when present, are never empty lists (`encode` would write `{}`, R2).
 
 The packs' `agents` key is allowed only on `agent.stop` (`src/types/hooks/neutral.rs:212`), which is
 skipped, so no entry needs an agent filter.
@@ -368,7 +381,8 @@ The table's last line is `];`; the file ends with `};` and a newline. Each entry
 `extensions/claude/lib/hooks.lua:124`), one per line, joined by `,\n  `; with no entries the table
 line is `const HOOKS = [];`. This shim, with a hand-built table, ran in OpenCode v2.4.1 and gave
 every behaviour of §4.5 and §4.7 (`probes/shim-results.md`; with stderr ignored and in a CommonJS
-project, `probes/fix-results.md` F3).
+project, `probes/fix-results.md` F3; the airsl notice, this exact fixed body,
+`probes/review-results.md` R1).
 
 ```js
 // agentstacks hook shim for OpenCode, api 0. Written by `agentstacks apply`; edits are drift.
@@ -387,6 +401,11 @@ Fixed body:
 ```js
 const ROOT = fileURLToPath(new URL("../../", import.meta.url)).replace(/\/+$/, "");
 const TIMEOUT_MS = 60000;
+const AIRSL_MISSING =
+  "agentstacks: airsl is not on PATH, so the agentstacks Lua hooks are not running. Install airsl, then run agentstacks doctor.";
+
+// Set when sh could not find a hook command's program (exit 127): every Lua hook runs airsl.
+let airslMissing = false;
 
 // Runs one hook command under sh from the project root, with `payload` as JSON on stdin.
 // Resolves to its stdout, or null when it cannot run or runs past the timeout.
@@ -422,8 +441,9 @@ function run(command, payload) {
     child.stdout.on("data", (chunk) => {
       out += chunk;
     });
-    child.on("close", () => {
+    child.on("close", (code) => {
       clearTimeout(timer);
+      if (code === 127) airslMissing = true;
       finish(out);
     });
     child.stdin.on("error", () => {});
@@ -468,6 +488,7 @@ export default {
   setup: async (ctx) => {
     const parents = new Map();
     const started = new Set();
+    let told = false;
     const held = new Map();
 
     async function parentOf(sessionID) {
@@ -533,6 +554,10 @@ export default {
         }
         const r = await dispatch(["prompt.submit", "session.prompt"], null, { ...payload, prompt: e.prompt.text });
         if (r.context) parts.push(r.context);
+        if (airslMissing && !told) {
+          told = true;
+          parts.push(AIRSL_MISSING);
+        }
         if (parts.length > 0) e.prompt.text = e.prompt.text + "\n\n" + parts.join("\n");
       } catch {}
     });
@@ -550,7 +575,7 @@ export default {
 | `shell.create.before` | none | sets `AGENTSTACKS_PROJECT_DIR` = project root in the agent's shell, main and subagent | `probes/followup-results.md` P2; `probes/shim-results.md:439` |
 | `tool.execute.before` | `tool.before`, `tool.execute.before` whose `tools` holds the tool | block → `throw new Error(<block>\n<context>)`: the tool does not run and the model sees `{"error":{"type":"unknown","message":"<text>"},"content":[]}`. Context → held under the call id | `probes/plugin-tool-results.md` P4; `probes/shim-results.md:433`, `:445` |
 | `tool.execute.after` (status `completed` only) | `tool.after`, `tool.execute.after` | held and new contexts joined with `\n`, appended as one `{type:"text"}` item to `result.content`; block → throw (the tool already ran, the model sees the error with the text) | `probes/followup-results.md` P5, P6; `probes/shim-results.md:435`, `:437` |
-| `session.prompt` (top-level sessions only) | first prompt of a session id in this process: `session.start` (source `startup`); every prompt: `prompt.submit`, `session.prompt` | contexts (and a session.start block, as context) appended to `prompt.text` after a blank line, joined with `\n` | `probes/plugin-session-results.md` P2; `probes/shim-results.md:431` |
+| `session.prompt` (top-level sessions only) | first prompt of a session id in this process: `session.start` (source `startup`); every prompt: `prompt.submit`, `session.prompt` | contexts (and a session.start block, as context), then the airsl notice once (D17), appended to `prompt.text` after a blank line, joined with `\n` | `probes/plugin-session-results.md` P2; `probes/shim-results.md:431`; `probes/review-results.md` R1 |
 
 **Payload on stdin** (the "raw payload" the translator and native hooks see):
 
@@ -580,20 +605,36 @@ failure, a process running past 60 s (killed), stdout that is not a JSON object,
 exception inside the shim. A plugin that fails to load at all is shown only in OpenCode's log file
 (`probes/plugin-tool-results.md` P1d); §8.3 S1 catches that before release.
 
+**Missing airsl (D17).** A hook process that exits 127 sets `airslMissing` for this OpenCode process.
+The next top-level prompt hook appends `AIRSL_MISSING` after any other context and sets `told`; a
+later prompt, in the same session or a new one, served by the same process does not repeat it, and a
+new process tells it again if airsl is still missing. A failure first seen in a tool hook is told at
+the next prompt (`probes/review-results.md` R1, R4). One process serves many sessions: `opencode run`
+without `--standalone` uses a background `opencode serve --service` that outlives the CLI
+(`probes/config-results.md:81-87`), so there the notice comes once per service start; it stays in the
+session history as part of that user message (§9). Nothing else changes: the hook gave no output, so
+no context and no block, and so every `may_block` guard is off while airsl is missing (R4, ms-03).
+Only exit 127 is told: an airsl on `PATH` without an execute bit makes sh exit 126 and gives no
+notice (R5); `plan` and `doctor` count such a file as missing (`book/src/ch05-00-plan-and-apply.md:369`).
+
 ### 4.6 Skips
 
-| Case | Item | Reason (exact) |
-|---|---|---|
-| a hook on `session.end` (any kind) | the hook | `opencode has no hook when a session ends` |
-| a hook on `agent.stop` (any kind) | the hook | `opencode has no hook when a subagent stops` |
-| a hook on `session.start` whose `match` does not hold `startup` | the hook | `opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match` |
-| a `may_block` lua hook on `prompt.submit`, or a `may_block` native lua hook on `session.prompt` (a native message hook there renders) | the hook | `opencode cannot block a prompt` |
-| a native hook on `session.prompt` with a `match` | the hook | `opencode has no matcher for session.prompt` |
-| a native hook on any event but the three of §4.4 | the hook | `opencode has no native hook event "<event>" (use tool.execute.before, tool.execute.after or session.prompt)` |
-| a hook whose text or argv holds `${OPENCODE_SESSION_ID}` | the hook | `opencode gives hooks the session id in the event (event.session_id), not as {{var session_id}}` |
-| a lua argv element with a `$` left after removing every var form present in `values.vars`, longest first (claude §9.4) | the hook | `opencode runs hook commands through sh, which would expand the literal $ in argument "<arg>"` |
-| a native key that is not a plain word | the skill (group) or agent | `native.opencode key "<key>" cannot be written as frontmatter` |
+| # | Case | Applies to | Item | Reason (exact) |
+|---|---|---|---|---|
+| 1 | a hook on `session.end` (message or lua) | neutral hooks | the hook | `opencode has no hook when a session ends` |
+| 2 | a hook on `agent.stop` (message or lua) | neutral hooks | the hook | `opencode has no hook when a subagent stops` |
+| 3 | a hook on `session.start` whose `match` does not hold `startup` | neutral hooks | the hook | `opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match` |
+| 4 | a `may_block` lua hook on `prompt.submit` (neutral), or on `session.prompt` (native); a message hook on either renders | both, by those event names | the hook | `opencode cannot block a prompt` |
+| 5 | a hook on `session.prompt` with a non-empty `match` | native hooks | the hook | `opencode has no matcher for session.prompt` |
+| 6 | a hook on any event but `tool.execute.before`, `tool.execute.after` and `session.prompt` | native hooks | the hook | `opencode has no native hook event "<event>" (use tool.execute.before, tool.execute.after or session.prompt)` |
+| 7 | a hook whose text or argv holds `${OPENCODE_SESSION_ID}` | both | the hook | `opencode gives hooks the session id in the event (event.session_id), not as {{var session_id}}` |
+| 8 | a lua argv element with a `$` left after removing every var form present in `values.vars`, longest first (claude §9.4) | both | the hook | `opencode runs hook commands through sh, which would expand the literal $ in argument "<arg>"` |
+| 9 | a native key that is not a plain word | skills, agents | the skill (group) or agent | `native.opencode key "<key>" cannot be written as frontmatter` |
 
+A rule applies only to the hooks its "Applies to" names (native = from `native.hooks`, §4.4). So a
+native hook is judged by rules 4 (on `session.prompt` only) to 8, and one whose event text is
+`session.end`, `agent.stop`, `session.start` or `prompt.submit` gets rule 6, naming its event, even
+when it is a `may_block` lua hook; a neutral hook never reaches rules 5-6.
 Rules are checked in table order; the first that applies gives the reason. Every other item has an
 OpenCode form (§4.2-§4.4), so nothing else is skipped. Items the core already skipped for a missing
 value never reach the extension (ch06-01 §6).
@@ -780,7 +821,9 @@ operations go through the core's existing checks (ch06-01 §9). Owners:
 | a message hook with a newline, `"` or `\` | JSON-encoded in the table, so the shim gets the exact text | `lib/plugin` |
 | a hook process prints nothing, or non-JSON | no context, no block | shim |
 | a hook process hangs | killed after 60 s, no context, no block | shim |
-| airsl missing from `PATH` | `require_binary` refuses at plan when a locked pack needs airsl (ch06-02 §10); if it disappears later, sh fails, the shim gets empty stdout and goes on | core, shim |
+| airsl missing from `PATH` | `require_binary` refuses at plan when a locked pack needs airsl (ch06-02 §10); if it disappears later, sh exits 127, each Lua hook gives nothing (so no `may_block` guard blocks), and the model is told once per OpenCode process at the next top-level prompt (D17, `probes/review-results.md` R4); `doctor` reports it. An airsl without an execute bit gives exit 126 and no notice (R5) | core, shim (documented) |
+| a native frontmatter value that is an empty table (`permissions = []`) | written `[]` (§4.2) | `lib/frontmatter` |
+| a native hook with `match = []` | the same as no `match`: every tool, and on `session.prompt` it renders (`probes/review-results.md` R3) | `lib/hooks` |
 | the user edits `agentstacks.js` | drift: `doctor` reports it; `apply` restores it (core) | core |
 | the user removes the `opencode` tool | the core deletes every locked file of the tool, the shim included | core |
 | a nested agentstacks project inside another | OpenCode loads `.opencode/` from every parent (`probes/config-results.md` P5), so two shims with the same id would load. Not supported; the book says so | documented |
@@ -805,10 +848,17 @@ One `<module>_test.lua` per `lib/` module, plain values in, asserted out:
 
 - `values_test`: root; skill invoke and dir; agent names; each var; a var not in the payload absent.
 - `frontmatter_test`: skill with and without `invocation = user`; `argument_hint` not written; agent
-  with no tools (`permissions: []`), with `tools = []` (deny-all only), with
-  `["read","write","edit","grep"]` (deny-all, then `read`, `edit`, `grep`); native key replaces a generated one; bad native key → `nil` plus the §4.6 reason;
+  with no tools (the literal `permissions: []`), with `tools = []` (deny-all only, byte exact), with
+  `["read","write","edit","grep"]` (deny-all, then `read`, `edit`, `grep`, in `encode`'s sorted
+  bytes); native key replaces a generated one; a native `permissions = []` on an agent and an empty
+  native list on a skill both written `[]`; bad native key → `nil` plus the §4.6 reason;
   command text for `core-discuss`, byte exact.
-- `hooks_test`: each row of §4.4 and every skip row of §4.6 with its exact reason; quoting of an
+- `hooks_test`: each row of §4.4 and every skip row of §4.6 with its exact reason, including: a
+  native `session.prompt` message hook and a native `session.prompt` lua hook without `may_block`
+  (both render, no `tools`), and one with `match = []` (renders); a native `tool.execute.before`
+  hook with no `match` and one with `match = []` (no `tools`); a neutral `session.start` hook with no
+  `match` (renders); native hooks on `session.end`, `agent.stop`, `session.start` and a `may_block`
+  lua one on `prompt.submit` (each rule 6, naming its event). Quoting of an
   argv element holding a `"`, a `\` and a backtick (claude §9.4 example); the `$` rule with `^a$`
   (skip) and `${TMPDIR:-/tmp}/x` (render).
 - `plugin_test`: header and body exact; empty table → `const HOOKS = [];`; two entries joined with
@@ -863,6 +913,7 @@ files left):
 | S4 | hooks: prompt, write `blocked.txt`, write `ok.txt`, read, shell `echo "$AGENTSTACKS_PROJECT_DIR"` | the first user message holds the session.start and prompt contexts; `blocked.txt` absent and its error carries the block reason; `ok.txt` result carries the before context; read result carries the after context; shell prints the project root |
 | S5 | patch: project model `mock/gpt-5`, a patch adding `blocked.txt` and updating a file, then a patch adding `ok2.txt` | the first patch blocked with `CHECK-BLOCK blocked.txt` and nothing written; the second applied with `CHECK-BEFORE ok2.txt` in its result (hook 3 matches `write`; the shape of `probes/shim-results.md:443-449`) |
 | S6 | command: `opencode api --standalone session.command` with the user-only skill's command and text `a b`, then `opencode run --session <id>` | the model receives the expanded body with `Load the skill` and `a b` (`probes/config-results.md` P1b) |
+| S7 | missing airsl, in one `opencode serve --port <p>` process started with `PATH` minus every directory holding an `airsl` file and with `OPENCODE_PASSWORD` set, driven by `opencode run --server http://127.0.0.1:<p> --auto` clients (the shape of `probes/review-results.md` R4): prompt 1 `hello`, in which the model writes `blocked.txt`; prompt 2 `again` in the same session (`--session <id>`) | prompt 1's user message holds `CHECK-WELCOME` and ends with the D17 notice, exactly once, with `CHECK-START` and `CHECK-PROMPT` absent; `blocked.txt` is written (the guard is off); prompt 2's user message holds no notice; both clients exit 0 |
 
 ### 8.4 Task and CI
 
@@ -901,7 +952,13 @@ files left):
 - `README.md` and `CLAUDE.md` Status: the opencode extension is built; the layout lists
   `extensions/opencode/`; Commands lists `cargo make opencode-check`. The stale lines change too:
   `CLAUDE.md:66` and `README.md:149` ("OpenCode plugins are TypeScript") become "OpenCode hooks are
-  JavaScript plugins", and `README.md:163` ("opencode/ planned") becomes "opencode/ built".
+  JavaScript plugins", and `README.md:163` ("opencode/ planned") becomes "opencode/ built". Also
+  `README.md:7` ("OpenCode is not here yet"), `README.md:106` (`| OpenCode | Planned |`),
+  `book/src/introduction.md:18` ("Claude Code is the one supported tool") and `CLAUDE.md:113`
+  ("claude is built") name OpenCode as built.
+- `ch05-00-plan-and-apply.md:372-373` ("A missing airsl after install is caught in two ways: the
+  tool's own error for a missing command, and `doctor`") adds that under OpenCode the error is the
+  shim's one-time notice to the model (D17).
 - Changelog entries: `crates/agentstacks/CHANGELOG.md` (the runtime change, saying existing projects
   see `update <root>/runtime.lua` once, and `opencode` as an official tool),
   `crates/agentstacks-cli/CHANGELOG.md` (`--tool opencode`) and `packs/CHANGELOG.md` (the opencode
@@ -917,6 +974,9 @@ files left):
 - A resumed session gets `session.start` as `startup` again in a new OpenCode process (§6).
 - A hook's stderr is discarded, including the runtime's "tried to block but is not declared
   may_block" line.
+- With airsl missing, every Lua hook is off, guards included; the model is told once per OpenCode
+  process (once per background-service start), and an airsl without an execute bit is not told at
+  all (§4.5 **Missing airsl**). `doctor` checks the airsl pin against the binary it finds (`src/app/doctor.rs:60-61`).
 - Context added to a prompt becomes part of the stored user message: the user sees it in the history,
   and OpenCode's title request reads it (`probes/plugin-session-results.md` P2).
 - Files written by `shell`, `generate_image` or `generate_video` (optional `path`, which overwrites,
@@ -927,9 +987,9 @@ files left):
 
 | # | Risk | Owner |
 |---|---|---|
-| K1 | The Linux build has not run here (D6). The first CI run of `opencode-check` proves it; if it fails, the plan that adds the CI job reports it | CI plan, execute |
-| K2 | OpenCode V2 moves fast: v2.3.2 on 2026-11-18, v2.4.1 on 2026-11-23 (`probes/cadence-results.md`). The pin holds the check steady; a bump re-runs S1-S6 | maintainers |
-| K3 | Every OpenCode API the shim calls is documented (§4.5 sources); none is `experimental` (D2). A V2 release could still change them; S1-S6 catch that at the next pin bump | maintainers |
+| K1 | The Linux build has not run here (D6), nor Linux `/bin/sh` exiting 127 for a missing airsl (D17, proven on macOS). The first CI run of `opencode-check` proves both (S7); if it fails, the plan that adds the CI job reports it | CI plan, execute |
+| K2 | OpenCode V2 moves fast: v2.3.2 on 2026-11-18, v2.4.1 on 2026-11-23 (`probes/cadence-results.md`). The pin holds the check steady; a bump re-runs S1-S7 | maintainers |
+| K3 | Every OpenCode API the shim calls is documented (§4.5 sources); none is `experimental` (D2). A V2 release could still change them; S1-S7 catch that at the next pin bump | maintainers |
 
 ## 11. Handed to other chains
 
