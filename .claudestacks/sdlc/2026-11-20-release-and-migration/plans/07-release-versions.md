@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 built-on: d3463785d0cb
 ---
@@ -208,3 +208,21 @@ passing (spec P51).
 - `cargo make dod` green (includes the pack text gates).
 - `cargo publish --workspace --dry-run --allow-dirty` exits 0 with the four versions.
 - `cargo make claudevs-check` and `cargo deny check` green.
+
+## Review findings
+
+- F4 🔵 `crates/agentstacks-cli/README.md:16` doubled subject in the airsl note — fixed: reworded to
+  "Note: this route does not install airsl, …"; `task1.sh` re-run: `PASS PASS PASS`, claudevs links PASS.
+- F5 🔵 nothing in dod or CI guards the release versions, `publish = true` or the changelog text
+  against a later reversion — open (noted; no check asked for by this plan).
+
+## Deviations
+
+- 2026-11-24 — The tasks ran in one coder for the whole plan, not one coder per task; the
+  task-briefer was not used (the coder read each task from this file). Commits were made per task
+  with this plan's messages (the plan names them), by the orchestrator after review.
+- 2026-11-24 — The two new crate READMEs link to the book, docs.rs, crates.io and the repository
+  README by absolute `https://` URL (the plan's `readme-links-absolute` check); a License line and a
+  docs.rs link were added beyond the task text.
+- 2026-11-24 — `cargo make dod`, `cargo make claudevs-check` and `cargo deny check` run once by the
+  orchestrator after the wave: all exit 0.

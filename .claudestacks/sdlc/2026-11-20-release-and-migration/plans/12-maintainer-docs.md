@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 depends-on: [08, 10]
 built-on: d3463785d0cb
@@ -131,3 +131,32 @@ CLAUDE.md      — modify: status heading, layout, dist line, CI sentence, archi
 ## Proof
 
 - Every check above passes; `cargo make dod` green.
+
+## Review findings
+
+- 🔵 `CLAUDE.md:23` the layout block names only `ci.yml` of the workflows — open.
+- 🔵 `CLAUDE.md:75` line past the ~100-column wrap — fixed: rewrapped; `check.py all` → 15 PASS,
+  0 FAIL.
+- 🔵 `RELEASING.md:22` "tags the merged release commit with all five" vs step 4's recovery — open
+  (spec §4.3 text).
+- 🔵 `RELEASING.md:48,59` "M9" is a spec identifier in a shipped doc — open (spec text, explained
+  at :59).
+- 🔵 `RELEASING.md:80` steps 11–12 name the org root and the sdlc milestone command — open (spec
+  text).
+- 🔵 `RELEASING.md:90-94` only the banner's first line carries `>` — declined: it sits in a `text`
+  block, shown as the literal text to paste.
+- 🔵 `RELEASING.md:97` "above line 53" cites a line number in claudestacks — open (spec text; the
+  quoted line also anchors it).
+
+## Deviations
+
+- 2026-11-24 — `RELEASING.md` drops the spec's "(this chain's work)", the `P<n>` citations and the
+  "(§8.1)" pointer, and inlines or links §8.2/§8.3 as its own sections: planning vocabulary does not
+  ship in the runbook. Step lead words and every command are unchanged (`steps-complete` passes).
+- 2026-11-24 — The packs-update reference links `book/src/ch05-00-plan-and-apply.md` instead of the
+  spec's `docs/plan-and-apply.md:336` (moved by plan 10).
+- 2026-11-24 — The layout entries for `dist-workspace.toml` and `install/` carry short descriptions
+  of my choosing; the spec only says the block gains them.
+- 2026-11-24 — Ran in parallel with plan 11 (disjoint files). One coder for both tasks; no
+  task-briefer. Commits per task with this plan's messages, by the orchestrator.
+- 2026-11-24 — `cargo make dod` run once by the orchestrator after the wave: exit 0.

@@ -1,8 +1,9 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 depends-on: [09]
 built-on: d3463785d0cb
+disproves: d3463785d0cb
 ---
 
 # Book Implementation Plan
@@ -298,3 +299,48 @@ installers beside it.
 
 - The §7.7 build step exits 0; every relative href resolves; `book/src/` holds 41 files.
 - `cargo make dod` green.
+
+## Review findings
+
+- C1 🔴 `book/src/ch02-00-packs.md:11` gave journal's needs as "airsl ≥0.1.5" only;
+  `packs/journal/pack.toml:9-11` has `[requires] packs = ["core"]` — fixed: the row reads "`core` and
+  airsl ≥0.1.5" and the refusal sentence names `sdlc` or `journal`; `bash task4-checks.sh` exit 0
+  (`PASS migration-sections`, `PASS setup-ends`, `PASS rename-coverage`, `PASS no-planning-paths`),
+  `bash task5-checks.sh` exit 0.
+- C2 🟡 `book/src/ch03-00-migration.md:46,94` said only `sdlc` requires `core` — fixed: line 46
+  names `sdlc` and `journal`; a bullet "`journal` requires `core` too." follows the sdlc bullet.
+- C3 🔵 installation chapter says agentstacks/`plan` need airsl, true only for the core, sdlc and
+  journal packs — open (the wording follows the spec's installation texts).
+- C4 🔵 official names need `git` on PATH; the installation chapter does not say so — open.
+- C5 🔵 `update` prints a `note …` line per source before `nothing to update` — fixed: "it prints:"
+  → "it ends with:".
+- C6 🔵 `marketplace remove` also removes cmux — declined: line 42 already says it uninstalls
+  `claudestacks-cmux` too.
+- C7 🔵 "forwards here once that change lands" — fixed: "will forward here."
+- C8 🔵 link texts still read old file names (`architecture.md` …) — open: the spec §7.6 map limits
+  the move to link targets.
+- C9 🔵 the two book usage lines in `Makefile.toml`'s header were not column-aligned — fixed.
+- C10 🔵 `cargo make book-build` exits 0 on a missing include, while CI and Pages fail on `[ERROR]`
+  lines — open (the tasks are copied verbatim from claudestacks).
+- C11 🔵 no permanent check catches a relative pack README link, a broken anchor or a stale count —
+  open (spec §10/§13 accept this).
+
+## Deviations
+
+- 2026-11-24 — Spec §7.6 (the ch02-00 bullet: "`core`, `journal` → airsl ≥0.1.5") is contradicted
+  by the code: `grep -n -A3 requires packs/journal/pack.toml` → `9:[requires]` /
+  `10:packs = ["core"]` / `11:airsl = ">=0.1.5"`. Built instead: journal needs `core` and airsl
+  ≥0.1.5, in the packs table and the migration chapter. `disproves: d3463785d0cb` set.
+- 2026-11-24 — One coder ran all six tasks; the task-briefer was not used. Commits per task with
+  this plan's messages, made by the orchestrator after review.
+- 2026-11-24 — Task 4's chapters were written before their check script; the red state was shown by
+  moving the seven files away (8 of 9 checks failed; `init-has-core` passes vacuously).
+- 2026-11-24 — A short comment above each `Build the book` step says why it also fails on
+  `[ERROR]` lines; the `run:` body is byte-equal to spec §7.7. The Pages copy step is named "Add the
+  installers".
+- 2026-11-24 — Makefile placement: the two usage lines follow the `cargo make deny` line; the Book
+  section sits between "Supply chain" and "Development helpers".
+- 2026-11-24 — The link check saw 884 relative hrefs (the probe's 843 used placeholder chapters);
+  0 broken.
+- 2026-11-24 — `cargo make dod`, `cargo make claudevs-check`, `cargo deny check` and
+  `cargo make book-build` (0 `[ERROR]` lines) run once by the orchestrator: all exit 0.

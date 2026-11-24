@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 built-on: d3463785d0cb
 ---
@@ -98,3 +98,19 @@ until airsdk; the airsstack and airsdk entries stay planned.
 ## Proof
 
 - Every check above passes. The three files are left uncommitted for the author.
+
+## Review findings
+
+- F6 🔵 lines the plan does not touch (`README.md:45,86-89,117,177`, `CLAUDE.md:37,56,120,126-127`
+  in the org root) still place claudevs and the Lua plugins in claudestacks and the clone loop omits
+  agentstacks — open, outside this plan; the author's call at spec §9 step 11.
+
+## Deviations
+
+- 2026-11-24 — `table-shape` on the org profile README was checked by reading the file, not by the
+  script: the worktree guard refuses any shell command naming that directory. The reviewer
+  re-checked it: every row has the header's column count.
+- 2026-11-24 — The profile's "Where we are heading" row still reads "claudevs moves here." It is the
+  record of the move, so it was left as is.
+- 2026-11-24 — `cargo make dod` (no repository file changes here) run once by the orchestrator:
+  exit 0.

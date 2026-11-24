@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 built-on: d3463785d0cb
 ---
@@ -170,3 +170,24 @@ the exact spec §5.5 text with these substitutions.
 - Both scripts pass `sh -n` under `/bin/sh` and `/bin/dash`; the `installers` job body passes
   locally.
 - `cargo make dod` green.
+
+## Review findings
+
+- F1 🟡 `install/install.sh:11` header said agentstacks needs airsl "to run extensions" (extensions
+  run on the embedded airsl library; the binary is for pack hooks and `plan`) — fixed: reworded;
+  `shellcheck install/install.sh` clean, `sh task1.sh` → `FAILS=0`.
+- F2 🔵 the scripts' header cites the Pages workflow `pages.yml`, created by plan 10 — open until
+  plan 10 lands.
+- F3 🟡 CI checks only parse, M1 and M2 (what this plan asks); M3–M10 and the airsl branching have
+  no committed reversion guard — open.
+
+## Deviations
+
+- 2026-11-24 — One coder ran all three tasks; the task-briefer was not used. Commits per task with
+  this plan's messages, made by the orchestrator after review.
+- 2026-11-24 — The live checks (`latest-no-release-m5`, `pinned-unreleased-m7`) compare only the
+  script's own prefixed stderr lines: real `curl -sS` adds its own `curl: (56) … 404` line. The stub
+  checks and the CI job compare stderr exactly.
+- 2026-11-24 — `dist-installer-fails` asserts no `airsl` text at all in stderr, a stricter form of
+  "no M8/M9".
+- 2026-11-24 — The scripts carry no executable bit (run with `sh`, as airsl's pointer).

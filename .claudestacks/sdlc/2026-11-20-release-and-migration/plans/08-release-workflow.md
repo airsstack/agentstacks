@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 depends-on: [07]
 built-on: d3463785d0cb
@@ -154,3 +154,25 @@ it serves two apps, is never triggered alone, and runs `aarch64-apple-darwin` on
 
 - `dist plan` exits 0 untagged and for both binary tags; `cmp` shows both spec blocks unchanged.
 - `cargo make dod` green.
+
+## Review findings
+
+- C12 🔵 `allow-dirty` turns off dist's drift check, so a regenerate that drops the `on:` edit
+  would not be caught (this plan's Risks name it) — open.
+- C13 🔵 the three files were intent-to-add only when reviewed — fixed: added and committed as
+  `9a3e0dc` and `0fbb4ea`.
+
+## Deviations
+
+- 2026-11-24 — One coder ran both tasks; the task-briefer was not used. Commits per task with this
+  plan's messages, made by the orchestrator after review. dist 0.33.1; `dist generate` left
+  `Cargo.toml` unchanged.
+- 2026-11-24 — The smoke step names are not given by the plan; chosen: "Unpack, and point BIN at
+  the binary", "Reports the version being released", "Agentstacks project initialises, plans and
+  is healthy", and the three claudevs step names kept from claudestacks.
+- 2026-11-24 — `agentstacks-steps-local` ran the step bodies in a scratch workspace (holding
+  `extensions/`, `packs/guideline-rust` and the fixtures) so `.smoke/` stayed out of the worktree;
+  `PATH=/nonexistent` applied to the binary through a launcher, since the step body needs `cp` and
+  `grep`.
+- 2026-11-24 — `cargo make dod`, `cargo make claudevs-check`, `cargo deny check` run once by the
+  orchestrator after the wave: all exit 0.

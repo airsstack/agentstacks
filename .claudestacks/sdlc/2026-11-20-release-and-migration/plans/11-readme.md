@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 depends-on: [10, 12]
 built-on: d3463785d0cb
@@ -98,3 +98,23 @@ README.md   — modify: status, Install, Usage, Tools, Extending, Packs, Layout,
 ## Proof
 
 - Every check above passes; `cargo make dod` green.
+
+## Review findings
+
+- 🟡 `README.md:72` "`init` writes the manifest…" followed the local-paths block, whose `init`
+  writes `path = …` entries, not the git/tag tables shown — fixed: "The official-names `init` above
+  writes the manifest that the project commits:"; all seven plan checks re-run, each exit 0.
+- 🔵 `README.md:166` the spec's `book/` line runs past the tree's `built` column — open (the spec
+  sets the line word for word).
+- 🔵 `README.md:167` "release checklist" vs "runbook" elsewhere — fixed: "release runbook", column
+  kept.
+- 🔵 nothing permanent guards these doc edits against a revert — open (spec §13 rules out a link
+  checker).
+
+## Deviations
+
+- 2026-11-24 — Ran in parallel with plan 12 (disjoint files) instead of after it; `raw-link-target`
+  was re-run by the orchestrator once `RELEASING.md` existed: exit 0. One coder; no task-briefer.
+- 2026-11-24 — The layout tree's `install/` and `RELEASING.md` rows align to the existing status
+  column; the `book/` line is the spec §7.2 line verbatim.
+- 2026-11-24 — `cargo make dod` run once by the orchestrator after the wave: exit 0.
