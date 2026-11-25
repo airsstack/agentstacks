@@ -50,7 +50,7 @@ use crate::types::tokens::TokenTarget;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]
@@ -82,7 +82,7 @@ use crate::types::tokens::TokenTarget;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]

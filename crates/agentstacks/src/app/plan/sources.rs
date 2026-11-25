@@ -24,11 +24,11 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
 
-use crate::app::plan::read::{Inputs, PROJECT_FILE};
+use crate::app::plan::read::Inputs;
 use crate::port::{EntryKind, FileTree, Git, Workspace};
 use crate::types::lock::LockedSource;
 use crate::types::plan::{Note, StepError};
-use crate::types::project::{CommitId, Pin, Source};
+use crate::types::project::{CommitId, PROJECT_FILE, Pin, Source};
 use crate::types::report::{Diagnostic, Diagnostics, Location};
 use crate::types::resolve::{FetchError, Reconciled, SourceKey, check_tree, reconcile};
 use crate::types::tree::{ContentHash, tree_hash};
@@ -329,7 +329,7 @@ mod tests {
     const PATH_PACK: &str = "path = \"packs/core\"";
 
     fn project(tool_source: &str, pack_source: &str) -> String {
-        format!("api = 0\n\n[tools.claude]\n{tool_source}\n\n[packs.core]\n{pack_source}\n")
+        format!("api = 1\n\n[tools.claude]\n{tool_source}\n\n[packs.core]\n{pack_source}\n")
     }
 
     fn git_pack(tag: &str) -> String {
@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn fetch_sources_refuses_a_path_source_outside_the_project() -> TestResult {
         let text = format!(
-            "api = 0\n\n[tools.claude]\n{PATH_TOOL}\n\n[packs.team-lint]\npath = \"packs/team-lint\"\n"
+            "api = 1\n\n[tools.claude]\n{PATH_TOOL}\n\n[packs.team-lint]\npath = \"packs/team-lint\"\n"
         );
         let outside = local("packs/team-lint")?;
         let scenario = with_tool_tree(Scenario::new(&text))?

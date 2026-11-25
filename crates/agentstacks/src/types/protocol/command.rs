@@ -24,7 +24,7 @@ use crate::types::protocol::{Blocking, HookKind, HookModule, RUNTIME_FILE};
 /// use agentstacks::types::protocol::{Blocking, HookCommand, HookKind, HookModule};
 /// # use std::path::Path;
 /// # use agentstacks::types::{HookAction, PackManifest, PackName};
-/// # let text = "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
+/// # let text = "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\n\
 /// #     [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"hooks/enforce.lua\"\n";
 /// # let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), text)
 /// #     .map_err(|found| format!("{found:?}"))?;
@@ -166,7 +166,7 @@ mod tests {
 
     fn module(name: &str) -> Result<HookModule, Box<dyn std::error::Error>> {
         let text = format!(
-            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
+            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\n\
              [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"hooks/{name}.lua\"\n"
         );
         let manifest = PackManifest::parse(std::path::Path::new("packs/core/pack.toml"), &text)

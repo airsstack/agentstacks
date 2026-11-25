@@ -44,7 +44,7 @@ impl Diagnostic {
     /// use agentstacks::types::{Diagnostic, FieldError, Location};
     ///
     /// let diagnostic = Diagnostic::new(Location::file("pack.toml"), FieldError::UnknownKey);
-    /// assert_eq!(diagnostic.location().file_path(), std::path::Path::new("pack.toml"));
+    /// assert_eq!(diagnostic.location().file_path(), Some(std::path::Path::new("pack.toml")));
     /// assert_eq!(diagnostic.error().to_string(), "unknown key");
     /// ```
     #[must_use]

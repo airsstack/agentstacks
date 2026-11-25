@@ -5,7 +5,7 @@
 //!
 //! # Responsibilities
 //!
-//! - [`render_project`] writes `api = 0`, then the tool entries and the pack entries, each section
+//! - [`render_project`] writes `api = 1`, then the tool entries and the pack entries, each section
 //!   in name order, with a blank line before every entry.
 //! - A git source writes `git`, `tag` (or `rev`) and `subdir` in that order; a path source writes
 //!   one `path` key.
@@ -36,7 +36,7 @@ use crate::types::project::{Pin, Source};
 /// let team = (PackName::new("team")?, Source::Path(LocalPath::new("packs/team")?));
 /// assert_eq!(
 ///     render_project(&[], &[team]),
-///     "api = 0\n\n[packs.team]\npath = \"packs/team\"\n",
+///     "api = 1\n\n[packs.team]\npath = \"packs/team\"\n",
 /// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -68,7 +68,7 @@ fn section<'a>(entries: impl Iterator<Item = (&'a str, &'a Source)>) -> Item {
 }
 
 /// The keys of one entry, in the order `git`, `tag` or `rev`, `subdir`, or the single `path`.
-fn entry(source: &Source) -> Table {
+pub(super) fn entry(source: &Source) -> Table {
     let mut table = Table::new();
     match source {
         Source::Git { url, pin, subdir } => {
@@ -119,7 +119,7 @@ mod tests {
     fn official_set_renders_the_exact_bytes() -> TestResult {
         assert_eq!(
             official_set()?,
-            "api = 0\n\n[tools.claude]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"extensions/claude\"\n\n[packs.core]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"packs/core\"\n\n[packs.sdlc]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"packs/sdlc\"\n"
+            "api = 1\n\n[tools.claude]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"extensions/claude\"\n\n[packs.core]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"packs/core\"\n\n[packs.sdlc]\ngit = \"https://github.com/airsstack/agentstacks\"\ntag = \"packs-v0.1.0\"\nsubdir = \"packs/sdlc\"\n"
         );
         Ok(())
     }
@@ -157,7 +157,7 @@ mod tests {
         let text = render_project(&[], &[(PackName::new("core")?, source)]);
         assert_eq!(
             text,
-            "api = 0\n\n[packs.core]\ngit = \"https://github.com/airsstack/agentstacks\"\nrev = \"0123456789abcdef0123456789abcdef01234567\"\nsubdir = \"packs/core\"\n"
+            "api = 1\n\n[packs.core]\ngit = \"https://github.com/airsstack/agentstacks\"\nrev = \"0123456789abcdef0123456789abcdef01234567\"\nsubdir = \"packs/core\"\n"
         );
         Ok(())
     }

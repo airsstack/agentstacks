@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn agentstacks_table_has_exactly_the_api_zero_functions() -> TestResult {
+    fn agentstacks_table_has_exactly_the_api_one_functions() -> TestResult {
         assert_eq!(
             run(&keys_of("agentstacks"))?,
             "copy,json,on,read,require,require_binary,skip,write"

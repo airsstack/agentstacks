@@ -3,8 +3,8 @@
 //! # Responsibilities
 //!
 //! - [`SystemBinary`] looks a binary up in the directories of a `PATH` value, and runs the
-//!   `airsl` it finds there with `--version`. The `PATH` is a constructor argument, so a test never
-//!   changes the environment of the process.
+//!   `airsl` it finds there with `--version`, or with `test` over a directory. The `PATH` is a
+//!   constructor argument, so a test never changes the environment of the process.
 //! - A binary is found when a `PATH` entry holds a regular file of that name with an execute bit.
 //!   A symlink counts when it leads to such a file, and an empty entry is skipped, so the current
 //!   directory is never searched.
@@ -15,15 +15,14 @@
 //! the rules in `types::op`.
 
 use std::ffi::{OsStr, OsString};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::port::Binary;
-use crate::types::name::BinaryName;
+use crate::port::binary::LuaTestRun;
+use crate::types::name::{AIRSL, BinaryName};
 use crate::types::plan::{AirslAnswer, Exit};
-
-/// The binary `airsl_version` runs.
-const AIRSL: &str = "airsl";
 
 /// The executables on a `PATH`.
 ///
@@ -116,6 +115,22 @@ impl Binary for SystemBinary {
             // failure to run it, not an absent binary.
             Err(error) => AirslAnswer::SpawnFailed(error),
         }
+    }
+
+    fn airsl_test(&self, dir: &Path) -> io::Result<LuaTestRun> {
+        let program = self
+            .find(AIRSL)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "airsl not found on PATH"))?;
+        let output = Command::new(program)
+            .arg("test")
+            .arg(dir)
+            .stdin(Stdio::null())
+            .output()?;
+        Ok(LuaTestRun {
+            success: output.status.success(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
     }
 }
 
@@ -239,11 +254,23 @@ mod tests {
         Ok(())
     }
 
+    /// Whether the test must stop because `airsl` is not on `PATH`. It fails instead when
+    /// `AGENTSTACKS_REQUIRE_AIRSL` is set, so a missing binary cannot pass the suite unseen.
+    fn skip_without_airsl(binaries: &SystemBinary) -> Result<bool, Box<dyn Error>> {
+        if binaries.on_path(&name(AIRSL)?) {
+            return Ok(false);
+        }
+        if std::env::var_os("AGENTSTACKS_REQUIRE_AIRSL").is_some() {
+            return Err("airsl is not on PATH and AGENTSTACKS_REQUIRE_AIRSL is set".into());
+        }
+        println!("skipped: airsl is not on PATH");
+        Ok(true)
+    }
+
     #[test]
     fn real_airsl_prints_a_parsable_version() -> TestResult {
         let binaries = SystemBinary::from_env();
-        if !binaries.on_path(&name(AIRSL)?) {
-            println!("skipped: airsl is not on PATH");
+        if skip_without_airsl(&binaries)? {
             return Ok(());
         }
         let answer = binaries.airsl_version();
@@ -251,6 +278,47 @@ mod tests {
             matches!(&answer, AirslAnswer::Printed(text) if parse_airsl_version(text).is_some()),
             "{answer:?}"
         );
+        Ok(())
+    }
+
+    /// A directory holding one Lua test file whose single test has `body`.
+    fn lua_dir(body: &str) -> Result<tempfile::TempDir, Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        fs::write(
+            dir.path().join("sample_test.lua"),
+            format!("return {{\n  sample = function()\n    {body}\n  end,\n}}\n"),
+        )?;
+        Ok(dir)
+    }
+
+    #[test]
+    fn airsl_test_contract() -> TestResult {
+        let binaries = SystemBinary::from_env();
+        if skip_without_airsl(&binaries)? {
+            return Ok(());
+        }
+        let passing = lua_dir("assert(1 + 1 == 2)")?;
+        let run = binaries.airsl_test(passing.path())?;
+        assert!(run.success, "{run:?}");
+        assert_eq!(
+            run.stdout.lines().last(),
+            Some("1 passed, 0 failed (1 files)"),
+            "{run:?}"
+        );
+
+        let failing = lua_dir("assert(false, \"boom\")")?;
+        let run = binaries.airsl_test(failing.path())?;
+        assert!(!run.success, "{run:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn test_without_airsl_on_path_is_not_found() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let Err(error) = SystemBinary::new(None).airsl_test(dir.path()) else {
+            return Err("a missing airsl must be an error".into());
+        };
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
         Ok(())
     }
 }

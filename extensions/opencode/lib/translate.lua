@@ -4,7 +4,7 @@
 local M = {}
 
 local TEXT = [==[
--- agentstacks translator for opencode, api 0.
+-- agentstacks translator for opencode, api 1.
 local M = {}
 
 local TOOLS = { read = "read", edit = "edit", write = "write" }

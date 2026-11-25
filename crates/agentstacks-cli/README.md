@@ -26,7 +26,15 @@ agentstacks plan                             # show what apply would do, write n
 agentstacks apply                            # show the plan, ask, then write the files and the lock
 agentstacks doctor                           # report drift from agentstacks.lock
 agentstacks update                           # move to the newest pack tags, then plan and apply
+agentstacks ext add <SOURCE>                 # add a tool extension to agentstacks.toml, then plan and apply
+agentstacks ext test <EXTENSION>             # check an extension against the built-in conformance pack
 ```
+
+## Stability
+
+The command line (commands, flags and exit codes) and the extension API (`api = 1`) are frozen:
+1.x changes are additive only. See
+[the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html).
 
 ## Documentation
 

@@ -1,0 +1,36 @@
+## P5 airsl airsl 0.1.5: airsl test
+### pass
+stdout:
+<tmp>/pass/a_test.lua
+  ok    a
+
+1 passed, 0 failed (1 files)
+stderr:
+exit=0
+### fail
+stdout:
+<tmp>/fail/b_test.lua
+  FAIL  bad
+  ok    good
+
+1 passed, 1 failed (1 files)
+
+<tmp>/fail/b_test.lua: bad
+    runtime error: ...90nx4d32s72tqf5nw0000gn/T/tmp.EAgdoBIUiG/fail/b_test.lua:1: boom
+stack traceback:
+	[C]: in ?
+	[C]: in function 'assert'
+	...90nx4d32s72tqf5nw0000gn/T/tmp.EAgdoBIUiG/fail/b_test.lua:1: in function <...90nx4d32s72tqf5nw0000gn/T/tmp.EAgdoBIUiG/fail/b_test.lua:1>
+stderr:
+exit=1
+### empty
+stdout:
+stderr:
+airsl: no test files found under `<tmp>/empty`
+       a test file is named `*_test.lua` or `test_*.lua`
+exit=1
+### missing
+stdout:
+stderr:
+airsl: IO error for operation on <tmp>/missing: No such file or directory (os error 2)
+exit=1

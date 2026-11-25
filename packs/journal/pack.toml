@@ -2,8 +2,8 @@ exclude = ["README.md", "**/*_test.lua"]
 
 [pack]
 name        = "journal"
-version     = "0.2.0"
-api         = 0
+version     = "1.0.0"
+api         = 1
 description = "Session journal: capture, atomic notes, recall and review over a local vault"
 
 [requires]

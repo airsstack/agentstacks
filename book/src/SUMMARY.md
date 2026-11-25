@@ -14,12 +14,16 @@
   - [guideline-rust](ch02-04-guideline-rust.md)
   - [guideline-python](ch02-05-guideline-python.md)
 - [Moving from the claudestacks Plugins](ch03-00-migration.md)
+  - [Moving a Project from 0.x](ch03-01-from-0x.md)
 - [The Command Line](ch04-00-cli.md)
 - [Plan, Apply and the Lock](ch05-00-plan-and-apply.md)
 - [Writing a Tool Extension](ch06-00-authoring.md)
   - [The Extension API](ch06-01-extensions.md)
   - [Hooks](ch06-02-hooks.md)
   - [OpenCode](ch06-03-opencode.md)
+  - [Writing a Pack](ch06-04-pack-authoring.md)
+  - [The Pack Format](ch06-05-pack-format.md)
+  - [The 1.x Stability Promise](ch06-06-stability.md)
 - [Under the Hood](ch07-00-architecture.md)
 
 # claudevs

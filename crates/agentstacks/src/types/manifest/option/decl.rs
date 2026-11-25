@@ -1,7 +1,7 @@
 //! One option a pack declares.
 //!
-//! It is separate from `PackManifest` because an option's fields check one another (the default must
-//! fit the type), a rule of the declaration that the manifest should not carry beside its own
+//! It is separate from `PackManifest` because an option's fields check one another (the default
+//! must fit the type), a rule of the declaration that the manifest should not carry beside its own
 //! fields.
 //!
 //! # Responsibilities
@@ -37,7 +37,7 @@ use crate::types::manifest::error::ManifestError;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [options.retries]
@@ -66,7 +66,7 @@ use crate::types::manifest::error::ManifestError;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [options.retries]

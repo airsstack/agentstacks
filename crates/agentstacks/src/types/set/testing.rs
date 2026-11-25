@@ -27,7 +27,7 @@ use crate::types::set::check::check;
 use crate::types::set::valid::ValidSet;
 
 /// How the tests name the project file.
-pub(super) const PROJECT_FILE: &str = "agentstacks.toml";
+pub(super) use crate::types::project::PROJECT_FILE;
 
 /// The refusals as the text the author reads.
 pub(super) fn shown(diagnostics: &[Diagnostic]) -> Vec<String> {
@@ -59,7 +59,7 @@ pub(super) fn project(
     packs: &[(&str, &str)],
     tools: &[&str],
 ) -> Result<ProjectFile, Box<dyn Error>> {
-    let mut parts = vec!["api = 0\n".to_owned()];
+    let mut parts = vec!["api = 1\n".to_owned()];
     for tool in tools {
         parts.push(format!("[tools.{tool}]\npath = \"extensions/{tool}\"\n"));
     }
@@ -86,7 +86,7 @@ pub(super) fn extension_api(name: &str, api: i64) -> Result<Extension, Diagnosti
 
 /// An extension named `name`, loaded from an in-memory directory.
 pub(super) fn extension(name: &str) -> Result<Extension, Box<dyn Error>> {
-    extension_api(name, 0).map_err(|found| shown(&found.into_sorted()).join("; ").into())
+    extension_api(name, 1).map_err(|found| shown(&found.into_sorted()).join("; ").into())
 }
 
 /// A pack under construction.
@@ -190,7 +190,7 @@ impl PackSpec {
         let mut parts = vec![
             self.top.clone(),
             format!(
-                "[pack]\nname = \"{}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n",
+                "[pack]\nname = \"{}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n",
                 self.name
             ),
         ];
@@ -261,7 +261,7 @@ pub(super) fn run_check(
 ) -> Result<Result<ValidSet, Vec<String>>, Box<dyn Error>> {
     let extensions = tools
         .iter()
-        .map(|tool| (*tool, extension_api(tool, 0)))
+        .map(|tool| (*tool, extension_api(tool, 1)))
         .collect();
     run_check_with(packs, extensions)
 }

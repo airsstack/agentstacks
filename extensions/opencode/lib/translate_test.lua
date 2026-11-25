@@ -29,6 +29,6 @@ return {
 
   text_names_opencode = function()
     local first = translate.text():match("^[^\n]*")
-    assert(first == "-- agentstacks translator for opencode, api 0.", "first line was: " .. first)
+    assert(first == "-- agentstacks translator for opencode, api 1.", "first line was: " .. first)
   end,
 }

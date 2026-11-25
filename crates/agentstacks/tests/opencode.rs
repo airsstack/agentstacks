@@ -4,17 +4,17 @@
 //! runs the real `app::plan::plan` over it with `StdWorkspace` and `AirslAdapter`. What the
 //! extension proposes is compared with the checked-in files under
 //! `tests/fixtures/opencode/<case>/expected`, which are written from the rules of the opencode
-//! extension, with three exceptions: the expected `translate.lua` is the translator text itself, the
-//! header and body of the expected `agentstacks.js` are the fixed text of `lib/plugin.lua` (only its
-//! hook table is written by hand), and `both_tools_plan_without_clash` has no `expected` tree and
-//! checks that the paths of both tools are proposed.
+//! extension, with three exceptions: the expected `translate.lua` is the translator text itself,
+//! the header and body of the expected `agentstacks.js` are the fixed text of `lib/plugin.lua`
+//! (only its hook table is written by hand), and `both_tools_plan_without_clash` has no `expected`
+//! tree and checks that the paths of both tools are proposed.
 //!
 //! The translator tests run the `translate.lua` the full fixture expects, with the core runtime, on
 //! the real `airsl` binary and the payloads under `tests/fixtures/opencode/payloads`, and compare
 //! stdout with the hand-written files under `payloads/expected`.
 //!
-//! The plan tests of packs with lua hooks need the `airsl` binary because the plan checks it, and the
-//! translator tests need it because they run it; both stop early when it cannot run (see
+//! The plan tests of packs with lua hooks need the `airsl` binary because the plan checks it, and
+//! the translator tests need it because they run it; both stop early when it cannot run (see
 //! `skip_without_airsl`).
 
 pub mod common;
@@ -79,13 +79,13 @@ fn without_runtime(plan: &Plan) -> BTreeMap<String, String> {
 
 #[test]
 fn opencode_manifest_loads() -> TestResult {
-    // `Extension::load` refuses a manifest whose `api` is not the core's (0), so a load that
-    // succeeds is what proves the extension declares api 0.
+    // `Extension::load` refuses a manifest whose `api` is not the core's (1), so a load that
+    // succeeds is what proves the extension declares api 1.
     let tree = StdFileTree::new(extension_dir());
     let extension = Extension::load(&tree).map_err(|found| format!("{found:?}"))?;
     assert_eq!(extension.manifest().name().as_str(), "opencode");
     assert_eq!(extension.manifest().entry().as_str(), "adapter.lua");
-    assert_eq!(extension.manifest().version().to_string(), "0.1.0");
+    assert_eq!(extension.manifest().version().to_string(), "1.0.0");
     assert!(extension.reads().is_empty());
     Ok(())
 }
@@ -296,8 +296,8 @@ fn translator_project() -> Result<TempDir, Box<dyn Error>> {
 
 /// Runs the hook module `hook` on `payloads/<payload>.json` with the argument vector `HookCommand`
 /// builds, from the project directory, and compares stdout with `payloads/expected/<out>.out` byte
-/// for byte. Stderr must be empty and the exit status zero. Does nothing when `airsl` cannot run and
-/// is not required.
+/// for byte. Stderr must be empty and the exit status zero. Does nothing when `airsl` cannot run
+/// and is not required.
 fn check_to(hook: &str, blocking: Blocking, payload: &str, out: &str) -> TestResult {
     if skip_without_airsl()? {
         return Ok(());

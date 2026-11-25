@@ -1,8 +1,8 @@
 //! New tags written into an existing `agentstacks.toml` with its comments kept.
 //!
 //! `update` finds newer tags for entries the author already wrote by hand, so the file has
-//! comments, alignment and a layout of its own. This rule changes only the tag text and leaves every
-//! other byte as it was.
+//! comments, alignment and a layout of its own. This rule changes only the tag text and leaves
+//! every other byte as it was.
 //!
 //! # Responsibilities
 //!
@@ -19,12 +19,10 @@
 
 use toml_edit::{DocumentMut, Item, Value};
 
+use crate::types::project::document::parse_document;
 use crate::types::project::{GitTag, ProjectError};
-use crate::types::report::{Diagnostic, FormatError, Location, ParserMessage};
+use crate::types::report::Diagnostic;
 use crate::types::resolve::SourceKey;
-
-/// The file the refusals are located in.
-const PROJECT_FILE: &str = "agentstacks.toml";
 
 /// `text` with each change applied: the tag of entry `key` goes from `current` to `new`.
 ///
@@ -59,12 +57,7 @@ pub fn retag_project(
     text: &str,
     changes: &[(SourceKey, GitTag, GitTag)],
 ) -> Result<String, Diagnostic> {
-    let mut document: DocumentMut = text.parse().map_err(|error: toml_edit::TomlError| {
-        Diagnostic::new(
-            Location::file(PROJECT_FILE),
-            FormatError::TomlSyntax(ParserMessage::new(&error.to_string())),
-        )
-    })?;
+    let mut document = parse_document(text)?;
     for (key, current, new) in changes {
         retag_entry(&mut document, key, current, new)?;
     }
@@ -73,9 +66,9 @@ pub fn retag_project(
 
 /// Replaces the `tag` of one entry, copying the old value's decor onto the new one.
 ///
-/// The lookup goes through `Table::get_mut` and `TableLike::get_mut`, which only look. `Item::get_mut`
-/// and indexing a missing entry go through `IndexMut`, which writes an empty table for the entry
-/// into the document.
+/// The lookup goes through `Table::get_mut` and `TableLike::get_mut`, which only look.
+/// `Item::get_mut` and indexing a missing entry go through `IndexMut`, which writes an empty table
+/// for the entry into the document.
 fn retag_entry(
     document: &mut DocumentMut,
     key: &SourceKey,
@@ -129,7 +122,7 @@ mod tests {
 
     #[test]
     fn trailing_comment_survives_a_retag() -> TestResult {
-        let text = "# my project\napi = 0\n\n[packs.core]\ngit = \"https://x\"\ntag = \"packs-v0.1.0\"   # pinned\nsubdir = \"packs/core\"\n";
+        let text = "# my project\napi = 1\n\n[packs.core]\ngit = \"https://x\"\ntag = \"packs-v0.1.0\"   # pinned\nsubdir = \"packs/core\"\n";
         let out = retag(text, &[pack("core", OLD, NEW)?])?;
         assert_eq!(out, text.replace(OLD, NEW));
         Ok(())
@@ -138,7 +131,7 @@ mod tests {
     #[test]
     fn inline_table_tag_is_retagged() -> TestResult {
         let text =
-            "api = 0\n\n[packs]\ncore = { git = \"https://x\", tag = \"packs-v0.1.0\" } # c\n";
+            "api = 1\n\n[packs]\ncore = { git = \"https://x\", tag = \"packs-v0.1.0\" } # c\n";
         let out = retag(text, &[pack("core", OLD, NEW)?])?;
         assert_eq!(out, text.replace(OLD, NEW));
         Ok(())
@@ -147,7 +140,7 @@ mod tests {
     #[test]
     fn dotted_key_tag_is_retagged() -> TestResult {
         let text =
-            "api = 0\npacks.core.git = \"https://x\"\npacks.core.tag = \"packs-v0.1.0\" # c\n";
+            "api = 1\npacks.core.git = \"https://x\"\npacks.core.tag = \"packs-v0.1.0\" # c\n";
         let out = retag(text, &[pack("core", OLD, NEW)?])?;
         assert_eq!(out, text.replace(OLD, NEW));
         Ok(())

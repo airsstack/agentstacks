@@ -1,11 +1,13 @@
-//! The five commands, one module each, and what they share.
+//! The commands, one module each, and what they share.
 //!
 //! # Responsibilities
 //!
-//! - `plan`, `apply`, `doctor`, `update` and `init` each run one subcommand: they call the library
-//!   flow, print through [`show`](crate::show) and return an [`Outcome`](crate::exit::Outcome).
-//! - `confirm` is the show, ask and apply sequence that `apply`, `init` and `update` share, and
-//!   `followup` adds the lines `init` and `update` print after they rewrite `agentstacks.toml`.
+//! - `plan`, `apply`, `doctor`, `update`, `init`, `ext add` and `ext test` each run one
+//!   subcommand: they call the library flow, print through [`show`](crate::show) and return an
+//!   [`Outcome`](crate::exit::Outcome). `ext` holds the subcommands of `agentstacks ext`.
+//! - `confirm` is the show, ask and apply sequence that `apply`, `init`, `update` and `ext add`
+//!   share, and `followup` adds the lines `init`, `update` and `ext add` print after they rewrite
+//!   `agentstacks.toml`.
 //! - [`Ports`] holds the four ports a command works through, and [`Console`] the terminal flag and
 //!   the three streams.
 //!
@@ -24,6 +26,7 @@ mod apply;
 mod confirm;
 mod console;
 mod doctor;
+pub(crate) mod ext;
 mod followup;
 mod init;
 mod plan;

@@ -30,6 +30,7 @@ use crate::types::resolve::SourceKey;
 use crate::types::resolve::TagVersion;
 use crate::types::resolve::latest_tag;
 use crate::types::resolve::tag::precedence;
+use crate::types::shorthand::official_major;
 
 /// Why a git source is not updated.
 ///
@@ -136,6 +137,9 @@ pub struct UpdateEntry {
 
 /// What an update asks the remote of one git source pinned to a versioned tag: the tags that start
 /// with `prefix`.
+///
+/// For the official repository and the `packs-v` prefix, [`UpdateQuery::finish`] only considers the
+/// tags of the major version of the `api`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateQuery {
     /// The entry.
@@ -194,10 +198,12 @@ impl UpdateQuery {
     }
 
     /// The entry for the `tags` the remote listed: the latest tag when it is newer than the
-    /// current one, otherwise the note that nothing is.
+    /// current one, otherwise the note that nothing is. The official `packs-v` tags are limited to
+    /// the major version of the `api`; the tags of any other source are all considered.
     #[must_use]
     pub fn finish(self, tags: &[RemoteTag]) -> UpdateEntry {
-        let newer = latest_tag(tags, &self.prefix)
+        let major = official_major(&self.url, &self.prefix);
+        let newer = latest_tag(tags, &self.prefix, major)
             .filter(|(_, version)| precedence(version, &self.version).is_gt())
             .map(|(tag, _)| tag);
         let outcome = newer.map_or_else(
@@ -234,12 +240,39 @@ mod tests {
         Ok(SourceKey::Pack(PackName::new("core")?))
     }
 
-    fn tag_source(tag: &str) -> Result<Source, Box<dyn std::error::Error>> {
+    fn source_at(url: &str, tag: &str) -> Result<Source, Box<dyn std::error::Error>> {
         Ok(Source::Git {
-            url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+            url: GitUrl::new(url)?,
             pin: Pin::Tag(GitTag::new(tag)?),
             subdir: None,
         })
+    }
+
+    fn tag_source(tag: &str) -> Result<Source, Box<dyn std::error::Error>> {
+        source_at("https://github.com/acme/packs", tag)
+    }
+
+    fn remotes(names: &[&str]) -> Result<Vec<RemoteTag>, Box<dyn std::error::Error>> {
+        names
+            .iter()
+            .map(|name| {
+                Ok(RemoteTag {
+                    rev: CommitId::new(NEW)?,
+                    tag: GitTag::new(name)?,
+                })
+            })
+            .collect()
+    }
+
+    fn outcome_at(
+        url: &str,
+        current: &str,
+        listed: &[&str],
+    ) -> Result<UpdateOutcome, Box<dyn std::error::Error>> {
+        let query = UpdateQuery::for_source(core()?, &source_at(url, current)?)
+            .ok_or("a git source")?
+            .map_err(|entry| format!("{entry:?}"))?;
+        Ok(query.finish(&remotes(listed)?).outcome)
     }
 
     fn g1() -> Result<Vec<RemoteTag>, Box<dyn std::error::Error>> {
@@ -362,6 +395,69 @@ mod tests {
         assert_eq!(note_of(&entry)?, expected);
         let entry = query("packs-v0.10.0")?.finish(&[]);
         assert_eq!(note_of(&entry)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn official_packs_tag_keeps_api_major() -> TestResult {
+        let outcome = outcome_at(
+            "https://github.com/airsstack/agentstacks",
+            "packs-v0.2.0",
+            &[
+                "packs-v0.2.0",
+                "packs-v1.0.0",
+                "packs-v1.4.2",
+                "packs-v2.0.0",
+            ],
+        )?;
+        assert_eq!(outcome, UpdateOutcome::NewTag(GitTag::new("packs-v1.4.2")?));
+        Ok(())
+    }
+
+    #[test]
+    fn official_source_never_moves_past_the_api_major() -> TestResult {
+        let outcome = outcome_at(
+            "https://github.com/airsstack/agentstacks",
+            "packs-v1.0.0",
+            &["packs-v1.0.0", "packs-v2.0.0"],
+        )?;
+        assert!(matches!(
+            outcome,
+            UpdateOutcome::Note(UpdateNote::NoNewer { .. })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn third_party_tags_unchanged() -> TestResult {
+        let outcome = outcome_at(
+            "https://github.com/acme/packs",
+            "packs-v0.2.0",
+            &["packs-v0.2.0", "packs-v1.0.0", "packs-v2.0.0"],
+        )?;
+        assert_eq!(outcome, UpdateOutcome::NewTag(GitTag::new("packs-v2.0.0")?));
+        Ok(())
+    }
+
+    #[test]
+    fn dot_git_url_is_third_party() -> TestResult {
+        let outcome = outcome_at(
+            "https://github.com/airsstack/agentstacks.git",
+            "packs-v0.2.0",
+            &["packs-v0.2.0", "packs-v1.0.0", "packs-v2.0.0"],
+        )?;
+        assert_eq!(outcome, UpdateOutcome::NewTag(GitTag::new("packs-v2.0.0")?));
+        Ok(())
+    }
+
+    #[test]
+    fn official_url_with_another_prefix_keeps_every_major() -> TestResult {
+        let outcome = outcome_at(
+            "https://github.com/airsstack/agentstacks",
+            "rel-0.2.0",
+            &["rel-0.2.0", "rel-2.0.0"],
+        )?;
+        assert_eq!(outcome, UpdateOutcome::NewTag(GitTag::new("rel-2.0.0")?));
         Ok(())
     }
 

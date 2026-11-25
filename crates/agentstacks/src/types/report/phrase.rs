@@ -11,6 +11,8 @@
 //!
 //! - [`ListedTwice`]: `<entry> listed twice`, generic over how the repeated entry is shown. A list
 //!   entry shows as [`Quoted`] text; the lock shows a typed entry with its kind in front.
+//! - [`AlreadyGiven`]: `<noun> "<key>" is already given by <first>`, for a pack or tool that two
+//!   arguments, or an argument and a built-in, both name.
 //! - [`MustBeRelative`]: `"<text>" must be relative`.
 //! - [`OutsideProject`]: `"<text>" must stay inside the project`. A refusal that names no value
 //!   uses the bare phrase, `OUTSIDE_PROJECT`.
@@ -18,6 +20,10 @@
 //! - [`DoesNotExist`]: `"<text>" does not exist`.
 //! - [`UnsupportedApi`]: `<found> not supported (this agentstacks speaks <API>)`. A format whose
 //!   message starts with `api` puts the word in front in its own variant.
+//! - [`LegacyApi`]: `0 is from agentstacks 0.x (this agentstacks speaks <API>; set api = <API>, or
+//!   use a newer release of it)`, for a pack or extension file written for the `0.x` releases.
+//! - [`LegacyProject`]: `api 0 is from agentstacks 0.x (run agentstacks update)`, for a project
+//!   file written for the `0.x` releases.
 //!
 //! # Non-responsibilities
 //!
@@ -26,7 +32,7 @@
 
 use std::fmt::{self, Display};
 
-use crate::types::api::API;
+use crate::types::api::{API, LEGACY_API};
 
 /// The bare phrase of a path that climbs out of the project, for a refusal that names no value.
 pub(in crate::types) const OUTSIDE_PROJECT: &str = "must stay inside the project";
@@ -82,6 +88,51 @@ impl ListedTwice<Quoted> {
     /// The refusal of a repeated list entry written as `text`.
     pub(in crate::types) fn text(text: impl Into<String>) -> Self {
         Self::new(Quoted::new(text))
+    }
+}
+
+/// A pack or tool that an earlier argument, or a built-in, already gives: `<noun> "<key>" is
+/// already given by <first>`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{noun} \"{key}\" is already given by {first}")]
+pub struct AlreadyGiven {
+    // The texts are `Box<str>` to keep a `Diagnostic` under clippy's large-error size.
+    noun: &'static str,
+    key: Box<str>,
+    first: Box<str>,
+}
+
+impl AlreadyGiven {
+    /// The refusal of `key`, a `noun` that `first` already gives; `first` is the earlier argument
+    /// as written, flag included, or the name of the built-in.
+    pub(crate) fn new(
+        noun: &'static str,
+        key: impl Into<String>,
+        first: impl Into<String>,
+    ) -> Self {
+        Self {
+            noun,
+            key: key.into().into_boxed_str(),
+            first: first.into().into_boxed_str(),
+        }
+    }
+
+    /// `pack` or `tool`.
+    #[must_use]
+    pub const fn noun(&self) -> &'static str {
+        self.noun
+    }
+
+    /// The shared key.
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// What gave it first.
+    #[must_use]
+    pub fn first(&self) -> &str {
+        &self.first
     }
 }
 
@@ -154,6 +205,29 @@ impl UnsupportedApi {
     }
 }
 
+/// The legacy `api` of a pack or extension file: `0 is from agentstacks 0.x (this agentstacks
+/// speaks <API>; set api = <API>, or use a newer release of it)`.
+///
+/// A format whose message starts with `api` puts the word in front in its own variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LegacyApi;
+
+impl Display for LegacyApi {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{LEGACY_API} is from agentstacks 0.x (this agentstacks speaks {API}; set api = {API}, or use a newer release of it)"
+        )
+    }
+}
+
+impl std::error::Error for LegacyApi {}
+
+/// The legacy `api` of a project file: `api 0 is from agentstacks 0.x (run agentstacks update)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("api {} is from agentstacks 0.x (run agentstacks update)", LEGACY_API)]
+pub struct LegacyProject;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +250,19 @@ mod tests {
         assert_eq!(
             ListedTwice::new("tool \"claude\"").to_string(),
             "tool \"claude\" listed twice"
+        );
+    }
+
+    #[test]
+    fn already_given_names_the_key_and_what_gave_it_first() {
+        let refusal = AlreadyGiven::new("pack", "core", "--pack \"core\"");
+        assert_eq!(
+            refusal.to_string(),
+            "pack \"core\" is already given by --pack \"core\""
+        );
+        assert_eq!(
+            (refusal.noun(), refusal.key(), refusal.first()),
+            ("pack", "core", "--pack \"core\"")
         );
     }
 
@@ -219,11 +306,27 @@ mod tests {
 
     #[test]
     fn unsupported_api_names_the_found_and_the_spoken_api() {
-        let refusal = UnsupportedApi::new(1);
+        let refusal = UnsupportedApi::new(2);
         assert_eq!(
             refusal.to_string(),
-            "1 not supported (this agentstacks speaks 0)"
+            "2 not supported (this agentstacks speaks 1)"
         );
-        assert_eq!(refusal.found(), 1);
+        assert_eq!(refusal.found(), 2);
+    }
+
+    #[test]
+    fn legacy_phrase_names_api_one() {
+        assert_eq!(
+            LegacyApi.to_string(),
+            "0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)"
+        );
+    }
+
+    #[test]
+    fn legacy_project_names_update() {
+        assert_eq!(
+            LegacyProject.to_string(),
+            "api 0 is from agentstacks 0.x (run agentstacks update)"
+        );
     }
 }

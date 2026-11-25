@@ -1,7 +1,7 @@
 //! The hooks a pack declares for one tool in `native/<tool>/hooks.toml`.
 //!
-//! It is separate from `NativeHook` because it owns the file-level rules (syntax, the single `hooks`
-//! key, every refusal returned at once), where `NativeHook` reads one item.
+//! It is separate from `NativeHook` because it owns the file-level rules (syntax, the single
+//! `hooks` key, every refusal returned at once), where `NativeHook` reads one item.
 //!
 //! # Responsibilities
 //!
@@ -214,7 +214,7 @@ args  = ["{{root}}/data"]
         );
         let manifest = crate::types::PackManifest::parse(
             Path::new("packs/core/pack.toml"),
-            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n[requires]\nbinaries = [\"git\"]\n",
+            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n[requires]\nbinaries = [\"git\"]\n",
         )
         .map_err(|d| shown(d).join("; "))?;
         let hooks = NativeHooks::parse(Path::new(FILE), text, manifest.requires())

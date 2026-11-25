@@ -27,11 +27,9 @@ use crate::fs::workspace::swap::{delete_file, swap_onto, write_lock, write_proje
 use crate::port::Workspace;
 use crate::types::op::OpPath;
 use crate::types::plan::{DiskState, Link, Resolution};
-use crate::types::project::LocalPath;
+use crate::types::project::{LocalPath, PROJECT_FILE};
 use crate::types::tree::utf8_text;
 
-/// The project file that holds the author's intent.
-const PROJECT_FILE: &str = "agentstacks.toml";
 /// The project file that pins what was applied.
 const LOCK_FILE: &str = "agentstacks.lock";
 

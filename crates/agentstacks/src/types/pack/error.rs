@@ -3,8 +3,8 @@
 //! A refusal is a message without its location: the diagnostic that carries it names the file, the
 //! line or the key path.
 //!
-//! It is separate from the loader so the layout, install-set, hook and token rules can all raise the
-//! same refusals without depending on the code that reads the files.
+//! It is separate from the loader so the layout, install-set, hook and token rules can all raise
+//! the same refusals without depending on the code that reads the files.
 //!
 //! # Responsibilities
 //!
@@ -18,6 +18,7 @@
 //! the errors of those formats. An invalid name is not redeclared: it wraps
 //! [`InvalidName`].
 
+use crate::types::api::API;
 use crate::types::name::InvalidName;
 use crate::types::name::ItemName;
 use crate::types::name::PackName;
@@ -50,8 +51,8 @@ pub enum PackError {
     /// The directory has no `pack.toml` at its root.
     #[error("not a pack (no pack.toml)")]
     NotAPack,
-    /// A directory the format reserves and does not support in api 0.
-    #[error("reserved, not supported in api 0")]
+    /// A directory the format reserves for later, which the supported [`API`] does not read.
+    #[error("reserved, not supported in api {}", API)]
     Reserved,
     /// A skill directory without a `SKILL.md`.
     #[error("missing SKILL.md")]
@@ -122,7 +123,17 @@ pub enum PackError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::report::{Diagnostic, Location};
     use std::error::Error;
+
+    #[test]
+    fn reserved_dir_refusal_names_the_supported_api_at_the_directory() {
+        let refusal = Diagnostic::new(Location::file("core/commands"), PackError::Reserved);
+        assert_eq!(
+            refusal.to_string(),
+            format!("core/commands: reserved, not supported in api {API}")
+        );
+    }
 
     #[test]
     fn pack_error_messages_read_as_documented() -> Result<(), Box<dyn Error>> {
@@ -138,7 +149,7 @@ mod tests {
             .ok_or("My_Skill must be refused")?;
         let cases: Vec<(PackError, &str)> = vec![
             (PackError::NotAPack, "not a pack (no pack.toml)"),
-            (PackError::Reserved, "reserved, not supported in api 0"),
+            (PackError::Reserved, "reserved, not supported in api 1"),
             (PackError::MissingSkillMd, "missing SKILL.md"),
             (
                 PackError::OnlySkillDirectories,

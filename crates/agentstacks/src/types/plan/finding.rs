@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn lock_finding_shows_the_lock_refusal() -> TestResult {
-        let text = "api = 0\n\n[[pack]]\nname = \"core\"\nversion = \"1.0.0\"\nbranch = \"main\"\n";
+        let text = "api = 1\n\n[[pack]]\nname = \"core\"\nversion = \"1.0.0\"\nbranch = \"main\"\n";
         let refusals = Lockfile::parse(std::path::Path::new("agentstacks.lock"), text)
             .err()
             .ok_or("the lock was accepted")?;

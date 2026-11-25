@@ -18,21 +18,25 @@
 //!
 //! # Non-responsibilities
 //!
-//! Where a refusal is located belongs to the [`Diagnostic`](crate::types::Diagnostic) that carries it, and
-//! which field raises which refusal belongs to the types that read the fields.
+//! Where a refusal is located belongs to the [`Diagnostic`](crate::types::Diagnostic) that carries
+//! it, and which field raises which refusal belongs to the types that read the fields.
+
+use semver::Version;
 
 use crate::types::hooks::HookEvent;
 use crate::types::hooks::InvalidHookEvent;
 use crate::types::hooks::InvalidPolicy;
-use crate::types::manifest::InvalidAirslReq;
 use crate::types::manifest::InvalidExcludeGlob;
 use crate::types::manifest::InvalidOptionType;
 use crate::types::manifest::InvalidPackPath;
+use crate::types::manifest::InvalidRange;
 use crate::types::manifest::InvalidVersion;
+use crate::types::manifest::VersionRange;
 use crate::types::name::InvalidEnvName;
 use crate::types::name::InvalidName;
 use crate::types::name::InvalidOptionName;
 use crate::types::name::PackName;
+use crate::types::report::LegacyApi;
 use crate::types::report::ListedTwice;
 use crate::types::report::NotLuaFile;
 use crate::types::report::Quoted;
@@ -74,9 +78,18 @@ pub enum ManifestError {
     /// A version that is not a semantic version (a `pack.version`).
     #[error(transparent)]
     Version(#[from] InvalidVersion),
-    /// A `requires.airsl` value that cannot be held as a range.
+    /// A `requires` version that is not a version range, or whose operator is not supported.
     #[error(transparent)]
-    AirslReq(#[from] InvalidAirslReq),
+    Range(#[from] InvalidRange),
+    /// A `requires.agentstacks` range that does not include the running agentstacks.
+    #[error("\"{range}\" does not match agentstacks {version} (install a newer agentstacks)")]
+    TooNew {
+        /// The range as written. Boxed so that this variant does not grow every
+        /// [`Diagnostic`](crate::types::Diagnostic).
+        range: Box<VersionRange>,
+        /// The running agentstacks version.
+        version: Version,
+    },
     /// A path that cannot be held as a pack-relative path.
     #[error(transparent)]
     PackPath(#[from] InvalidPackPath),
@@ -103,6 +116,17 @@ pub enum ManifestError {
     /// A `pack.api` this agentstacks does not speak, for a pack without a valid name.
     #[error(transparent)]
     UnsupportedApi(#[from] UnsupportedApi),
+    /// A `pack.api` written for the `0.x` releases, for a pack with a valid name.
+    #[error("{pack}: api {api}")]
+    PackLegacyApi {
+        /// The pack that asked for the api.
+        pack: PackName,
+        /// The legacy api asked for.
+        api: LegacyApi,
+    },
+    /// A `pack.api` written for the `0.x` releases, for a pack without a valid name.
+    #[error(transparent)]
+    LegacyApi(#[from] LegacyApi),
     /// A list entry that repeats an earlier one.
     #[error(transparent)]
     ListedTwice(#[from] ListedTwice<Quoted>),
@@ -199,6 +223,19 @@ mod tests {
         value.to_owned()
     }
 
+    #[test]
+    fn too_new_names_the_range_and_the_running_version() -> Result<(), Box<dyn std::error::Error>> {
+        let error = ManifestError::TooNew {
+            range: Box::new(VersionRange::new(">=1.3")?),
+            version: Version::new(1, 0, 0),
+        };
+        assert_eq!(
+            error.to_string(),
+            "\">=1.3\" does not match agentstacks 1.0.0 (install a newer agentstacks)"
+        );
+        Ok(())
+    }
+
     fn value_cases() -> Cases {
         vec![
             (
@@ -218,7 +255,7 @@ mod tests {
                 "\"1.2\" is not semver",
             ),
             (
-                ManifestError::from(InvalidAirslReq::NotVersionRange { text: text("nope") }),
+                ManifestError::from(InvalidRange::NotVersionRange { text: text("nope") }),
                 "\"nope\" is not a version range",
             ),
             (
@@ -249,13 +286,24 @@ mod tests {
             (
                 ManifestError::PackUnsupportedApi {
                     pack: PackName::new("sdlc")?,
-                    api: UnsupportedApi::new(1),
+                    api: UnsupportedApi::new(2),
                 },
-                "sdlc: api 1 not supported (this agentstacks speaks 0)",
+                "sdlc: api 2 not supported (this agentstacks speaks 1)",
             ),
             (
-                ManifestError::from(UnsupportedApi::new(1)),
-                "1 not supported (this agentstacks speaks 0)",
+                ManifestError::from(UnsupportedApi::new(2)),
+                "2 not supported (this agentstacks speaks 1)",
+            ),
+            (
+                ManifestError::PackLegacyApi {
+                    pack: PackName::new("sdlc")?,
+                    api: LegacyApi,
+                },
+                "sdlc: api 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
+            ),
+            (
+                ManifestError::from(LegacyApi),
+                "0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
             ),
             (
                 ManifestError::from(ListedTwice::text("core")),

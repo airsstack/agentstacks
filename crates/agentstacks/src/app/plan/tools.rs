@@ -24,7 +24,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::app::plan::load::Loaded;
-use crate::app::plan::read::PROJECT_FILE;
 use crate::app::plan::render::render_packs;
 use crate::port::{Adapter, FileTree, Workspace};
 use crate::types::extension::Extension;
@@ -35,6 +34,7 @@ use crate::types::op::{
 };
 use crate::types::pack::Pack;
 use crate::types::plan::{Reads, Skipped, keep_shared_writes};
+use crate::types::project::PROJECT_FILE;
 use crate::types::protocol::RUNTIME_LUA;
 use crate::types::report::{Diagnostic, Diagnostics, Location};
 use crate::types::resolve::SourceKey;
@@ -293,8 +293,8 @@ mod tests {
     use crate::types::lock::LockContents;
     use crate::types::op::{Origin, owner};
 
-    const CLAUDE_ONLY: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
-    const TWO_TOOLS: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[tools.opencode]\npath = \"extensions/opencode\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const CLAUDE_ONLY: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const TWO_TOOLS: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[tools.opencode]\npath = \"extensions/opencode\"\n\n[packs.core]\npath = \"packs/core\"\n";
     const LUA_HOOK: &str =
         "[[hooks]]\nkind = \"lua\"\nevent = \"session.end\"\nrun = \"hooks/enforce.lua\"\n";
     const MESSAGE_HOOK: &str =
@@ -307,7 +307,7 @@ mod tests {
             .file(
                 "pack.toml",
                 format!(
-                    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n[requires]\nairsl = \">=0.1.4\"\n{manifest_extra}"
+                    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n[requires]\nairsl = \">=0.1.4\"\n{manifest_extra}"
                 )
                 .as_bytes(),
             )

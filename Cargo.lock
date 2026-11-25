@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agentstacks"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "airsl",
  "globset",
@@ -21,13 +21,14 @@ dependencies = [
 
 [[package]]
 name = "agentstacks-cli"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "agentstacks",
  "clap",
  "serde_json",
  "similar",
  "tempfile",
+ "toml 1.2.0+spec-1.1.0",
 ]
 
 [[package]]

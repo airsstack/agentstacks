@@ -22,8 +22,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::types::manifest::AirslReq;
 use crate::types::manifest::PackVersion;
+use crate::types::manifest::VersionRange;
 use crate::types::name::PackName;
 use crate::types::pack::Pack;
 use crate::types::report::Diagnostic;
@@ -36,11 +36,11 @@ use crate::types::set::interval::VersionInterval;
 /// # Examples
 ///
 /// ```
-/// use agentstacks::types::{AirslReq, AirslRange, PackName, PackVersion};
+/// use agentstacks::types::{AirslRange, PackName, PackVersion, VersionRange};
 ///
 /// let range = AirslRange::new(vec![
-///     (PackName::new("sdlc")?, AirslReq::new("<0.3")?),
-///     (PackName::new("core")?, AirslReq::new(">=0.1.4")?),
+///     (PackName::new("sdlc")?, VersionRange::new("<0.3")?),
+///     (PackName::new("core")?, VersionRange::new(">=0.1.4")?),
 /// ])
 /// .ok_or("a pack declares a range")?;
 /// assert!(range.is_satisfiable());
@@ -51,7 +51,7 @@ use crate::types::set::interval::VersionInterval;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AirslRange {
-    needs: Vec<(PackName, AirslReq)>,
+    needs: Vec<(PackName, VersionRange)>,
     together: VersionInterval,
 }
 
@@ -67,7 +67,7 @@ impl AirslRange {
     /// assert!(AirslRange::new(Vec::new()).is_none());
     /// ```
     #[must_use]
-    pub fn new(mut needs: Vec<(PackName, AirslReq)>) -> Option<Self> {
+    pub fn new(mut needs: Vec<(PackName, VersionRange)>) -> Option<Self> {
         if needs.is_empty() {
             return None;
         }
@@ -96,7 +96,7 @@ impl AirslRange {
 
     /// Each pack that declares a range, in pack name order, with the range as written.
     #[must_use]
-    pub fn needs(&self) -> &[(PackName, AirslReq)] {
+    pub fn needs(&self) -> &[(PackName, VersionRange)] {
         &self.needs
     }
 
@@ -105,11 +105,11 @@ impl AirslRange {
     /// # Examples
     ///
     /// ```
-    /// use agentstacks::types::{AirslReq, AirslRange, PackName};
+    /// use agentstacks::types::{AirslRange, PackName, VersionRange};
     ///
     /// let disjoint = AirslRange::new(vec![
-    ///     (PackName::new("core")?, AirslReq::new(">=0.2")?),
-    ///     (PackName::new("sdlc")?, AirslReq::new("<0.2")?),
+    ///     (PackName::new("core")?, VersionRange::new(">=0.2")?),
+    ///     (PackName::new("sdlc")?, VersionRange::new("<0.2")?),
     /// ])
     /// .ok_or("a pack declares a range")?;
     /// assert!(!disjoint.is_satisfiable());
@@ -136,9 +136,9 @@ impl AirslRange {
     /// ```
     /// use std::path::Path;
     ///
-    /// use agentstacks::types::{AirslReq, AirslRange, PackName, PackVersion};
+    /// use agentstacks::types::{AirslRange, PackName, PackVersion, VersionRange};
     ///
-    /// let range = AirslRange::new(vec![(PackName::new("core")?, AirslReq::new(">=0.1.4")?)])
+    /// let range = AirslRange::new(vec![(PackName::new("core")?, VersionRange::new(">=0.1.4")?)])
     ///     .ok_or("a pack declares a range")?;
     /// let refusal = range
     ///     .installed_refusal(Path::new("agentstacks.toml"), &PackVersion::new("0.1.3")?)
@@ -193,7 +193,7 @@ mod tests {
     fn range(needs: &[(&str, &str)]) -> Result<AirslRange, Box<dyn Error>> {
         let mut parsed = Vec::new();
         for (pack, written) in needs {
-            parsed.push((name(pack)?, AirslReq::new(written)?));
+            parsed.push((name(pack)?, VersionRange::new(written)?));
         }
         Ok(AirslRange::new(parsed).ok_or("no pack declares a range")?)
     }

@@ -66,9 +66,10 @@ pub(super) fn precedence(a: &PackVersion, b: &PackVersion) -> Ordering {
 
 /// The highest released tag that starts with `prefix` and continues with a semantic version.
 ///
-/// Tags with another prefix, a suffix that is not semver, or a pre-release are ignored. The tags
-/// rank by semver precedence; among tags of equal precedence (they differ only in build
-/// metadata) the greater tag in byte order wins. `None` when no tag qualifies.
+/// Tags with another prefix, a suffix that is not semver, or a pre-release are ignored. With
+/// `Some(major)`, tags whose major version is not `major` are ignored too; with `None` every major
+/// is considered. The tags rank by semver precedence; among tags of equal precedence (they differ
+/// only in build metadata) the greater tag in byte order wins. `None` when no tag qualifies.
 ///
 /// # Examples
 ///
@@ -81,21 +82,24 @@ pub(super) fn precedence(a: &PackVersion, b: &PackVersion) -> Ordering {
 ///     .iter()
 ///     .map(|tag| Ok(RemoteTag { rev: rev.clone(), tag: GitTag::new(tag)? }))
 ///     .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
-/// let (latest, version) = latest_tag(&tags, "packs-v").ok_or("no tag")?;
+/// let (latest, version) = latest_tag(&tags, "packs-v", None).ok_or("no tag")?;
 /// assert_eq!(latest.as_str(), "packs-v0.10.0");
 /// assert_eq!(version.to_string(), "0.10.0");
+/// assert!(latest_tag(&tags, "packs-v", Some(1)).is_none());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[must_use]
-pub fn latest_tag(tags: &[RemoteTag], prefix: &str) -> Option<(GitTag, PackVersion)> {
+pub fn latest_tag(
+    tags: &[RemoteTag],
+    prefix: &str,
+    major: Option<u64>,
+) -> Option<(GitTag, PackVersion)> {
     tags.iter()
         .filter_map(|remote| {
             let suffix = remote.tag.as_str().strip_prefix(prefix)?;
             let version = PackVersion::new(suffix).ok()?;
-            version
-                .as_version()
-                .pre
-                .is_empty()
+            let semver = version.as_version();
+            (semver.pre.is_empty() && major.is_none_or(|m| semver.major == m))
                 .then(|| (remote.tag.clone(), version))
         })
         .max_by(|(tag_a, a), (tag_b, b)| {
@@ -125,7 +129,15 @@ mod tests {
     }
 
     fn latest(names: &[&str], prefix: &str) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        Ok(latest_tag(&remote(names)?, prefix).map(|(tag, _)| tag.to_string()))
+        latest_of(names, prefix, None)
+    }
+
+    fn latest_of(
+        names: &[&str],
+        prefix: &str,
+        major: Option<u64>,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        Ok(latest_tag(&remote(names)?, prefix, major).map(|(tag, _)| tag.to_string()))
     }
 
     #[test]
@@ -159,7 +171,7 @@ mod tests {
             "packs-v0.9.0",
         ];
         assert_eq!(latest(&names, "packs-v")?.as_deref(), Some("packs-v0.10.0"));
-        let (_, version) = latest_tag(&remote(&names)?, "packs-v").ok_or("no tag")?;
+        let (_, version) = latest_tag(&remote(&names)?, "packs-v", None).ok_or("no tag")?;
         assert_eq!(version, PackVersion::new("0.10.0")?);
         Ok(())
     }
@@ -189,6 +201,32 @@ mod tests {
                 Some("packs-v1.0.0+b")
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn major_filter_ignores_other_majors() -> TestResult {
+        let names = ["packs-v1.4.0", "packs-v2.0.0", "packs-v0.2.0"];
+        assert_eq!(
+            latest_of(&names, "packs-v", Some(1))?.as_deref(),
+            Some("packs-v1.4.0")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_major_is_todays_rule() -> TestResult {
+        let names = ["packs-v1.4.0", "packs-v2.0.0", "packs-v0.2.0"];
+        assert_eq!(
+            latest_of(&names, "packs-v", None)?.as_deref(),
+            Some("packs-v2.0.0")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_tag_of_that_major_is_none() -> TestResult {
+        assert_eq!(latest_of(&["packs-v0.2.0"], "packs-v", Some(1))?, None);
         Ok(())
     }
 

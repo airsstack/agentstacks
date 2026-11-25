@@ -2,7 +2,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Binary`]: whether a binary is on `PATH`, and what `airsl --version` printed.
+//! - [`Binary`]: whether a binary is on `PATH`, what `airsl --version` printed and how `airsl test`
+//!   ended in a directory.
+//! - [`LuaTestRun`]: how one `airsl test` run ended.
 //!
 //! # Non-responsibilities
 //!
@@ -24,3 +26,5 @@ pub use fake::BinaryCall;
 pub use fake::FakeBinary;
 #[doc(inline)]
 pub use seam::Binary;
+#[doc(inline)]
+pub use seam::LuaTestRun;

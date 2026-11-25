@@ -10,11 +10,14 @@
 //!   normalised path, and answers every [`Workspace`] method from them. A staged file is a
 //!   temporary file beside its canonical target and a swap moves it onto the target, keeping an
 //!   existing file's mode and writing through a symlink.
+//! - [`Workspace::source_tree`] serves the tree a test gave with [`FakeWorkspace::source`] or
+//!   [`FakeWorkspace::source_outside`], and for any other directory the regular files the
+//!   workspace holds under it, or a missing directory when it holds none.
 //! - [`FakeWorkspace::project_written`] and [`FakeWorkspace::lock_written`] return the last text
 //!   written to each project file.
 //! - [`FakeWorkspace::fail`] makes one exact call fail every time with
-//!   [`FakeWorkspace::denied`], and [`FakeWorkspace::set_file`] and [`FakeWorkspace::remove`] edit
-//!   the disk between two calls.
+//!   [`FakeWorkspace::denied`], and [`FakeWorkspace::set_project`], [`FakeWorkspace::set_file`] and
+//!   [`FakeWorkspace::remove`] edit the disk between two calls.
 //! - [`WorkspaceCall`] is one entry of the call log that [`FakeWorkspace::calls`] returns.
 //!
 //! # Non-responsibilities
@@ -92,6 +95,35 @@ impl Disk {
             Some(Entry::Outside) => None,
             _ => Some(target.clone()),
         }
+    }
+
+    /// The tree of the regular files held under `dir`, rooted at `dir` as written, or a tree whose
+    /// root is missing when no file lives there.
+    fn tree_under(&self, dir: &LocalPath) -> FakeFileTree {
+        let Some(prefix) = OpPath::new(dir.as_str())
+            .ok()
+            .map(|path| format!("{path}/"))
+        else {
+            return FakeFileTree::missing(dir.as_str());
+        };
+        let files: Vec<(&str, &Vec<u8>)> = self
+            .entries
+            .iter()
+            .filter_map(|(path, entry)| match entry {
+                Entry::File { bytes, .. } => {
+                    path.as_str().strip_prefix(&prefix).map(|rel| (rel, bytes))
+                }
+                _ => None,
+            })
+            .collect();
+        if files.is_empty() {
+            return FakeFileTree::missing(dir.as_str());
+        }
+        files
+            .into_iter()
+            .fold(FakeFileTree::new(dir.as_str()), |tree, (rel, bytes)| {
+                tree.file(rel, bytes)
+            })
     }
 
     fn resolve(&self, path: &OpPath) -> Resolution {
@@ -228,6 +260,11 @@ impl FakeWorkspace {
         FakeFileTree::denied()
     }
 
+    /// Replaces the text of `agentstacks.toml` between two calls.
+    pub fn set_project(&self, text: &str) {
+        self.disk.borrow_mut().project = Some(text.to_owned());
+    }
+
     /// Replaces the bytes of `path` between two calls, keeping the mode of a file that is there.
     pub fn set_file(&self, path: &OpPath, bytes: &[u8]) {
         let mut disk = self.disk.borrow_mut();
@@ -335,7 +372,7 @@ impl Workspace for FakeWorkspace {
         Ok(match self.sources.get(dir) {
             Some(Some(tree)) => Some(tree.clone()),
             Some(None) => None,
-            None => Some(FakeFileTree::missing(dir.as_str())),
+            None => Some(self.disk.borrow().tree_under(dir)),
         })
     }
 
@@ -513,6 +550,32 @@ mod tests {
     }
 
     #[test]
+    fn source_tree_serves_the_files_held_under_a_directory() -> TestResult {
+        let ws = FakeWorkspace::new()
+            .file(&p("packs/team/skills/a/SKILL.md")?, b"x")
+            .file(&p("packs/teammate/pack.toml")?, b"y")
+            .file(&p("other.txt")?, b"z");
+        let tree = ws
+            .source_tree(&LocalPath::new("./packs/team")?)?
+            .ok_or("a tree")?;
+        assert_eq!(tree.root(), std::path::Path::new("./packs/team"));
+        assert_eq!(
+            tree.read_file(std::path::Path::new("skills/a/SKILL.md"))?,
+            b"x"
+        );
+        assert!(tree.read_file(std::path::Path::new("pack.toml")).is_err());
+        let empty = ws
+            .source_tree(&LocalPath::new("packs/none")?)?
+            .ok_or("a tree")?;
+        let kind = empty
+            .read_dir(std::path::Path::new(""))
+            .err()
+            .map(|error| error.kind());
+        assert_eq!(kind, Some(std::io::ErrorKind::NotFound));
+        Ok(())
+    }
+
+    #[test]
     fn stage_then_swap_installs_bytes_and_keeps_mode() -> TestResult {
         let ws = FakeWorkspace::new().file_with_mode(&p(".claude/old")?, b"old", 0o755);
         ws.stage(&p(".claude/old")?, b"new")?;
@@ -668,6 +731,15 @@ mod tests {
         assert_eq!(hash_of(&ws)?, ContentHash::of_bytes(b"after"));
         ws.remove(&p("a")?);
         assert_eq!(ws.file_bytes(&p("a")?), None);
+        Ok(())
+    }
+
+    #[test]
+    fn set_project_changes_the_text_between_calls_without_a_write() -> TestResult {
+        let ws = FakeWorkspace::new().project("before");
+        ws.set_project("after");
+        assert_eq!(read_project(&ws)?, "after");
+        assert_eq!(ws.project_written(), None);
         Ok(())
     }
 

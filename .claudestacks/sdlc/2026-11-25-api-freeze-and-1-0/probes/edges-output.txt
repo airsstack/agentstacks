@@ -1,0 +1,46 @@
+## P8 agentstacks 0.2.0 (target/debug, HEAD 33e3925): edge refusals today
+### plan with no agentstacks.toml
+stdout:
+stderr:
+agentstacks.toml: No such file or directory (os error 2)
+exit=1
+### pack.toml requires.airsl = "": plan
+stdout:
+stderr:
+packs/demo/pack.toml: requires.airsl: "" is not a version range
+exit=1
+### pack.toml requires.airsl = "   ": plan
+stdout:
+stderr:
+packs/demo/pack.toml: requires.airsl: "   " is not a version range
+exit=1
+### pack.toml requires.airsl = 1: plan
+stdout:
+stderr:
+packs/demo/pack.toml: requires.airsl: expected string, got integer
+exit=1
+### pack.toml requires.airsl = "nope": plan
+stdout:
+stderr:
+packs/demo/pack.toml: requires.airsl: "nope" is not a version range
+exit=1
+### pack.toml requires.agentstacks today: plan
+stdout:
+stderr:
+packs/demo/pack.toml: requires.agentstacks: unknown key
+exit=1
+### extension.toml [requires] today: plan
+stdout:
+stderr:
+ext/claude/extension.toml: requires: unknown key
+exit=1
+## versions
+packs/core/pack.toml:version     = "0.1.1"
+packs/guideline-rust/pack.toml:version     = "0.1.0"
+packs/guideline-python/pack.toml:version     = "0.1.0"
+extensions/claude/extension.toml:version     = "0.1.0"
+packs/journal/pack.toml:version     = "0.2.0"
+extensions/opencode/extension.toml:version     = "0.1.0"
+packs/sdlc/pack.toml:version     = "0.1.1"
+crates/agentstacks-cli/Cargo.toml:version                = "0.2.0"
+crates/agentstacks/Cargo.toml:version                = "0.2.0"

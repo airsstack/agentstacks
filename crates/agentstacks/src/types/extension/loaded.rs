@@ -11,13 +11,19 @@
 //!   empty directories are ignored, and symlinks, special files and non-UTF-8 paths are refused,
 //!   with the symlink refusal worded for an extension. A walk refusal does not stop the load: it is
 //!   reported together with every other refusal.
-//! - It reads every walked file exactly once, hashing it as it goes; the manifest's text comes from
-//!   that same read. A file that cannot be read is an I/O refusal at its own path, reported with
-//!   every other refusal, and leaves the extension without a tree hash.
-//! - It requires `extension.toml` (a manifest the walk refused is not reported as absent), parses
-//!   it, and checks that `entry`, without its leading `./` segments, is one of the walked regular
-//!   files. An `entry` the walk refused is not reported as missing. Every refusal of those checks
-//!   is reported together. A manifest that is not UTF-8 is refused as `<file>: not valid UTF-8`.
+//! - It reads the manifest first. When it is UTF-8 TOML whose `requires.agentstacks` is a range
+//!   that excludes this agentstacks, that is the only refusal returned, before any other file is
+//!   read: the walk's refusals, the read failures and the other manifest refusals are dropped,
+//!   because a manifest written for a later agentstacks may use things this one does not know.
+//! - Otherwise it reads every walked file once, the manifest included, hashing each as it goes;
+//!   the manifest's text for the parse comes from that read. A file that cannot be read is an I/O
+//!   refusal at its own path, reported with every other refusal, and leaves the extension without
+//!   a tree hash.
+//! - It requires `extension.toml` (a manifest the walk refused is not reported as absent). It
+//!   parses the manifest and checks that `entry`, without its leading `./` segments, is one of
+//!   the walked regular files. An `entry` the walk refused is not reported as missing. Every
+//!   refusal of those checks, a range that does not parse included, is reported together. A
+//!   manifest that is not UTF-8 is refused as `<file>: not valid UTF-8`.
 //! - When nothing is refused it records the directory's tree hash and the dot entries it ignored.
 //!
 //! # Non-responsibilities
@@ -29,8 +35,10 @@
 use std::path::{Path, PathBuf};
 
 use crate::port::FileTree;
+use crate::types::VERSION;
 use crate::types::extension::error::ExtensionError;
 use crate::types::extension::manifest::ExtensionManifest;
+use crate::types::manifest::requires::agentstacks_too_new;
 use crate::types::project::SubPath;
 use crate::types::report::Diagnostic;
 use crate::types::report::Diagnostics;
@@ -74,7 +82,8 @@ impl Extension {
     ///
     /// # Errors
     ///
-    /// Returns every refusal the directory holds. A refused `api` therefore never yields an
+    /// Returns every refusal the directory holds, or only the `requires.agentstacks` refusal when
+    /// that range excludes this agentstacks. A refused `api` therefore never yields an
     /// [`Extension`].
     ///
     /// # Examples
@@ -90,16 +99,24 @@ impl Extension {
     ///     .map_err(|refusals| format!("{refusals:?}"))?;
     /// assert_eq!(extension.manifest().name().as_str(), "claude");
     ///
-    /// let refused = Extension::load(&StdFileTree::new(format!("{fixtures}/invalid/api-one")))
+    /// let refused = Extension::load(&StdFileTree::new(format!("{fixtures}/invalid/api-two")))
     ///     .err()
-    ///     .ok_or("api 1 is not supported")?;
+    ///     .ok_or("api 2 is not supported")?;
     /// let shown: Vec<String> = refused.into_sorted().iter().map(ToString::to_string).collect();
-    /// assert!(shown[0].ends_with("extension.api: 1 not supported (this agentstacks speaks 0)"));
+    /// assert!(shown[0].ends_with("extension.api: 2 not supported (this agentstacks speaks 1)"));
     /// # Ok(())
     /// # }
     /// ```
     pub fn load<T: FileTree>(tree: &T) -> Result<Self, Diagnostics> {
         let (walked, walk_refusals) = walk(tree);
+        let manifest_path = tree.root().join(MANIFEST_FILE);
+        let listed = walked
+            .files()
+            .iter()
+            .any(|path| path.as_str() == MANIFEST_FILE);
+        if listed && let Some(too_new) = excluding_range(tree, &manifest_path) {
+            return Err(Diagnostics::from(too_new));
+        }
         let mut diagnostics = Diagnostics::new();
         diagnostics.extend(walk_refusals.into_iter().map(reword_walk_diagnostic));
         let mut manifest_bytes = None;
@@ -108,11 +125,6 @@ impl Extension {
                 manifest_bytes = Some(bytes);
             }
         });
-        let manifest_path = tree.root().join(MANIFEST_FILE);
-        let listed = walked
-            .files()
-            .iter()
-            .any(|path| path.as_str() == MANIFEST_FILE);
         if !listed {
             if !walked.covers(Path::new(MANIFEST_FILE)) {
                 diagnostics.push(Diagnostic::new(
@@ -194,6 +206,14 @@ impl Extension {
     }
 }
 
+/// The refusal of a `requires.agentstacks` in the manifest of `tree` that excludes this
+/// agentstacks, or `None` when the manifest cannot be read as UTF-8 text or holds no excluding
+/// range. The manifest is read here before any other file, so the refusal is returned alone.
+fn excluding_range<T: FileTree>(tree: &T, manifest_path: &Path) -> Option<Diagnostic> {
+    let text = tree.read_text(Path::new(MANIFEST_FILE)).ok()?;
+    agentstacks_too_new(manifest_path, &text, &VERSION)
+}
+
 /// Words the walker's symlink refusal for an extension and passes every other diagnostic through.
 fn reword_walk_diagnostic(diagnostic: Diagnostic) -> Diagnostic {
     if matches!(diagnostic.error(), FormatError::Walk(WalkError::Symlink)) {
@@ -220,7 +240,7 @@ mod tests {
     const EXAMPLE: &str = "[extension]\n\
         name        = \"claude\"\n\
         version     = \"0.1.0\"\n\
-        api         = 0\n\
+        api         = 1\n\
         description = \"Renders packs into Claude Code project config\"\n\
         entry       = \"adapter.lua\"\n";
 
@@ -329,6 +349,82 @@ mod tests {
         assert_eq!(
             refusals(Extension::load(&minimal().special("sock"))),
             ["extensions/claude/sock: only regular files and directories are allowed"]
+        );
+    }
+
+    fn requiring(range: &str, top: &str) -> String {
+        format!("{top}{EXAMPLE}\n[requires]\nagentstacks = \"{range}\"\n")
+    }
+
+    #[test]
+    fn excluding_range_is_the_only_refusal() {
+        let manifest = requiring(">=99", "zzz = 1\n");
+        let tree = FakeFileTree::new(ROOT)
+            .file("extension.toml", manifest.as_bytes())
+            .symlink("adapter.lua");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [format!(
+                "{MANIFEST}: requires.agentstacks: \">=99\" does not match agentstacks {VERSION} (install a newer agentstacks)"
+            )]
+        );
+    }
+
+    #[test]
+    fn invalid_range_is_one_refusal_among_others() {
+        let manifest = requiring("nope", "zzz = 1\n");
+        let tree = minimal().file("extension.toml", manifest.as_bytes());
+        assert_eq!(
+            sorted(refusals(Extension::load(&tree))),
+            [
+                format!("{MANIFEST}: requires.agentstacks: \"nope\" is not a version range"),
+                format!("{MANIFEST}: zzz: unknown key"),
+            ]
+        );
+    }
+
+    #[test]
+    fn absent_range_loads() {
+        assert!(Extension::load(&minimal()).is_ok());
+    }
+
+    #[test]
+    fn matching_range_loads() {
+        let manifest = requiring(">=1.0", "");
+        let tree = minimal().file("extension.toml", manifest.as_bytes());
+        assert!(Extension::load(&tree).is_ok());
+    }
+
+    #[test]
+    fn unreadable_or_invalid_toml_is_refused_by_the_parse_not_the_range_check() {
+        let tree = minimal().file("extension.toml", b"agentstacks = \">=99\"\na = [1,");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [format!("{MANIFEST}:2: unclosed array, expected `]`")]
+        );
+        let tree = minimal().file("extension.toml", b"\xff\xfe");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [format!("{MANIFEST}: not valid UTF-8")]
+        );
+        let tree = minimal().unreadable("extension.toml");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [format!("{MANIFEST}: {}", FakeFileTree::denied())]
+        );
+    }
+
+    #[test]
+    fn excluding_range_wins_before_an_unreadable_file_is_read() {
+        let manifest = requiring(">=99", "");
+        let tree = FakeFileTree::new(ROOT)
+            .file("extension.toml", manifest.as_bytes())
+            .unreadable("adapter.lua");
+        assert_eq!(
+            refusals(Extension::load(&tree)),
+            [format!(
+                "{MANIFEST}: requires.agentstacks: \">=99\" does not match agentstacks {VERSION} (install a newer agentstacks)"
+            )]
         );
     }
 
@@ -469,17 +565,17 @@ mod tests {
     }
 
     #[test]
-    fn extension_load_refuses_api_one_without_returning_an_extension() {
+    fn extension_load_refuses_api_two_without_returning_an_extension() {
         let tree = FakeFileTree::new(ROOT)
             .file(
                 "extension.toml",
-                manifest_with("api         = 0", "api         = 1").as_bytes(),
+                manifest_with("api         = 1", "api         = 2").as_bytes(),
             )
             .file("adapter.lua", b"");
         assert_eq!(
             refusals(Extension::load(&tree)),
             [format!(
-                "{MANIFEST}: extension.api: 1 not supported (this agentstacks speaks 0)"
+                "{MANIFEST}: extension.api: 2 not supported (this agentstacks speaks 1)"
             )]
         );
     }

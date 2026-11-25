@@ -8,9 +8,11 @@
 //! - [`ProjectFile::parse`] reads the whole file and returns the project, or every refusal of the
 //!   file at once: a bad entry never hides the others. A syntax error stops only this file and is
 //!   its only diagnostic.
-//! - It reads `api`, `[tools.*]` and `[packs.*]`. Entry names follow the name rule; each entry is
-//!   read through the source reader under the pin rule "exactly one of `tag` and `rev`"; a pack
-//!   entry may also hold an `options` table, kept raw.
+//! - It reads `api`, `[tools.*]` and `[packs.*]`. An `api` of `0` is read and reported as
+//!   [`ApiCheck::Legacy`] for the caller to act on; an `api` that is neither `0` nor the current
+//!   one is refused as unsupported. Entry names follow the name rule; each entry is read through
+//!   the source reader under the pin rule "exactly one of `tag` and `rev`"; a pack entry may also
+//!   hold an `options` table, kept raw.
 //! - A file must list at least one tool and one pack. A section that is missing or empty is
 //!   reported as `nothing to install`; a section of the wrong type is reported for its type only.
 //! - Empty text is an empty table, so the fields it lacks are refused one by one.
@@ -26,7 +28,7 @@ use std::path::Path;
 
 use toml::{Table, Value};
 
-use crate::types::api::API;
+use crate::types::api::{self, ApiCheck};
 use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
 use crate::types::name::InvalidName;
@@ -39,8 +41,22 @@ use crate::types::project::SourceFields;
 use crate::types::project::error::ProjectError;
 use crate::types::report::Diagnostics;
 use crate::types::report::FieldError;
+use crate::types::report::LegacyProject;
 use crate::types::report::TypeWord;
-use crate::types::report::UnsupportedApi;
+
+/// The name of the project file, the one place the name is written.
+///
+/// It is the path of the file under the project root and the file every refusal of the project is
+/// located in.
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::project::PROJECT_FILE;
+///
+/// assert_eq!(PROJECT_FILE, "agentstacks.toml");
+/// ```
+pub const PROJECT_FILE: &str = "agentstacks.toml";
 
 /// The keys `agentstacks.toml` may hold at its top level.
 const TOP_LEVEL_KEYS: [&str; 3] = ["api", "tools", "packs"];
@@ -58,7 +74,7 @@ const PACK_KEYS: [&str; 6] = ["git", "path", "tag", "rev", "subdir", "options"];
 ///
 /// use agentstacks::types::ProjectFile;
 ///
-/// let text = "api = 0\n\
+/// let text = "api = 1\n\
 ///     [tools.claude]\n\
 ///     path = \"extensions/claude\"\n\
 ///     [packs.team-lint]\n\
@@ -71,6 +87,7 @@ const PACK_KEYS: [&str; 6] = ["git", "path", "tag", "rev", "subdir", "options"];
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProjectFile {
+    api: ApiCheck,
     tools: BTreeMap<ToolName, Source>,
     packs: BTreeMap<PackName, PackEntry>,
 }
@@ -90,7 +107,7 @@ impl ProjectFile {
     ///
     /// use agentstacks::types::{ProjectFile, Source};
     ///
-    /// let text = "api = 0\n\
+    /// let text = "api = 1\n\
     ///     [tools.claude]\n\
     ///     git = \"https://github.com/airsstack/agentstacks\"\n\
     ///     tag = \"packs-v0.1.0\"\n\
@@ -107,7 +124,7 @@ impl ProjectFile {
     /// ));
     ///
     /// // A file that lists nothing to install is refused.
-    /// assert!(ProjectFile::parse(Path::new("agentstacks.toml"), "api = 0\n").is_err());
+    /// assert!(ProjectFile::parse(Path::new("agentstacks.toml"), "api = 1\n").is_err());
     /// # Ok::<(), String>(())
     /// ```
     pub fn parse(file: &Path, text: &str) -> Result<Self, Diagnostics> {
@@ -121,9 +138,8 @@ impl ProjectFile {
         };
         let mut root = TomlFields::new(file, "", table);
         root.refuse_unknown_keys(&TOP_LEVEL_KEYS);
-        if let Some(api) = root.required_integer("api").filter(|api| *api != API) {
-            root.refuse_at_file(ProjectError::from(UnsupportedApi::new(api)));
-        }
+        // A refused `api` makes the whole parse fail, so the stand-in is never returned.
+        let api = api::read(&mut root, ProjectError::from).unwrap_or(ApiCheck::Current);
         let tools = read_section(&mut root, "tools", ToolName::new, read_tool);
         let packs = read_section(&mut root, "packs", PackName::new, read_pack);
         if tools.supplies_nothing() || packs.supplies_nothing() {
@@ -132,11 +148,32 @@ impl ProjectFile {
         let diagnostics = root.into_diagnostics();
         if diagnostics.is_empty() {
             Ok(Self {
+                api,
                 tools: tools.entries,
                 packs: packs.entries,
             })
         } else {
             Err(diagnostics)
+        }
+    }
+
+    /// Which `api` the file declared: [`ApiCheck::Current`], or [`ApiCheck::Legacy`] for a file
+    /// written for the `0.x` releases. Any other `api` is refused when the file is parsed, so it
+    /// is never returned.
+    #[must_use]
+    pub const fn api(&self) -> ApiCheck {
+        self.api
+    }
+
+    /// Refuses a file written for the `0.x` releases, which only `update` goes on with.
+    ///
+    /// # Errors
+    ///
+    /// [`ProjectError::LegacyProject`] when the file declares the legacy `api`.
+    pub fn refuse_legacy(&self) -> Result<(), ProjectError> {
+        match self.api {
+            ApiCheck::Legacy => Err(ProjectError::from(LegacyProject)),
+            ApiCheck::Current | ApiCheck::Unsupported(_) => Ok(()),
         }
     }
 
@@ -253,7 +290,7 @@ mod tests {
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-    const EXAMPLE: &str = "api = 0\n\
+    const EXAMPLE: &str = "api = 1\n\
         \n\
         [tools.claude]\n\
         git    = \"https://github.com/airsstack/agentstacks\"\n\
@@ -270,7 +307,7 @@ mod tests {
         path = \"packs/team-lint\"\n";
 
     /// A file that is valid apart from what a test adds to it.
-    const BASE: &str = "api = 0\n\
+    const BASE: &str = "api = 1\n\
         [tools.claude]\n\
         git = \"https://example.org/r\"\n\
         tag = \"v1\"\n\
@@ -347,18 +384,18 @@ mod tests {
     #[test]
     fn project_file_refuses_a_syntax_error_with_its_line() -> TestResult {
         refused_once(
-            "api = 0\n\nx = [1,",
+            "api = 1\n\nx = [1,",
             "agentstacks.toml:3: unclosed array, expected `]`",
         )
     }
 
     #[test]
     fn project_file_refuses_api_rules() -> TestResult {
-        let rest = BASE.trim_start_matches("api = 0\n");
+        let rest = BASE.trim_start_matches("api = 1\n");
         let cases = [
             (
-                format!("api = 1\n{rest}"),
-                "agentstacks.toml: api 1 not supported (this agentstacks speaks 0)",
+                format!("api = 2\n{rest}"),
+                "agentstacks.toml: api 2 not supported (this agentstacks speaks 1)",
             ),
             (rest.to_owned(), "agentstacks.toml: api: required"),
             (
@@ -377,14 +414,42 @@ mod tests {
     }
 
     #[test]
+    fn project_refuses_api_two() -> TestResult {
+        let rest = BASE.trim_start_matches("api = 1\n");
+        refused_once(
+            &format!("api = 2\n{rest}"),
+            "agentstacks.toml: api 2 not supported (this agentstacks speaks 1)",
+        )?;
+        refused_once(
+            &format!("api = -1\n{rest}"),
+            "agentstacks.toml: api -1 not supported (this agentstacks speaks 1)",
+        )
+    }
+
+    #[test]
+    fn project_reads_api_zero_as_legacy() -> TestResult {
+        let rest = BASE.trim_start_matches("api = 1\n");
+        let legacy = parse(&format!("api = 0\n{rest}")).map_err(|shown| shown.join("; "))?;
+        assert_eq!(legacy.api(), ApiCheck::Legacy);
+        let current = parse(&format!("api = 1\n{rest}")).map_err(|shown| shown.join("; "))?;
+        assert_eq!(current.api(), ApiCheck::Current);
+        assert_eq!(
+            legacy.refuse_legacy().map_err(|error| error.to_string()),
+            Err("api 0 is from agentstacks 0.x (run agentstacks update)".to_owned())
+        );
+        assert_eq!(current.refuse_legacy(), Ok(()));
+        Ok(())
+    }
+
+    #[test]
     fn project_file_refuses_nothing_to_install() -> TestResult {
         let tool = "[tools.claude]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n";
         let pack = "[packs.core]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n";
         let cases = [
-            format!("api = 0\n{tool}"),
-            format!("api = 0\n{pack}"),
-            "api = 0\n[tools]\n[packs]\n".to_owned(),
-            "api = 0\n".to_owned(),
+            format!("api = 1\n{tool}"),
+            format!("api = 1\n{pack}"),
+            "api = 1\n[tools]\n[packs]\n".to_owned(),
+            "api = 1\n".to_owned(),
         ];
         for text in cases {
             refused_once(&text, "agentstacks.toml: nothing to install")?;
@@ -404,11 +469,11 @@ mod tests {
     fn project_file_gives_only_the_wrong_type_for_a_mistyped_table_beside_a_listed_one()
     -> TestResult {
         refused_once(
-            "api = 0\ntools = 1\n[packs.core]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n",
+            "api = 1\ntools = 1\n[packs.core]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n",
             "agentstacks.toml: tools: expected table, got integer",
         )?;
         refused_once(
-            "api = 0\npacks = \"x\"\n[tools.claude]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n",
+            "api = 1\npacks = \"x\"\n[tools.claude]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n",
             "agentstacks.toml: packs: expected table, got string",
         )
     }
@@ -421,24 +486,24 @@ mod tests {
                 .into()
         };
         let packs_only: BTreeSet<String> =
-            refusals("api = 0\npacks = \"x\"\n")?.into_iter().collect();
+            refusals("api = 1\npacks = \"x\"\n")?.into_iter().collect();
         assert_eq!(
             packs_only,
             expected("agentstacks.toml: packs: expected table, got string")
         );
-        let tools_only: BTreeSet<String> = refusals("api = 0\ntools = 1\n")?.into_iter().collect();
+        let tools_only: BTreeSet<String> = refusals("api = 1\ntools = 1\n")?.into_iter().collect();
         assert_eq!(
             tools_only,
             expected("agentstacks.toml: tools: expected table, got integer")
         );
-        let both_empty: BTreeSet<String> = refusals("api = 0\ntools = 1\n[packs]\n")?
+        let both_empty: BTreeSet<String> = refusals("api = 1\ntools = 1\n[packs]\n")?
             .into_iter()
             .collect();
         assert_eq!(
             both_empty,
             expected("agentstacks.toml: tools: expected table, got integer")
         );
-        let both_mistyped: BTreeSet<String> = refusals("api = 0\ntools = 1\npacks = \"x\"\n")?
+        let both_mistyped: BTreeSet<String> = refusals("api = 1\ntools = 1\npacks = \"x\"\n")?
             .into_iter()
             .collect();
         let both_wrong: BTreeSet<String> = [
@@ -471,11 +536,11 @@ mod tests {
         let pack = "git = \"https://example.org/r\"\ntag = \"v1\"\n";
         let tool = "[tools.claude]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n";
         refused_once(
-            &format!("api = 0\n{tool}[packs.Core]\n{pack}"),
+            &format!("api = 1\n{tool}[packs.Core]\n{pack}"),
             "agentstacks.toml: packs.Core: not a valid name",
         )?;
         refused_once(
-            &format!("api = 0\n[tools.Claude]\n{pack}[packs.core]\n{pack}"),
+            &format!("api = 1\n[tools.Claude]\n{pack}[packs.core]\n{pack}"),
             "agentstacks.toml: tools.Claude: not a valid name",
         )
     }
@@ -502,7 +567,7 @@ mod tests {
     #[test]
     fn project_file_refuses_wrong_typed_tables() -> TestResult {
         refused_once(
-            "api = 0\n[packs.core]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n\
+            "api = 1\n[packs.core]\ngit = \"https://example.org/r\"\ntag = \"v1\"\n\
              [tools]\nclaude = \"x\"\n",
             "agentstacks.toml: tools.claude: expected table, got string",
         )?;
@@ -519,33 +584,33 @@ mod tests {
         let hex = "0123456789abcdef0123456789abcdef01234567";
         let cases = [
             (
-                format!("api = 0\n{tool}{pack}path = \"packs/x\"\n"),
+                format!("api = 1\n{tool}{pack}path = \"packs/x\"\n"),
                 "agentstacks.toml: packs.core: needs exactly one of git, path",
             ),
             (
-                format!("api = 0\n{tool}{pack}rev = \"{hex}\"\n"),
+                format!("api = 1\n{tool}{pack}rev = \"{hex}\"\n"),
                 "agentstacks.toml: packs.core: needs exactly one of tag, rev",
             ),
             (
                 format!(
-                    "api = 0\n{tool}[packs.core]\ngit = \"https://example.org/r\"\nrev = \"main\"\n"
+                    "api = 1\n{tool}[packs.core]\ngit = \"https://example.org/r\"\nrev = \"main\"\n"
                 ),
                 "agentstacks.toml: packs.core.rev: not a commit id",
             ),
             (
-                format!("api = 0\n{tool}[packs.team-lint]\npath = \"packs/x\"\ntag = \"v1\"\n"),
+                format!("api = 1\n{tool}[packs.team-lint]\npath = \"packs/x\"\ntag = \"v1\"\n"),
                 "agentstacks.toml: packs.team-lint: tag, rev and subdir apply only to git sources",
             ),
             (
-                format!("api = 0\n{tool}[packs.team-lint]\npath = \"/abs\"\n"),
+                format!("api = 1\n{tool}[packs.team-lint]\npath = \"/abs\"\n"),
                 "agentstacks.toml: packs.team-lint.path: absolute paths are not portable",
             ),
             (
-                format!("api = 0\n[tools.claude]\ngit = \"-x\"\ntag = \"v1\"\n{pack}"),
+                format!("api = 1\n[tools.claude]\ngit = \"-x\"\ntag = \"v1\"\n{pack}"),
                 "agentstacks.toml: tools.claude.git: URL must not start with \"-\"",
             ),
             (
-                format!("api = 0\n{tool}subdir = \"/x\"\n{pack}"),
+                format!("api = 1\n{tool}subdir = \"/x\"\n{pack}"),
                 "agentstacks.toml: tools.claude.subdir: must stay inside the repository",
             ),
         ];
@@ -557,7 +622,7 @@ mod tests {
 
     #[test]
     fn project_file_reports_every_error() -> TestResult {
-        let text = "api = 1\n\
+        let text = "api = 2\n\
             [tools.claude]\n\
             git = \"https://example.org/r\"\n\
             tag = \"v1\"\n\
@@ -571,7 +636,7 @@ mod tests {
             branch = \"main\"\n";
         let shown: BTreeSet<String> = refusals(text)?.into_iter().collect();
         let expected: BTreeSet<String> = [
-            "agentstacks.toml: api 1 not supported (this agentstacks speaks 0)",
+            "agentstacks.toml: api 2 not supported (this agentstacks speaks 1)",
             "agentstacks.toml: packs.Core: not a valid name",
             "agentstacks.toml: packs.core.branch: unknown key",
             "agentstacks.toml: tools.claude.options: unknown key",

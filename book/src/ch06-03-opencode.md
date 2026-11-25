@@ -2,8 +2,9 @@
 
 What the official `opencode` extension does: the files it writes, the variables it gives packs, how
 hooks reach OpenCode, what it skips, and what it cannot do. It is checked against OpenCode v2.4.1
-(V2 project config). It runs on the same `api = 0` as every extension; see
-[the extension API](ch06-01-extensions.md) and [hooks](ch06-02-hooks.md).
+(V2 project config). It runs on the same `api = 1` as every extension, under the promise on [the stability
+page](ch06-06-stability.md); see [the extension API](ch06-01-extensions.md) and
+[hooks](ch06-02-hooks.md).
 
 Use it with `agentstacks init --tool opencode --pack <p>`.
 

@@ -22,7 +22,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::types::api::API;
+use crate::types::api::{ApiCheck, check};
 use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
 use crate::types::hooks::Hook;
@@ -36,6 +36,7 @@ use crate::types::name::BinaryName;
 use crate::types::name::OptionName;
 use crate::types::name::PackName;
 use crate::types::report::Diagnostics;
+use crate::types::report::LegacyApi;
 use crate::types::report::UnsupportedApi;
 use crate::types::tokens::LocatedToken;
 
@@ -52,7 +53,7 @@ use crate::types::tokens::LocatedToken;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 /// "#;
 /// let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), text)
@@ -98,7 +99,7 @@ impl PackManifest {
     /// [pack]
     /// name = "core"
     /// version = "1.0.0"
-    /// api = 0
+    /// api = 1
     /// description = "Shared skills"
     /// "#;
     /// let refused = PackManifest::parse(Path::new("packs/core/pack.toml"), text)
@@ -235,20 +236,30 @@ fn read_identity(pack: &mut TomlFields) -> (Option<PackName>, Option<Identity>) 
             .map_err(|error| pack.refuse("version", ManifestError::from(error)))
             .ok()
     });
-    let api = pack.required_integer("api");
-    if let Some(api) = api.filter(|api| *api != API) {
-        match &name {
-            Some(pack_name) => pack.refuse_at_file(ManifestError::PackUnsupportedApi {
+    let api = pack.required_integer("api").map(check);
+    match (api, &name) {
+        (Some(ApiCheck::Legacy), Some(pack_name)) => {
+            pack.refuse_at_file(ManifestError::PackLegacyApi {
                 pack: pack_name.clone(),
-                api: UnsupportedApi::new(api),
-            }),
-            None => pack.refuse("api", ManifestError::from(UnsupportedApi::new(api))),
+                api: LegacyApi,
+            });
         }
+        (Some(ApiCheck::Legacy), None) => pack.refuse("api", ManifestError::from(LegacyApi)),
+        (Some(ApiCheck::Unsupported(found)), Some(pack_name)) => {
+            pack.refuse_at_file(ManifestError::PackUnsupportedApi {
+                pack: pack_name.clone(),
+                api: UnsupportedApi::new(found),
+            });
+        }
+        (Some(ApiCheck::Unsupported(found)), None) => {
+            pack.refuse("api", ManifestError::from(UnsupportedApi::new(found)));
+        }
+        (Some(ApiCheck::Current) | None, _) => {}
     }
     let description = pack.required_text("description");
     pack.refuse_unknown_keys(&["name", "version", "api", "description"]);
     let identity = match (name.clone(), version, api, description) {
-        (Some(name), Some(version), Some(API), Some(description)) => Some(Identity {
+        (Some(name), Some(version), Some(ApiCheck::Current), Some(description)) => Some(Identity {
             name,
             version,
             description,
@@ -343,7 +354,7 @@ mod tests {
     const FILE: &str = "packs/core/pack.toml";
 
     const VALID: &str =
-        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n";
+        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n";
 
     /// The metadata part of a typical manifest. `render` and `exclude` come first because a key
     /// written after a `[table]` header belongs to that table.
@@ -354,7 +365,7 @@ exclude = ["**/*_test.lua"]
 [pack]
 name        = "sdlc"
 version     = "0.4.2"
-api         = 0
+api         = 1
 description = "a chain of steps"
 
 [requires]
@@ -416,27 +427,27 @@ binaries = ["git"]
         let cases = [
             (
                 FILE,
-                "[pack]\nname = \"Core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n",
+                "[pack]\nname = \"Core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n",
                 "packs/core/pack.toml: pack.name: \"Core\" is not a valid name",
             ),
             (
                 FILE,
-                "[pack]\nname = \"core\"\nversion = \"1.2\"\napi = 0\ndescription = \"d\"\n",
+                "[pack]\nname = \"core\"\nversion = \"1.2\"\napi = 1\ndescription = \"d\"\n",
                 "packs/core/pack.toml: pack.version: \"1.2\" is not semver",
             ),
             (
                 "packs/sdlc/pack.toml",
-                "[pack]\nname = \"sdlc\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n",
-                "packs/sdlc/pack.toml: sdlc: api 1 not supported (this agentstacks speaks 0)",
+                "[pack]\nname = \"sdlc\"\nversion = \"1.0.0\"\napi = 2\ndescription = \"d\"\n",
+                "packs/sdlc/pack.toml: sdlc: api 2 not supported (this agentstacks speaks 1)",
             ),
             (
                 FILE,
-                "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"\"\n",
+                "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"\"\n",
                 "packs/core/pack.toml: pack.description: empty",
             ),
             (
                 FILE,
-                "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"  \"\n",
+                "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"  \"\n",
                 "packs/core/pack.toml: pack.description: empty",
             ),
             (
@@ -459,24 +470,65 @@ binaries = ["git"]
     #[test]
     fn pack_manifest_refuses_api_without_a_valid_name() -> TestResult {
         let file = "packs/sdlc/pack.toml";
-        let api = "packs/sdlc/pack.toml: pack.api: 1 not supported (this agentstacks speaks 0)";
+        let api = "packs/sdlc/pack.toml: pack.api: 2 not supported (this agentstacks speaks 1)";
         let cases = [
             (
-                "[pack]\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n",
+                "[pack]\nversion = \"1.0.0\"\napi = 2\ndescription = \"d\"\n",
                 "packs/sdlc/pack.toml: pack.name: required",
             ),
             (
-                "[pack]\nname = \"Core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n",
+                "[pack]\nname = \"Core\"\nversion = \"1.0.0\"\napi = 2\ndescription = \"d\"\n",
                 "packs/sdlc/pack.toml: pack.name: \"Core\" is not a valid name",
             ),
             (
-                "[pack]\nname = 1\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n",
+                "[pack]\nname = 1\nversion = \"1.0.0\"\napi = 2\ndescription = \"d\"\n",
                 "packs/sdlc/pack.toml: pack.name: expected string, got integer",
             ),
         ];
         for (text, name_message) in cases {
             assert_eq!(refusals(file, text)?, [name_message, api], "{text}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn pack_api_zero_is_legacy() -> TestResult {
+        assert_eq!(
+            refusals(
+                "packs/demo/pack.toml",
+                "[pack]\nname = \"demo\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n"
+            )?,
+            [
+                "packs/demo/pack.toml: demo: api 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)"
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pack_api_zero_without_name_is_legacy_at_pack_api() -> TestResult {
+        assert_eq!(
+            refusals(
+                "packs/demo/pack.toml",
+                "[pack]\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n"
+            )?,
+            [
+                "packs/demo/pack.toml: pack.name: required",
+                "packs/demo/pack.toml: pack.api: 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pack_api_two_is_unsupported() -> TestResult {
+        assert_eq!(
+            refusals(
+                "packs/demo/pack.toml",
+                "[pack]\nname = \"demo\"\nversion = \"1.0.0\"\napi = 2\ndescription = \"d\"\n"
+            )?,
+            ["packs/demo/pack.toml: demo: api 2 not supported (this agentstacks speaks 1)"]
+        );
         Ok(())
     }
 
@@ -524,7 +576,7 @@ binaries = ["git"]
 
     #[test]
     fn pack_manifest_refuses_unknown_keys_at_each_level() -> TestResult {
-        let text = "foo = 1\n[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\nfoo = 1\n";
+        let text = "foo = 1\n[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\nfoo = 1\n";
         assert_eq!(
             refusals(FILE, text)?,
             [
@@ -537,7 +589,7 @@ binaries = ["git"]
 
     #[test]
     fn pack_manifest_reports_all_errors_at_once() -> TestResult {
-        let text = "render = [\"/x\"]\n[pack]\nname = \"Core\"\nversion = \"1.2\"\napi = 0\ndescription = \"d\"\n";
+        let text = "render = [\"/x\"]\n[pack]\nname = \"Core\"\nversion = \"1.2\"\napi = 1\ndescription = \"d\"\n";
         assert_eq!(
             refusals(FILE, text)?,
             [
@@ -551,7 +603,7 @@ binaries = ["git"]
 
     #[test]
     fn pack_manifest_refuses_requiring_itself_beside_another_bad_field() -> TestResult {
-        let text = "[pack]\nname = \"sdlc\"\nversion = \"1.2\"\napi = 0\ndescription = \"d\"\n[requires]\npacks = [\"sdlc\"]\n";
+        let text = "[pack]\nname = \"sdlc\"\nversion = \"1.2\"\napi = 1\ndescription = \"d\"\n[requires]\npacks = [\"sdlc\"]\n";
         assert_eq!(
             refusals("packs/sdlc/pack.toml", text)?,
             [
@@ -721,6 +773,35 @@ exec   = []
         assert_eq!(
             refusals(FILE, "pack = 1")?,
             ["packs/core/pack.toml: pack: expected table, got integer"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn documented_examples_parse() -> TestResult {
+        let text = "exclude = [\"**/*_test.lua\"]\n\n[pack]\nname        = \"team-lint\"\nversion     = \"1.0.0\"\napi         = 1\ndescription = \"Team lint rules\"\n\n[requires]\nagentstacks = \">=1.0\"\nairsl       = \">=0.1.5\"\n";
+        let manifest = PackManifest::parse(Path::new("packs/team-lint/pack.toml"), text)
+            .map_err(|d| format!("{d:?}"))?;
+        assert_eq!(
+            manifest.requires().agentstacks().map(ToString::to_string),
+            Some(">=1.0".to_owned())
+        );
+        assert_eq!(
+            manifest.requires().airsl().map(ToString::to_string),
+            Some(">=0.1.5".to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pack_manifest_refuses_a_bad_agentstacks_range_beside_other_fields() -> TestResult {
+        let text = "render = [\"/x\"]\n[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n[requires]\nagentstacks = \"nope\"\n";
+        assert_eq!(
+            refusals(FILE, text)?,
+            [
+                "packs/core/pack.toml: requires.agentstacks: \"nope\" is not a version range",
+                "packs/core/pack.toml: render[0]: \"/x\" must be relative",
+            ]
         );
         Ok(())
     }

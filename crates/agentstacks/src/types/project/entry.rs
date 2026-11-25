@@ -25,7 +25,7 @@ use crate::types::project::Source;
 ///
 /// use agentstacks::types::{ProjectFile, Source};
 ///
-/// let text = "api = 0\n\
+/// let text = "api = 1\n\
 ///     [tools.claude]\n\
 ///     path = \"extensions/claude\"\n\
 ///     [packs.team-lint]\n\

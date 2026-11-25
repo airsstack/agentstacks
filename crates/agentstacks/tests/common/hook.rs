@@ -11,7 +11,7 @@ use agentstacks::types::{HookAction, PackManifest, PackName};
 /// The module of `hooks/<name>.lua` in the pack `core`.
 pub(crate) fn module(name: &str) -> Result<HookModule, Box<dyn Error>> {
     let text = format!(
-        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
+        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\n\
          [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"hooks/{name}.lua\"\n"
     );
     let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), &text)

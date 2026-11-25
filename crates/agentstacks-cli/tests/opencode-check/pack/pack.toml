@@ -1,7 +1,7 @@
 [pack]
 name = "check"
 version = "0.1.0"
-api = 0
+api = 1
 description = "Fixed inputs for the opencode-check run against a real OpenCode"
 
 [requires]

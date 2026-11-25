@@ -6,8 +6,12 @@
 //! - [`plan`]: building a reviewable plan.
 //! - [`apply`]: applying a plan that was shown, as the only writer.
 //! - [`init`]: writing a new `agentstacks.toml` from the arguments of `init`.
+//! - [`ext`]: the flows of `ext add`, which adds a tool extension to an existing
+//!   `agentstacks.toml`, and `ext test`, which checks an extension in a temporary project.
 //! - [`doctor`]: reporting drift against the lock.
 //! - [`update`]: finding newer tags for git sources.
+//! - `newest`: the newest release tag of the official repository, shared by `init` and `ext add`.
+//! - `local`: a directory of the project opened as a source, shared by `init` and `ext add`.
 //!
 //! # Non-responsibilities
 //!
@@ -19,6 +23,9 @@
 
 pub mod apply;
 pub mod doctor;
+pub mod ext;
 pub mod init;
+mod local;
+mod newest;
 pub mod plan;
 pub mod update;

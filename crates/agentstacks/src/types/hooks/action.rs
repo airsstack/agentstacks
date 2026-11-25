@@ -1,7 +1,7 @@
 //! What a hook does, chosen by its kind.
 //!
-//! It is a sum type of its own, not optional fields on a hook, so neutral and native hooks share one
-//! set of action rules and a field that does not apply to a kind cannot be held.
+//! It is a sum type of its own, not optional fields on a hook, so neutral and native hooks share
+//! one set of action rules and a field that does not apply to a kind cannot be held.
 //!
 //! # Responsibilities
 //!
@@ -16,8 +16,8 @@
 //! # Non-responsibilities
 //!
 //! The event, its selectors and the keys outside the action belong to the hook that holds the
-//! action: [`Hook`](crate::types::Hook) for neutral hooks, [`NativeHook`](crate::types::NativeHook) for native
-//! ones.
+//! action: [`Hook`](crate::types::Hook) for neutral hooks, [`NativeHook`](crate::types::NativeHook)
+//! for native ones.
 
 use crate::types::format::TomlFields;
 use crate::types::hooks::lua::LuaHook;
@@ -41,7 +41,7 @@ use crate::types::tokens::LocatedToken;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]

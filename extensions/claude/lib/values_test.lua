@@ -2,7 +2,7 @@ local values = require("values")
 
 local function payload(vars)
   return {
-    api = 0,
+    api = 1,
     tool = "claude",
     packs = { { name = "core", version = "0.3.0", skills = { "status" }, agents = { "coder" } } },
     vars = vars or {},

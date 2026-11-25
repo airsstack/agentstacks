@@ -7,6 +7,7 @@
 //!
 //! - [`BinaryName`] is a `requires.binaries` or `grants.exec` entry, valid on construction under
 //!   the same name rule as every other name.
+//! - [`AIRSL`] is the name of the `airsl` binary, written once.
 //!
 //! # Non-responsibilities
 //!
@@ -17,6 +18,9 @@ use std::str::FromStr;
 
 use crate::types::name::InvalidName;
 use crate::types::name::item::ItemName;
+
+/// The name of the `airsl` binary, which every hook may run without the pack requiring it.
+pub const AIRSL: &str = "airsl";
 
 /// The name of a binary.
 ///

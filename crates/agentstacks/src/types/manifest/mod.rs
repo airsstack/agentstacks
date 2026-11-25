@@ -8,15 +8,17 @@
 //!
 //! - [`PackManifest`]: reads the whole file into one value, or reports every refusal of it at once.
 //! - [`ManifestError`]: one variant per refusal wording a manifest field can meet.
-//! - [`Requires`]: the `[requires]` table: required packs, the airsl range and required binaries.
-//! - [`AirslReq`]: a `requires.airsl` range whose operators are all supported, kept as written.
+//! - [`Requires`]: the `[requires]` table: required packs, the agentstacks and airsl ranges and
+//!   required binaries.
+//! - [`VersionRange`]: a `requires` version range whose operators are all supported, kept as
+//!   written.
 //! - [`PackPath`]: a path that stays inside the pack, used by `render` and by hook scripts.
 //! - [`ExcludeGlob`]: a relative glob with its compiled matcher, used by `exclude`.
 //! - [`OptionDecl`]: one `[options.<name>]` declaration: type, default and description.
 //! - [`OptionType`]: the three option types, `boolean`, `integer` and `string`.
 //! - [`OptionValue`]: a value an option can hold.
 //! - [`PackVersion`]: a semantic version, used for packs, extensions and the locked airsl.
-//! - [`InvalidVersion`], [`InvalidAirslReq`], [`InvalidPackPath`], [`InvalidExcludeGlob`],
+//! - [`InvalidVersion`], [`InvalidRange`], [`InvalidPackPath`], [`InvalidExcludeGlob`],
 //!   [`InvalidOptionType`]: the refusal each of those constructors returns.
 //!
 //! # Non-responsibilities
@@ -28,28 +30,26 @@
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
-pub mod airsl;
 pub mod error;
 pub mod exclude;
 pub mod invalid;
 pub mod option;
 pub mod pack;
+pub mod range;
 pub mod requires;
 
-#[doc(inline)]
-pub use airsl::AirslReq;
 #[doc(inline)]
 pub use error::ManifestError;
 #[doc(inline)]
 pub use exclude::ExcludeGlob;
-#[doc(inline)]
-pub use invalid::InvalidAirslReq;
 #[doc(inline)]
 pub use invalid::InvalidExcludeGlob;
 #[doc(inline)]
 pub use invalid::InvalidOptionType;
 #[doc(inline)]
 pub use invalid::InvalidPackPath;
+#[doc(inline)]
+pub use invalid::InvalidRange;
 #[doc(inline)]
 pub use invalid::InvalidVersion;
 #[doc(inline)]
@@ -64,5 +64,7 @@ pub use pack::PackManifest;
 pub use pack::PackPath;
 #[doc(inline)]
 pub use pack::PackVersion;
+#[doc(inline)]
+pub use range::VersionRange;
 #[doc(inline)]
 pub use requires::Requires;

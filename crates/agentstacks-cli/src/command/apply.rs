@@ -150,6 +150,31 @@ mod tests {
     }
 
     #[test]
+    fn apply_refuses_a_legacy_project() -> TestResult {
+        let world = World::legacy()?;
+        let mut console = console(false, "");
+        let got = run(&world.ports, true, &mut console);
+        assert_eq!(got, Outcome::Refused);
+        assert_eq!(
+            err_of(&console),
+            "agentstacks.toml: api 0 is from agentstacks 0.x (run agentstacks update)\n"
+        );
+        assert_eq!(out_of(&console), "");
+        let workspace = &world.ports.workspace;
+        assert_eq!(workspace.file_bytes(&OpPath::new(AGENT_FILE)?), None);
+        assert!(workspace.lock_written().is_none());
+        assert!(
+            !workspace
+                .calls()
+                .iter()
+                .any(|call| matches!(call, WorkspaceCall::Stage(_))),
+            "{:?}",
+            workspace.calls()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn apply_lock_read_error_is_refused() -> TestResult {
         let world = World::paths()?;
         let ports = Ports {

@@ -58,9 +58,9 @@ fn load_refuses_each_fixture() {
         ("no-pack-toml", ": not a pack (no pack.toml)"),
         (
             "reserved-commands",
-            "/commands: reserved, not supported in api 0",
+            "/commands: reserved, not supported in api 1",
         ),
-        ("reserved-rules", "/rules: reserved, not supported in api 0"),
+        ("reserved-rules", "/rules: reserved, not supported in api 1"),
         ("skill-missing-skill-md", "/skills/a: missing SKILL.md"),
         (
             "skills-stray-file",
@@ -253,7 +253,11 @@ const SPEC_ROW_CASES: &[(&str, &str)] = &[
     ),
     (
         "pack-api-unsupported",
-        "/pack.toml: core: api 1 not supported (this agentstacks speaks 0)",
+        "/pack.toml: core: api 2 not supported (this agentstacks speaks 1)",
+    ),
+    (
+        "pack-api-legacy",
+        "/pack.toml: core: api 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
     ),
     (
         "pack-description-empty",

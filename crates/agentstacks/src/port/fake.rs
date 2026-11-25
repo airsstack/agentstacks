@@ -109,6 +109,13 @@ impl FakeFileTree {
         self.with(rel.as_ref(), Node::Uninspectable)
     }
 
+    /// The same tree with its root shown as `label` in messages.
+    #[must_use]
+    pub fn labelled(mut self, label: impl Into<PathBuf>) -> Self {
+        self.root = label.into();
+        self
+    }
+
     /// The error every failing read of the fake returns.
     #[must_use]
     pub fn denied() -> io::Error {

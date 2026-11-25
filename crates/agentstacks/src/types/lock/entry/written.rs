@@ -23,6 +23,7 @@ use crate::types::lock::entry::locked::read_hash;
 use crate::types::lock::error::LockError;
 use crate::types::lock::owner::Owner;
 use crate::types::project::InvalidSubPath;
+use crate::types::project::PROJECT_FILE;
 use crate::types::project::SourceError;
 use crate::types::project::SubPath;
 use crate::types::report::MustBeRelative;
@@ -30,7 +31,7 @@ use crate::types::report::OutsideProject;
 use crate::types::tree::ContentHash;
 
 /// The files agentstacks writes itself, which no entry may record.
-const OWN_FILES: [&str; 2] = ["agentstacks.lock", "agentstacks.toml"];
+const OWN_FILES: [&str; 2] = ["agentstacks.lock", PROJECT_FILE];
 /// The keys a `[[file]]` entry may hold.
 const FILE_KEYS: [&str; 3] = ["path", "hash", "by"];
 

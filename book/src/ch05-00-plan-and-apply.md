@@ -35,6 +35,10 @@ Where the code lives:
 10 return Plan, or every refusal                                    none
 ```
 
+Step 1 also refuses a project written for the 0.x releases, with the refusal that names
+`agentstacks update` ([the command line](ch04-00-cli.md#4-plan-and-apply)). The lock is still read,
+and nothing else runs.
+
 A refusal in steps 1 to 7 skips steps 8 and 9. No step is decided, so no false delete appears.
 
 **Order of tools.** Listed tools run in name order, then removed tools in name order. Each listed
@@ -215,6 +219,11 @@ Directories a delete leaves empty are left in place.
 `agentstacks.lock` records tools, packs, the non-shared files with their `by`, and `[airsl]`.
 Shared files are never recorded.
 
+- The lock is written with `api = 1`. It is read at `api = 0` too, so the lock of a project built
+  by a 0.x release loads as it is, and the next `apply` rewrites it at `api = 1`. Any other `api`
+  is refused: `agentstacks.lock: api 2 not supported (this agentstacks speaks 1)`. A lock at
+  `api = 0` is not a `doctor` finding.
+
 - There is no `[[merge]]` table. The key is unknown: `agentstacks.lock: merge: unknown key`.
 - A `[[file]].path` containing `\` is refused when the lock is read:
   `agentstacks.lock: file[0].path: "a\b" must use / as the separator`.
@@ -329,11 +338,11 @@ and renaming it into place.
 
 ## 10. Update
 
-`app/update` finds the latest tag for each git source. `latest_tag(url, prefix)` returns
-`Option<tag>`:
+`app/update` finds the latest tag for each git source. `latest_tag(tags, prefix, major)` returns
+`Option<tag>`; `major` is an optional required major version, and `None` keeps every major:
 
 1. List `refs/tags/<prefix>*`.
-2. Take each tag's suffix after `prefix`. Keep those that parse as semver and are not pre-releases.
+2. Take each tag's suffix after `prefix`. Keep those that parse as semver and are not pre-releases. With a required major, keep only those of that major.
 3. Return the highest by semver. If none remains, return `None`. Equal precedence (build metadata
    only) returns the greater tag in byte order.
 
@@ -353,8 +362,14 @@ whose remainder parses as semver.
 `app/update` returns one entry per git source: its key, the current tag, and the new tag or the
 note. Entries follow key order: `packs.*`, then `tools.*`.
 
-The CLI owns writing a new tag into `agentstacks.toml`, shorthand expansion (prefix `packs-v`) and
-its refusal when `latest_tag` returns `None`.
+For the official repository (the URL equal to `https://github.com/airsstack/agentstacks` byte for
+byte, so a `.git` suffix makes it a third-party source) and the prefix `packs-v`, `major` is the
+`api` this agentstacks speaks: a 1.x binary updates `packs-v0.2.0` to the newest `packs-v1.*` and
+never to `packs-v2.*`. Every other source passes `None`. The `init` shorthand and `ext add`
+follow the same rule, and `init` refuses with `no packs-v1 release tag in <url>` when no tag of that major exists.
+
+The library owns writing a new tag into `agentstacks.toml` (`app/update`), shorthand expansion
+(prefix `packs-v`) and its refusal when `latest_tag` returns `None` (`app/newest`, `app/init`).
 
 ## 11. Binaries and the airsl pin
 

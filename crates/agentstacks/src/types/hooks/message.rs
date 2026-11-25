@@ -1,7 +1,7 @@
 //! A hook that shows the agent a message.
 //!
-//! It is separate from `LuaHook` because the two kinds share no fields and each refuses the other's,
-//! which keeps each kind's reader small.
+//! It is separate from `LuaHook` because the two kinds share no fields and each refuses the
+//! other's, which keeps each kind's reader small.
 //!
 //! # Responsibilities
 //!
@@ -35,7 +35,7 @@ use crate::types::tokens::LocatedToken;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]
@@ -66,7 +66,7 @@ use crate::types::tokens::LocatedToken;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]

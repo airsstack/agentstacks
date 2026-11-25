@@ -31,7 +31,7 @@ use crate::types::name::PackName;
 /// [pack]
 /// name = "team-lint"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Lint rules"
 ///
 /// [[hooks]]
@@ -87,7 +87,7 @@ mod tests {
 
     fn module_of(pack: &str, run: &str) -> Result<String, Box<dyn std::error::Error>> {
         let text = format!(
-            "[pack]\nname = \"{pack}\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
+            "[pack]\nname = \"{pack}\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\n\
              [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"{run}\"\n"
         );
         let manifest = PackManifest::parse(Path::new("packs/p/pack.toml"), &text)

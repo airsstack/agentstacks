@@ -2,9 +2,10 @@
 //!
 //! # Responsibilities
 //!
-//! - [`run`] lists the newer tags, writes them into `agentstacks.toml` and then plans, shows and
-//!   applies like `apply`, with the lines that tell the author where the file stands.
-//! - It writes nothing, and plans nothing, when no tag is newer.
+//! - [`run`] lists the newer tags and a legacy `api`, writes them into `agentstacks.toml` and then
+//!   plans, shows and applies like `apply`, with the lines that tell the author where the file
+//!   stands.
+//! - It writes nothing, and plans nothing, when no tag is newer and the `api` is current.
 //!
 //! # Non-responsibilities
 //!
@@ -18,15 +19,17 @@
 
 use std::io::{BufRead, Write};
 
-use agentstacks::app::update::{retag, update};
+use agentstacks::app::update::{rewrite, update};
 use agentstacks::port::{Adapter, Binary, Git, Workspace};
+use agentstacks::types::ApiCheck;
 
 use super::followup::{Rewrite, plan_then_apply};
 use super::{Console, Ports};
 use crate::exit::Outcome;
 use crate::show::{has_newer, update_text};
 
-/// Moves each git source to its newest tag, then plans and applies.
+/// Moves a legacy `api` to the current one and each git source to its newest tag, then plans and
+/// applies.
 ///
 /// A refusal to list the tags, or to write them (the file changed meanwhile, or cannot be
 /// written), prints the diagnostics and is [`Outcome::Refused`] with the file as it was and no
@@ -45,21 +48,21 @@ where
     O: Write,
     E: Write,
 {
-    let entries = match update(&ports.workspace, &ports.git) {
-        Ok(entries) => entries,
+    let found = match update(&ports.workspace, &ports.git) {
+        Ok(found) => found,
         Err(refusals) => {
             console.refuse(refusals);
             return Outcome::Refused;
         }
     };
-    if !entries.is_empty() {
-        console.out_line(update_text(&entries));
+    if found.api == ApiCheck::Legacy || !found.entries.is_empty() {
+        console.out_line(update_text(&found));
     }
-    if !has_newer(&entries) {
+    if !has_newer(&found) {
         console.out_line("nothing to update");
         return Outcome::Success;
     }
-    if let Err(refusals) = retag(&ports.workspace, &entries) {
+    if let Err(refusals) = rewrite(&ports.workspace, &found) {
         console.refuse(refusals);
         return Outcome::Refused;
     }
@@ -75,7 +78,7 @@ mod tests {
     use super::*;
     use crate::command::Ports;
     use crate::command::testing::{
-        AGENT_FILE, GIT_PROJECT, Shifting, TestResult, World, console, err_of, out_of,
+        AGENT_FILE, GIT_PROJECT, PATH_PROJECT, Shifting, TestResult, World, console, err_of, out_of,
     };
 
     const FIX: &str = "agentstacks.toml updated; fix the above and run apply\n";
@@ -91,6 +94,25 @@ mod tests {
         assert_eq!(out_of(&console), "nothing to update\n");
         assert_eq!(err_of(&console), "");
         assert_eq!(world.ports.workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn update_legacy_with_no_tag_does_not_say_nothing() -> TestResult {
+        let world = World::legacy()?;
+        let mut console = console(false, "");
+        let got = run(&world.ports, true, &mut console);
+        assert_eq!(got, Outcome::Success, "{}", err_of(&console));
+        let out = out_of(&console);
+        assert!(
+            out.starts_with("  api: 0 \u{2192} 1\nagentstacks.toml updated\nagentstacks plan\n"),
+            "{out}"
+        );
+        assert!(!out.contains("nothing to update"), "{out}");
+        assert_eq!(
+            world.ports.workspace.project_written(),
+            Some(PATH_PROJECT.to_owned())
+        );
         Ok(())
     }
 

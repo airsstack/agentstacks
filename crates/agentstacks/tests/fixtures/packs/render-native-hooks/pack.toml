@@ -2,5 +2,5 @@ render = ["native/claude/hooks.toml"]
 [pack]
 name = "core"
 version = "0.1.0"
-api = 0
+api = 1
 description = "d"

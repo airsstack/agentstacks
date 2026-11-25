@@ -74,11 +74,6 @@ fn each_invalid_extension_fixture_reports_its_refusal() {
         ),
         ("empty-description", false, ": extension.description: empty"),
         (
-            "api-one",
-            false,
-            ": extension.api: 1 not supported (this agentstacks speaks 0)",
-        ),
-        (
             "entry-outside",
             false,
             ": extension.entry: \"../a.lua\" must stay inside the extension",
@@ -121,4 +116,30 @@ fn each_invalid_extension_fixture_reports_its_refusal() {
             "{name}"
         );
     }
+}
+
+#[test]
+fn extension_load_refuses_api_zero_as_legacy() {
+    let dir = fixture("invalid/api-zero");
+    let expected = format!(
+        "{}: extension.api: 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
+        dir.join("extension.toml").display()
+    );
+    assert_eq!(
+        refusals(Extension::load(&StdFileTree::new(dir))),
+        [expected]
+    );
+}
+
+#[test]
+fn extension_load_refuses_api_two() {
+    let dir = fixture("invalid/api-two");
+    let expected = format!(
+        "{}: extension.api: 2 not supported (this agentstacks speaks 1)",
+        dir.join("extension.toml").display()
+    );
+    assert_eq!(
+        refusals(Extension::load(&StdFileTree::new(dir))),
+        [expected]
+    );
 }

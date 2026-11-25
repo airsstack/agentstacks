@@ -334,6 +334,7 @@ fn holds_items(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::API;
     use crate::types::pack::testing::{DIR, paths, refused_walk};
     use std::error::Error;
     use std::path::PathBuf;
@@ -471,8 +472,8 @@ mod tests {
         assert_eq!(
             shown,
             [
-                format!("{DIR}/commands: reserved, not supported in api 0"),
-                format!("{DIR}/rules: reserved, not supported in api 0"),
+                format!("{DIR}/commands: reserved, not supported in api {API}"),
+                format!("{DIR}/rules: reserved, not supported in api {API}"),
             ]
         );
         Ok(())

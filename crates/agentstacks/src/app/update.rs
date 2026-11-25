@@ -1,51 +1,64 @@
-//! The flow that finds newer tags for the packs and extensions taken from git sources.
+//! The flow that finds newer tags for the packs and extensions taken from git sources, and whether
+//! the project file still speaks the legacy `api`.
 //!
 //! It exists so a user can see, without changing anything, which git source of `agentstacks.toml`
-//! has a newer released tag, and to put the newer tags into the file once the user accepts them.
+//! has a newer released tag and whether the file's `api` has to move, and to put both into the file
+//! once the user accepts them.
 //!
 //! # Responsibilities
 //!
-//! - [`update`] reads and parses `agentstacks.toml`, visits every source in key order (`packs.*`,
-//!   then `tools.*`), asks the update rules what each source needs, lists the tags of the git
-//!   sources that need them and hands the tags back to the rules. It collects one entry per git
-//!   source, or every refusal: git's failures located at their source, and one refusal for git
-//!   missing from `PATH` that names every source that needed it.
-//! - [`retag`] writes the newer tags of those entries into `agentstacks.toml`: it reads the file
-//!   again, checks it, hands every change to [`retag_project`] and writes the text once. `update`
-//!   itself never writes.
+//! - [`update`] reads and parses `agentstacks.toml` (`api` 0 or the current one), visits every
+//!   source in key order (`packs.*`, then `tools.*`), asks the update rules what each source needs,
+//!   lists the tags of the git sources that need them and hands the tags back to the rules. It
+//!   returns an [`Update`]: one entry per git source and whether the legacy `api` moves, or every
+//!   refusal: git's failures located at their source, and one refusal for git missing from `PATH`
+//!   that names every source that needed it.
+//! - [`rewrite`] writes an [`Update`] into `agentstacks.toml`: it reads the file again, checks it,
+//!   hands every newer tag to [`retag_project`], moves a legacy `api` with [`upgrade_project`] on
+//!   the same text and writes it once. `update` itself never writes.
 //!
 //! # Non-responsibilities
 //!
-//! No rule: how a tag is split, which tag is newest, the words of every note and how a tag is
-//! replaced in the file belong to [`UpdateQuery`], [`UpdateNote`](crate::types::resolve::UpdateNote)
-//! and [`retag_project`]. No shorthand expansion.
+//! No rule: how a tag is split, which tag is newest, the words of every note, and how a tag or the
+//! `api` is replaced in the file belong to [`UpdateQuery`],
+//! [`UpdateNote`](crate::types::resolve::UpdateNote), [`retag_project`] and [`upgrade_project`].
+//! No shorthand expansion.
 
 use std::path::Path;
 
 use crate::port::{Git, Workspace};
-use crate::types::project::{ProjectFile, retag_project};
+use crate::types::api::ApiCheck;
+use crate::types::project::{PROJECT_FILE, ProjectFile, retag_project, upgrade_project};
 use crate::types::report::{Diagnostic, Diagnostics, Location};
 use crate::types::resolve::{FetchError, SourceKey, UpdateEntry, UpdateOutcome, UpdateQuery};
 
-/// The project file, the file every refusal here is located in.
-const PROJECT_FILE: &str = "agentstacks.toml";
+/// What `update` found: the newest released tag for each git source, and whether the file's `api`
+/// has to move.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Update {
+    /// The `api` `agentstacks.toml` declares: [`ApiCheck::Legacy`] when `rewrite` will set the
+    /// current one, [`ApiCheck::Current`] otherwise. It is never [`ApiCheck::Unsupported`],
+    /// because `update` refuses a project file with one.
+    pub api: ApiCheck,
+    /// One entry per git source in key order, `packs.*` then `tools.*`, and none for a `path`
+    /// source. An entry says what the source is pinned to now and either the newer tag or why
+    /// there is none.
+    pub entries: Vec<UpdateEntry>,
+}
 
-/// The newest released tag for each git source of `agentstacks.toml`.
+/// The newest released tag for each git source of `agentstacks.toml`, and whether its `api` moves.
 ///
-/// There is one entry per git source in key order, `packs.*` then `tools.*`, and none for a `path`
+/// The entries are one per git source in key order, `packs.*` then `tools.*`, and none for a `path`
 /// source. An entry says what the source is pinned to now and either the newer tag or why there is
-/// none.
+/// none. `api` is [`ApiCheck::Legacy`] for a file written for the `0.x` releases.
 ///
 /// # Errors
 ///
-/// Returns every refusal, sorted, and no entries, when the project file cannot be read or is
+/// Returns every refusal, sorted, and nothing else, when the project file cannot be read or is
 /// refused, or when listing the tags of a source fails. A failure of git is located at the
 /// source's key; git missing from `PATH` is one refusal at the file that names every source that
 /// asked for it.
-pub fn update<W: Workspace, G: Git>(
-    workspace: &W,
-    git: &G,
-) -> Result<Vec<UpdateEntry>, Diagnostics> {
+pub fn update<W: Workspace, G: Git>(workspace: &W, git: &G) -> Result<Update, Diagnostics> {
     let text = workspace
         .project_text()
         .map_err(|error| single(Diagnostic::new(Location::file(PROJECT_FILE), error)))?;
@@ -83,22 +96,29 @@ pub fn update<W: Workspace, G: Git>(
         };
         refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
     }
-    refusals.into_result(entries)
+    refusals.into_result(Update {
+        api: project.api(),
+        entries,
+    })
 }
 
-/// Writes the newer tags of `entries` into `agentstacks.toml`, once.
+/// Writes the newer tags of `found`, and the current `api` when it moves, into `agentstacks.toml`,
+/// once.
 ///
-/// Returns `Ok(false)` and writes nothing when no entry carries a newer tag. Otherwise the file is
-/// read again and checked, every `(key, current tag, new tag)` is applied in one edit that keeps the
-/// comments, and the text is written; `Ok(true)` says it was.
+/// Returns `Ok(false)` and writes nothing when no entry carries a newer tag and the `api` does not
+/// move. Otherwise the file is read again and checked, every `(key, current tag, new tag)` is
+/// applied, then the `api` is set, all in one edit that keeps the comments, and the text is
+/// written; `Ok(true)` says it was.
 ///
 /// # Errors
 ///
 /// Returns the refusal, with nothing written, when the file cannot be read or no longer parses as a
-/// project file, when an entry has no tag now or a tag other than the one `update` listed (the file
-/// was edited since), or when the write fails. A read or write failure is located at the file.
-pub fn retag<W: Workspace>(workspace: &W, entries: &[UpdateEntry]) -> Result<bool, Diagnostics> {
-    let changes: Vec<_> = entries
+/// project file, when an entry has no tag now or a tag other than the one `update` listed, when
+/// the `api` is no longer the legacy one (the file was edited since), or when the write fails. A
+/// read or write failure is located at the file.
+pub fn rewrite<W: Workspace>(workspace: &W, found: &Update) -> Result<bool, Diagnostics> {
+    let changes: Vec<_> = found
+        .entries
         .iter()
         .filter_map(|entry| match (&entry.outcome, &entry.current) {
             (UpdateOutcome::NewTag(new), Some(current)) => {
@@ -107,14 +127,18 @@ pub fn retag<W: Workspace>(workspace: &W, entries: &[UpdateEntry]) -> Result<boo
             _ => None,
         })
         .collect();
-    if changes.is_empty() {
+    let api_moves = found.api == ApiCheck::Legacy;
+    if changes.is_empty() && !api_moves {
         return Ok(false);
     }
     let at_file =
         |error: std::io::Error| single(Diagnostic::new(Location::file(PROJECT_FILE), error));
     let text = workspace.project_text().map_err(at_file)?;
     ProjectFile::parse(Path::new(PROJECT_FILE), &text)?;
-    let edited = retag_project(&text, &changes).map_err(single)?;
+    let mut edited = retag_project(&text, &changes).map_err(single)?;
+    if api_moves {
+        edited = upgrade_project(&edited).map_err(single)?;
+    }
     workspace.write_project(&edited).map_err(at_file)?;
     Ok(true)
 }
@@ -167,7 +191,7 @@ mod tests {
         let tools = tools
             .iter()
             .map(|(name, body)| format!("[tools.{name}]\n{body}"));
-        std::iter::once("api = 0\n".to_owned())
+        std::iter::once("api = 1\n".to_owned())
             .chain(packs)
             .chain(tools)
             .collect()
@@ -193,7 +217,7 @@ mod tests {
     }
 
     fn refusals(
-        result: Result<Vec<UpdateEntry>, Diagnostics>,
+        result: Result<Update, Diagnostics>,
     ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let diagnostics = result.err().ok_or("update succeeded")?;
         Ok(diagnostics
@@ -203,13 +227,29 @@ mod tests {
             .collect())
     }
 
-    fn entries(
-        result: Result<Vec<UpdateEntry>, Diagnostics>,
-    ) -> Result<Vec<UpdateEntry>, Box<dyn std::error::Error>> {
+    fn found(result: Result<Update, Diagnostics>) -> Result<Update, Box<dyn std::error::Error>> {
         result.map_err(|d| {
             let shown: Vec<String> = d.into_sorted().iter().map(ToString::to_string).collect();
             format!("update refused: {shown:?}").into()
         })
+    }
+
+    fn entries(
+        result: Result<Update, Diagnostics>,
+    ) -> Result<Vec<UpdateEntry>, Box<dyn std::error::Error>> {
+        Ok(found(result)?.entries)
+    }
+
+    /// An update of a project at the current `api` that holds `entries`.
+    fn at_current(entries: &[UpdateEntry]) -> Update {
+        Update {
+            api: ApiCheck::Current,
+            entries: entries.to_vec(),
+        }
+    }
+
+    fn legacy(text: &str) -> String {
+        text.replacen("api = 1", "api = 0", 1)
     }
 
     fn note(entry: &UpdateEntry) -> Result<String, Box<dyn std::error::Error>> {
@@ -243,7 +283,7 @@ mod tests {
 
     #[test]
     fn update_passes_project_refusals_through() -> TestResult {
-        let workspace = FakeWorkspace::new().project("api = 0\n");
+        let workspace = FakeWorkspace::new().project("api = 1\n");
         let git = FakeGit::new();
         let found = refusals(update(&workspace, &git))?;
         assert_eq!(found, ["agentstacks.toml: nothing to install"]);
@@ -554,7 +594,7 @@ mod tests {
         })
     }
 
-    /// The tool the retag tests list beside their packs, a project needing one of each.
+    /// The tool the rewrite tests list beside their packs, a project needing one of each.
     fn claude_path() -> (&'static str, String) {
         ("claude", "path = \"extensions/claude\"\n".to_owned())
     }
@@ -574,13 +614,13 @@ mod tests {
     }
 
     #[test]
-    fn retag_writes_every_newer_tag_once() -> TestResult {
+    fn rewrite_writes_every_newer_tag_once() -> TestResult {
         let workspace = FakeWorkspace::new().project(&two_packs());
         let entries = [
             newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?,
             newer(lint()?, "packs-v0.1.0", "packs-v0.3.0")?,
         ];
-        assert!(retag(&workspace, &entries).map_err(|d| format!("{d:?}"))?);
+        assert!(rewrite(&workspace, &at_current(&entries)).map_err(|d| format!("{d:?}"))?);
         let written = workspace.project_written().ok_or("a write")?;
         assert_eq!(
             written,
@@ -598,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn retag_with_no_newer_tag_writes_nothing() -> TestResult {
+    fn rewrite_with_no_newer_tag_writes_nothing() -> TestResult {
         let workspace = FakeWorkspace::new().project(&two_packs());
         let no_newer = UpdateEntry {
             key: core()?,
@@ -608,32 +648,32 @@ mod tests {
                 tag: GitTag::new("packs-v0.1.0")?,
             }),
         };
-        assert!(!retag(&workspace, &[no_newer]).map_err(|d| format!("{d:?}"))?);
-        assert!(!retag(&workspace, &[]).map_err(|d| format!("{d:?}"))?);
+        assert!(!rewrite(&workspace, &at_current(&[no_newer])).map_err(|d| format!("{d:?}"))?);
+        assert!(!rewrite(&workspace, &at_current(&[])).map_err(|d| format!("{d:?}"))?);
         assert_eq!(workspace.project_written(), None);
         assert!(workspace.calls().is_empty());
         Ok(())
     }
 
     #[test]
-    fn retag_refuses_text_that_no_longer_parses() -> TestResult {
+    fn rewrite_refuses_text_that_no_longer_parses() -> TestResult {
         let workspace = FakeWorkspace::new().project("[packs.core\n");
         let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
-        let shown = refused(retag(&workspace, &entries))?;
+        let shown = refused(rewrite(&workspace, &at_current(&entries)))?;
         assert_eq!(shown, ["agentstacks.toml:1: unclosed table, expected `]`"]);
         assert_eq!(workspace.project_written(), None);
         Ok(())
     }
 
     #[test]
-    fn retag_refuses_a_tag_changed_at_re_read() -> TestResult {
+    fn rewrite_refuses_a_tag_changed_at_re_read() -> TestResult {
         let workspace = FakeWorkspace::new().project(&project(
             &[("core", tagged(CORE_URL, "packs-v0.1.5"))],
             &[claude_path()],
         ));
         let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
         assert_eq!(
-            refused(retag(&workspace, &entries))?,
+            refused(rewrite(&workspace, &at_current(&entries)))?,
             ["agentstacks.toml: packs.core: tag changed during update (run update again)"]
         );
         assert_eq!(workspace.project_written(), None);
@@ -641,26 +681,26 @@ mod tests {
     }
 
     #[test]
-    fn retag_reports_a_failed_write() -> TestResult {
+    fn rewrite_reports_a_failed_write() -> TestResult {
         let workspace = FakeWorkspace::new()
             .project(&two_packs())
             .fail(WorkspaceCall::WriteProject);
         let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
         assert_eq!(
-            refused(retag(&workspace, &entries))?,
+            refused(rewrite(&workspace, &at_current(&entries)))?,
             [format!("agentstacks.toml: {}", FakeWorkspace::denied())]
         );
         Ok(())
     }
 
     #[test]
-    fn retag_reports_a_failed_re_read() -> TestResult {
+    fn rewrite_reports_a_failed_re_read() -> TestResult {
         let workspace = FakeWorkspace::new()
             .project(&two_packs())
             .fail(WorkspaceCall::ProjectText);
         let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
         assert_eq!(
-            refused(retag(&workspace, &entries))?,
+            refused(rewrite(&workspace, &at_current(&entries)))?,
             [format!("agentstacks.toml: {}", FakeWorkspace::denied())]
         );
         assert_eq!(workspace.project_written(), None);
@@ -668,15 +708,88 @@ mod tests {
     }
 
     #[test]
-    fn retag_refuses_a_key_missing_at_re_read() -> TestResult {
+    fn rewrite_refuses_a_key_missing_at_re_read() -> TestResult {
         let workspace = FakeWorkspace::new().project(&project(
             &[("lint", tagged(LINT_URL, "packs-v0.1.0"))],
             &[claude_path()],
         ));
         let entries = [newer(core()?, "packs-v0.1.0", "packs-v0.2.0")?];
         assert_eq!(
-            refused(retag(&workspace, &entries))?,
+            refused(rewrite(&workspace, &at_current(&entries)))?,
             ["agentstacks.toml: packs.core: no tag to update (run update again)"]
+        );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_project_upgrades_with_no_newer_tag() -> TestResult {
+        let text = legacy(&project(
+            &[("core", "path = \"packs/core\"\n".to_owned())],
+            &[claude_path()],
+        ));
+        let workspace = FakeWorkspace::new().project(&text);
+        let result = found(update(&workspace, &FakeGit::new()))?;
+        assert_eq!(result.api, ApiCheck::Legacy);
+        assert!(result.entries.is_empty());
+        assert!(rewrite(&workspace, &result).map_err(|d| format!("{d:?}"))?);
+        assert_eq!(
+            workspace.project_written(),
+            Some(text.replacen("api = 0", "api = 1", 1))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_and_new_tags_rewrite_both() -> TestResult {
+        let text = legacy(&two_packs());
+        let workspace = FakeWorkspace::new().project(&text);
+        let git = FakeGit::new()
+            .tags(&url(CORE_URL)?, remotes(&["packs-v0.1.0", "packs-v0.2.0"])?)
+            .tags(&url(LINT_URL)?, remotes(&["packs-v0.1.0"])?);
+        let result = found(update(&workspace, &git))?;
+        assert_eq!(result.api, ApiCheck::Legacy);
+        assert!(rewrite(&workspace, &result).map_err(|d| format!("{d:?}"))?);
+        assert_eq!(
+            workspace.project_written(),
+            Some(text.replacen("api = 0", "api = 1", 1).replacen(
+                "packs-v0.1.0",
+                "packs-v0.2.0",
+                1
+            ))
+        );
+        let writes = workspace
+            .calls()
+            .iter()
+            .filter(|call| **call == WorkspaceCall::WriteProject)
+            .count();
+        assert_eq!(writes, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn current_project_unchanged_behaviour() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&two_packs());
+        let git = FakeGit::new()
+            .tags(&url(CORE_URL)?, remotes(&["packs-v0.1.0"])?)
+            .tags(&url(LINT_URL)?, remotes(&["packs-v0.1.0"])?);
+        let result = found(update(&workspace, &git))?;
+        assert_eq!(result.api, ApiCheck::Current);
+        assert!(!rewrite(&workspace, &result).map_err(|d| format!("{d:?}"))?);
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn api_edited_between_read_and_rewrite() -> TestResult {
+        let workspace = FakeWorkspace::new().project(&two_packs());
+        let result = Update {
+            api: ApiCheck::Legacy,
+            entries: Vec::new(),
+        };
+        assert_eq!(
+            refused(rewrite(&workspace, &result))?,
+            ["agentstacks.toml: api changed during update (run update again)"]
         );
         assert_eq!(workspace.project_written(), None);
         Ok(())
@@ -687,7 +800,7 @@ mod tests {
     ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         Ok(result
             .err()
-            .ok_or("retag succeeded")?
+            .ok_or("rewrite succeeded")?
             .into_sorted()
             .iter()
             .map(ToString::to_string)

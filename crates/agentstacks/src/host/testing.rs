@@ -55,7 +55,7 @@ use crate::types::tree::TreePath;
 fn manifest(reads: &[&str]) -> String {
     let listed: Vec<String> = reads.iter().map(|path| format!("{path:?}")).collect();
     format!(
-        "[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"adapter.lua\"\nreads = [{}]\n",
+        "[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\nreads = [{}]\n",
         listed.join(", ")
     )
 }

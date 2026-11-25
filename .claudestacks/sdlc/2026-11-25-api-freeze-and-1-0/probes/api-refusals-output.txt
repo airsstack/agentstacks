@@ -1,0 +1,48 @@
+## P7 agentstacks 0.2.0 (target/debug, HEAD 33e3925): today's api refusals
+### baseline api = 0 everywhere: apply --yes
+stdout:
+agentstacks plan
+
+  create   .claude/agents/demo-helper.md             demo
+  create   .claude/agentstacks/demo/hooks/guard.lua  demo
+  create   .claude/agentstacks/runtime.lua           claude
+  create   .claude/agentstacks/translate.lua         claude
+  create   .claude/settings.json                     shared
+  create   .claude/skills/demo-greet/SKILL.md        demo
+
+  airsl    0.1.5 (new pin)
+
+6 to write, 0 to delete, 0 unchanged, 0 skipped
+applied: 6 written, 0 deleted
+stderr:
+exit=0
+### agentstacks.toml api = 1: plan
+stdout:
+stderr:
+agentstacks.toml: api 1 not supported (this agentstacks speaks 0)
+exit=1
+### agentstacks.lock api = 1: plan
+stdout:
+stderr:
+agentstacks.lock: api 1 not supported (this agentstacks speaks 0)
+exit=1
+### pack.toml api = 1: plan
+stdout:
+stderr:
+packs/demo/pack.toml: demo: api 1 not supported (this agentstacks speaks 0)
+exit=1
+### extension.toml api = 1: plan
+stdout:
+stderr:
+ext/claude/extension.toml: extension.api: 1 not supported (this agentstacks speaks 0)
+exit=1
+### update with api = 0 (path sources only)
+stdout:
+nothing to update
+stderr:
+exit=0
+### doctor
+stdout:
+healthy
+stderr:
+exit=0

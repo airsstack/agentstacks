@@ -24,6 +24,7 @@
 //!
 //! The messages themselves belong to the module error enums this one wraps.
 
+use crate::types::check::{CheckError, StageError};
 use crate::types::extension::ExtensionError;
 use crate::types::frontmatter::FrontmatterError;
 use crate::types::json::JsonEditError;
@@ -101,6 +102,12 @@ pub enum FormatError {
     /// error here, and every `Result` that returns a diagnostic would grow with it.
     #[error(transparent)]
     Set(Box<SetError>),
+    /// A refusal of the `ext test` run itself.
+    #[error(transparent)]
+    Check(#[from] CheckError),
+    /// A refusal of the `ext test` scratch project's file set.
+    #[error(transparent)]
+    Stage(#[from] StageError),
     /// A TOML syntax error, in the parser's own words.
     #[error("{0}")]
     TomlSyntax(ParserMessage),

@@ -1,7 +1,6 @@
 //! The port to the project directory the flows plan against and apply to.
 //!
-//! Pure trait definition. No inline tests per the unit-test-mandate exemption #3: the trait body
-//! has no executable logic.
+//! Pure trait definition with no executable logic, so it carries no inline tests.
 //!
 //! # Responsibilities
 //!

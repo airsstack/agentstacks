@@ -198,7 +198,7 @@ fn check_skips_follow_on_errors_from_failed_packs() -> TestResult {
     assert_eq!(
         refused,
         [format!(
-            "{}/packs/core/pack.toml: core: api 1 not supported (this agentstacks speaks 0)",
+            "{}/packs/core/pack.toml: core: api 2 not supported (this agentstacks speaks 1)",
             fx.display()
         )]
     );

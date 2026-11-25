@@ -46,7 +46,12 @@ pub(super) fn check_native_references(dir: &Path, tokens: &[LocatedToken]) -> Di
         tokens
             .iter()
             .filter(|found| found.token().reaches_native())
-            .filter(|found| !found.location().file_path().starts_with(&native))
+            .filter(|found| {
+                found
+                    .location()
+                    .file_path()
+                    .is_none_or(|file| !file.starts_with(&native))
+            })
             .map(|found| Diagnostic::new(found.location().clone(), PackError::NativeReference)),
     );
     refusals
@@ -84,7 +89,11 @@ pub(super) fn check_local_tokens(
 
 /// Whether the token sits in a `skills/<name>/SKILL.md` of the pack in `dir`.
 fn in_skill_file(dir: &Path, found: &LocatedToken) -> bool {
-    let Ok(relative) = found.location().file_path().strip_prefix(dir) else {
+    let Some(relative) = found
+        .location()
+        .file_path()
+        .and_then(|file| file.strip_prefix(dir).ok())
+    else {
         return false;
     };
     let parts: Vec<Option<&str>> = relative
