@@ -1,0 +1,7 @@
+## P9 git 2.x: lock format unchanged since the first release
+$ git log --oneline agentstacks-cli-v0.1.0..HEAD -- crates/agentstacks/src/types/lock
+(empty)
+$ git log --oneline agentstacks-cli-v0.1.0..HEAD -- crates/agentstacks/src/types/shorthand.rs   # control
+3aa0763 feat(repo): official OpenCode extension and tool-neutral packs (#11)
+$ grep -rn "api = 0\|api *= *0\|api 0\|speaks 0" book/src README.md crates/*/README.md CLAUDE.md RELEASING.md | wc -l
+      19

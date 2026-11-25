@@ -1,0 +1,11 @@
+## P2b toml 1.2.0: reparse the P2 outputs
+standard: ok, tools keys = ["claude", "mytool"]
+inline: ok, tools keys = ["claude", "mytool"]
+dotted: ok, tools keys = ["claude", "mytool"]
+## P6b clap 4.6.9: -C placement with nested subcommands
+"ext test x -C proj" -> exit 2 : error: unexpected argument '-C' found
+"ext -C proj test x" -> Cli { dir: Some("x"), command: Ext(Test { dir: "x", pack: [] }) }
+"ext add x -C proj" -> Cli { dir: Some("proj"), command: Ext(Add { source: "x", tag: None, rev: None, subdir: None, yes: false }) }
+"plan -C proj" -> Cli { dir: Some("proj"), command: Plan }
+"ext test x --pack a -C proj" -> exit 2 : error: unexpected argument '-C' found
+"ext test x --pack=a -C proj" -> exit 2 : error: unexpected argument '-C' found

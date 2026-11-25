@@ -1,0 +1,93 @@
+## P1 semver 1.0.28: VersionReq::matches
+">=1.3" matches 1.0.0: false
+">=1.3" matches 1.3.0: true
+">=1.3" matches 2.0.0: true
+">=1.3" matches 1.1.0-rc.1: false
+">= 1.0" matches 1.0.0: true
+">= 1.0" matches 1.3.0: true
+">= 1.0" matches 2.0.0: true
+">= 1.0" matches 1.1.0-rc.1: false
+"^1" matches 1.0.0: true
+"^1" matches 1.3.0: true
+"^1" matches 2.0.0: false
+"^1" matches 1.1.0-rc.1: false
+"*" matches 1.0.0: true
+"*" matches 1.3.0: true
+"*" matches 2.0.0: true
+"*" matches 1.1.0-rc.1: false
+">=1.0, <2" matches 1.0.0: true
+">=1.0, <2" matches 1.3.0: true
+">=1.0, <2" matches 2.0.0: false
+">=1.0, <2" matches 1.1.0-rc.1: false
+"nope" -> parse error: unexpected character 'n' while parsing major version number
+"1.x" matches 1.0.0: true
+"1.x" matches 1.3.0: true
+"1.x" matches 2.0.0: false
+"1.x" matches 1.1.0-rc.1: false
+## P2 toml_edit 0.25.20: insert [tools.mytool]
+### standard tables
+# project
+api = 1
+
+# the tool
+[tools.claude]
+git    = "https://github.com/airsstack/agentstacks"
+tag    = "packs-v1.0.0"
+subdir = "extensions/claude"
+
+[tools.mytool]
+git = "https://example.com/x.git"
+tag = "v1.2.0"
+subdir = "ext/mytool"
+
+[packs.core] # core pack
+git    = "https://github.com/airsstack/agentstacks"
+tag    = "packs-v1.0.0"
+subdir = "packs/core"
+
+### inline tools
+api = 1
+tools = { claude = { path = "ext/claude" } , mytool = { git = "https://example.com/x.git", tag = "v1.2.0", subdir = "ext/mytool" } }
+
+[packs.core]
+path = "packs/core"
+
+### dotted tools
+api = 1
+tools.claude.path = "ext/claude"
+
+[tools.mytool]
+git = "https://example.com/x.git"
+tag = "v1.2.0"
+subdir = "ext/mytool"
+
+[packs.core]
+path = "packs/core"
+
+## P2b toml 1.2.0: reparse the P2 outputs
+standard: ok, tools keys = ["claude", "mytool"]
+inline: ok, tools keys = ["claude", "mytool"]
+dotted: ok, tools keys = ["claude", "mytool"]
+## P3 toml_edit 0.25.20: api 0 -> 1 keeping decor
+# my project
+api = 1 # pinned by hand
+
+[tools.claude]
+path = "ext/claude"
+## P4 toml 1.2.0: spec examples parse
+pack.toml: requires.agentstacks = Some(">=1.0"); api = Some(1)
+extension.toml: requires.agentstacks = Some(">=1.0"); api = Some(1)
+## P6 clap 4.6.9: nested ext subcommands
+"ext add https://example.com/x.git --tag v1.2.0 --subdir ext/mytool" -> Cli { dir: None, command: Ext(Add { source: "https://example.com/x.git", tag: Some("v1.2.0"), rev: None, subdir: Some("ext/mytool"), yes: false }) }
+"-C proj ext add ./ext/mytool --yes" -> Cli { dir: Some("proj"), command: Ext(Add { source: "./ext/mytool", tag: None, rev: None, subdir: None, yes: true }) }
+"ext add x --tag a --rev b" -> exit 2 : error: the argument '--tag <TAG>' cannot be used with '--rev <REV>'
+"ext test ext/mytool --pack packs/a --pack packs/b -C proj" -> Cli { dir: Some("proj"), command: Ext(Test { extension: "ext/mytool", pack: ["packs/a", "packs/b"] }) }
+"ext" -> exit 2 : Add or check a tool extension
+"ext test" -> exit 2 : error: the following required arguments were not provided:
+## P6b clap 4.6.9: -C placement with nested subcommands
+"ext test x -C proj" -> Cli { dir: Some("proj"), command: Ext(Test { extension: "x", pack: [] }) }
+"ext -C proj test x" -> Cli { dir: Some("proj"), command: Ext(Test { extension: "x", pack: [] }) }
+"ext add x -C proj" -> Cli { dir: Some("proj"), command: Ext(Add { source: "x", tag: None, rev: None, subdir: None, yes: false }) }
+"plan -C proj" -> Cli { dir: Some("proj"), command: Plan }
+"ext test x --pack a -C proj" -> Cli { dir: Some("proj"), command: Ext(Test { extension: "x", pack: ["a"] }) }
+"ext test x --pack=a -C proj" -> Cli { dir: Some("proj"), command: Ext(Test { extension: "x", pack: ["a"] }) }

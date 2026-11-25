@@ -1,0 +1,71 @@
+## P15 agentstacks 0.2.0 (target/debug, HEAD 33e3925): conformance pack against both official extensions, project under $TMPDIR
+### claude: init --tool ./ext/claude --pack ./packs/conformance --yes
+stdout:
+agentstacks plan
+
+  create   .claude/agents/conformance-checker.md                 conformance
+  create   .claude/agentstacks/conformance/data/settings.json    conformance
+  create   .claude/agentstacks/conformance/hooks/event.lua       conformance
+  create   .claude/agentstacks/runtime.lua                       claude
+  create   .claude/agentstacks/translate.lua                     claude
+  create   .claude/note.md                                       conformance
+  create   .claude/settings.json                                 shared
+  create   .claude/skills/conformance-check/SKILL.md             conformance
+  create   .claude/skills/conformance-check/logo.png             conformance
+  create   .claude/skills/conformance-check/references/notes.md  conformance
+
+  airsl    0.1.5 (new pin)
+  note     native/opencode: not for claude
+
+10 to write, 0 to delete, 0 unchanged, 0 skipped
+applied: 10 written, 0 deleted
+stderr:
+exit=0
+### claude: plan (second run)
+stdout:
+agentstacks plan
+
+  airsl    0.1.5 (pinned)
+  note     native/opencode: not for claude
+
+0 to write, 0 to delete, 10 unchanged, 0 skipped
+stderr:
+exit=0
+### opencode: init --tool ./ext/opencode --pack ./packs/conformance --yes
+stdout:
+agentstacks plan
+
+  create   .opencode/agents/conformance-checker.md                 conformance
+  create   .opencode/agentstacks/conformance/data/settings.json    conformance
+  create   .opencode/agentstacks/conformance/hooks/event.lua       conformance
+  create   .opencode/agentstacks/runtime.lua                       opencode
+  create   .opencode/agentstacks/translate.lua                     opencode
+  create   .opencode/commands/conformance-check.md                 conformance
+  create   .opencode/note.md                                       conformance
+  create   .opencode/plugins/agentstacks.js                        conformance
+  create   .opencode/skills/conformance-check/SKILL.md             conformance
+  create   .opencode/skills/conformance-check/logo.png             conformance
+  create   .opencode/skills/conformance-check/references/notes.md  conformance
+  skip     conformance/hook/2: opencode has no hook when a session ends
+  skip     conformance/hook/6: opencode has no hook when a subagent stops
+
+  airsl    0.1.5 (new pin)
+  note     native/claude: not for opencode
+
+11 to write, 0 to delete, 0 unchanged, 2 skipped
+applied: 11 written, 0 deleted
+stderr:
+exit=0
+### opencode: plan (second run)
+stdout:
+agentstacks plan
+
+  skip     conformance/hook/2: opencode has no hook when a session ends
+  skip     conformance/hook/6: opencode has no hook when a subagent stops
+
+  airsl    0.1.5 (pinned)
+  note     native/claude: not for opencode
+
+0 to write, 0 to delete, 11 unchanged, 2 skipped
+stderr:
+exit=0
