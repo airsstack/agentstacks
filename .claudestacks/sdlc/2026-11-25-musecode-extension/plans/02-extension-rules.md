@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: c1dbedb148db
 ---
@@ -177,3 +177,46 @@ Commit `feat(repo): musecode extension hooks-file merge`.
 ## Proof
 
 - `airsl test extensions` → `0 failed`; `cargo make dod` green.
+
+## Review findings
+
+One reviewer pass over the batch of plans 01-03 (verdict: compliant, `blocking: none`, 0🔴, 3🟡,
+10🔵 on this plan, 1❓). Every finding was fixed afterwards on the author's word (2026-11-25):
+
+- 🟡 fixed — F3 empty words: `""`, `"-a"`, `"a-"`, `"a--b"` added to
+  `agent_name_rejects_digit_underscore_capital_and_empty_words`; with `gmatch("[^-]+")` swapped in it
+  fails (`FAIL agent_name_rejects_digit_underscore_capital_and_empty_words`).
+- 🟡 fixed — F2 on a native `name`: `skill_name_limit_applies_to_a_native_name`; with the check on
+  `name` instead of the written value it fails.
+- 🟡 fixed — H3 isolated: `agent_stop_with_only_hook_agents_skips`,
+  `agent_stop_with_only_rendered_agents_skips`, `agents_on_another_event_render`; dropping the
+  `agent.stop` guard or either side of the OR fails exactly one of them.
+- ❓ fixed (no code change) — airsl 0.1.5 probe: `airsstack.json.decode('{"tools":[]}')` then
+  `encode(d.tools)` → `[]` (decoded arrays keep their array mark); a plain `{}` → `{}`. Native values
+  reach the adapter through the JSON payload, so they write `[]`. Guarded by
+  `native_empty_list_from_json_writes_brackets`.
+- 🔵 fixed — comments: `frontmatter.lua` header names the native-key refusal; `hooks.lua` marker
+  comment says handler; `reaches`; the `/bin/sh` comment states Muse Code runs a hook as `$SHELL -c`
+  (spec D4, `H-P1`).
+- 🔵 fixed — tests: `values_test` count check replaced by `only_the_six_known_vars_are_returned`
+  (asks seven names, gets six); claude cases `hyphenated_pack_is_prefixed_whole`,
+  `hook_agents_renders_each_name_in_order`, `hook_agents_prefixes_a_hyphenated_pack_whole`,
+  `hook_agents_is_empty_for_an_empty_list` added; `hookfile_test` fixture matcher `Read|Edit`;
+  duplicate `skip_reason_names_muse_hooks_json` removed; non-UTF-8 name test
+  `skill_name_counts_bytes_when_not_utf8`.
+- 🔵 fixed — rule ids dropped from test names (see Deviations).
+- 🔵 fixed — empty tool `match`: `tool_matcher` tests `match == nil` again, as the plan and the
+  claude extension do (the core refuses an empty `match`: `hooks[1].match: empty list never fires`).
+- Verified: `airsl test extensions/musecode` → `85 passed, 0 failed (5 files)`; `cargo make dod` →
+  Lua `651 passed, 0 failed (25 files)`, fingerprint and text gates passed, `Build Done in 47.77 seconds`.
+
+## Deviations
+
+- 2026-11-25 — F3 (`^[a-z]+(-[a-z]+)*$`): Lua patterns cannot repeat a group, so `is_word_name`
+  splits on `-` and requires every word to match `^[a-z]+$` (an empty word fails). Reviewer probe:
+  refuses `""`, `"-a"`, `"a-"`, `"a--b"`, `"a\n"`, `"é"`; accepts `"a"`, `"a-b-c"` — same set as the regex.
+- 2026-11-25 — Test names carry no rule ids (`skips_h1` → `skips_session_id_var`, `f3_…` →
+  `agent_name_…`, etc.): source is read without the spec (doc-comment discipline), so the
+  plan-mandated names were renamed after review on the author's word.
+- 2026-11-25 — Empty `tools` is a private sentinel rendered as the literal `[]`.
+- 2026-11-25 — No commits made: the execute instruction did not ask for them.
