@@ -2,7 +2,7 @@
 //! `HookCommand` builds.
 //!
 //! The project under `tests/fixtures/runtime/proj` holds a small translator for a made-up tool and
-//! five hook modules. Each test copies it into a temporary directory, writes the shipped runtime
+//! six hook modules. Each test copies it into a temporary directory, writes the shipped runtime
 //! beside the translator and runs one command from the project directory, as a tool does.
 //! When `airsl` cannot run, each test says so and returns, unless `AGENTSTACKS_REQUIRE_AIRSL` is
 //! set (CI sets it): then each test fails, so a missing binary cannot pass the suite unseen.
@@ -283,5 +283,75 @@ fn runtime_missing_module_fails_open() -> TestResult {
     };
     assert_eq!(text(&output.stdout), "");
     assert!(output.status.success());
+    Ok(())
+}
+
+const PATHS_WITH_STOP: &str = r#"{"paths":["a","stop","c"]}"#;
+
+#[test]
+fn runtime_list_joins_contexts() -> TestResult {
+    let case = Case {
+        payload: r#"{"paths":["a","b"]}"#,
+        ..Case::new("each")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(text(&output.stdout), "{\"context\":\"each a\\neach b\"}\n");
+    assert!(output.status.success());
+    Ok(())
+}
+
+#[test]
+fn runtime_list_stops_at_the_first_block() -> TestResult {
+    let case = Case {
+        blocking: Blocking::May,
+        payload: PATHS_WITH_STOP,
+        ..Case::new("each")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stdout),
+        "{\"block\":\"stop stop\",\"context\":\"each a\\neach stop\"}\n"
+    );
+    assert_eq!(text(&output.stderr), "");
+    Ok(())
+}
+
+#[test]
+fn runtime_list_drops_a_block_when_not_may_block() -> TestResult {
+    let case = Case {
+        payload: PATHS_WITH_STOP,
+        ..Case::new("each")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stderr),
+        "agentstacks: hook core.hooks.each tried to block but is not declared may_block; reason: stop stop\n"
+    );
+    assert_eq!(
+        text(&output.stdout),
+        "{\"context\":\"each a\\neach stop\\neach c\"}\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn runtime_empty_list_gives_nil() -> TestResult {
+    for payload in [r#"{"paths":[]}"#, r#"{"paths":["quiet","quiet"]}"#] {
+        let case = Case {
+            payload,
+            ..Case::new("each")
+        };
+        let Some(output) = run(&case)? else {
+            return Ok(());
+        };
+        assert_eq!(text(&output.stdout), "nil\n", "payload {payload}");
+        assert!(output.status.success());
+    }
     Ok(())
 }
