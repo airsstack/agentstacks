@@ -140,10 +140,24 @@ present in `vars`, longest first.
 
 Batch review, 2026-11-25 (`claudestacks:reviewer`, 0🔴). `airsl test extensions` → 122 passed, 0 failed (10 files); workspace `cargo make dod` → exit 0.
 
-- open 🔵 `extensions/opencode/lib/frontmatter.lua:40` — `ACTIONS[word] or word` passes an unmapped tool word through; unreachable today (the core's tool set is closed and all seven are mapped).
-- open 🔵 `extensions/opencode/lib/hooks.lua:99,106` — the `TOOLS[word] or { word }` fallback is unreachable (the core validates match values).
-- open 🔵 `extensions/opencode/lib/hooks.lua:125`, `extensions/opencode/lib/hooks_test.lua:187,206` — comments cite skip-table rule numbers; naming the reason would survive a reorder.
+- fixed 🔵 `extensions/opencode/lib/frontmatter.lua:40` — `ACTIONS[word] or word` passes an unmapped tool word through; unreachable today (the core's tool set is closed and all seven are mapped).
+- fixed 🔵 `extensions/opencode/lib/hooks.lua:99,106` — the `TOOLS[word] or { word }` fallback is unreachable (the core validates match values).
+- fixed 🔵 `extensions/opencode/lib/hooks.lua:125`, `extensions/opencode/lib/hooks_test.lua:187,206` — comments cite skip-table rule numbers; naming the reason would survive a reorder.
 - kept: extra tests `agent_every_tool_word_maps` and `skips_follow_table_order`.
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
 
 ## Deviations
 

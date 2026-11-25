@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 05, 06]
 built-on: d54f8422f1ff
@@ -87,3 +87,39 @@ start, with the exact notice text; an airsl without an execute bit is not told; 
 ## Proof
 
 - `cargo make book-build` and `cargo make dod` green.
+
+## Review findings
+
+Reviews, 2026-11-25 (`claudestacks:reviewer`): Task 1 in batch 1 (0🔴, 2 blocking 🟡), Task 2 in the final batch (0🔴, 1 blocking 🟡). Blocking lines fixed inline by the orchestrator. `cargo make book-build` → "Build Done in 0.96 seconds.", 0 `[ERROR]`; the Task 2 greps find nothing (`grep -n "one supported tool" book/src/introduction.md` → exit 1).
+
+- fixed 🟡 `book/src/ch06-03-opencode.md:39` — wrong cause for a path clash; now: paths join pack and item names with `-`, so only equal joined names or a native file on a generated path clash.
+- fixed 🟡 `book/src/ch06-03-opencode.md:110` (and `:50`) — rule 3 now says "non-empty `match`"; no `match` renders.
+- fixed 🟡 `book/src/introduction.md:18` — said OpenCode is supported though no `packs-v*` tag holds it; now uses the README's "built and ships with the next `packs-v*` release".
+- fixed 🔵 `book/src/ch06-03-opencode.md:63` — "each Lua entry" runs through `/bin/sh -c`.
+- fixed 🔵 `book/src/ch06-03-opencode.md:116` — names the allowed native-key characters.
+- fixed 🔵 `CLAUDE.md:8,17` — lines past the file's ~100-column wrap.
+- fixed 🔵 `CLAUDE.md:101` — "To build a new tool extension (OpenCode, or any other tool)" is stale.
+- fixed 🔵 `README.md:134` — "unstable until both official tools run on it": both now do; the freeze is M3.
+- fixed 🔵 `packs/CHANGELOG.md:12` — the entry omits the version and api the 0.1.0 entry names.
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
+
+## Deviations
+
+- 2026-11-25 — Task 1 ran in batch 1, before plan 05 Tasks 2-3 and plan 06 (`depends-on: [02, 05, 06]`), because it is docs-only from spec text; its hook and shim sections described Task 2 behaviour ahead of the code until plan 05 Task 2 landed in the same tree.
+- 2026-11-25 — Task 1 Proof: a whole-string `grep -F` returns 0 for two fixed reasons, because `extensions/opencode/lib/hooks.lua` builds them by `..` over two lines; the joined text equals the page (reviewer read both halves). The other reasons and `AIRSL_MISSING` pass `grep -F`.
+- 2026-11-25 — The blocking review findings were fixed inline by the orchestrator rather than by a fresh coder (three doc lines).
+- 2026-11-25 — The coder report for Task 2 (`10-coder-07t2.md`) was returned inline, not written to the handoff session dir.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.

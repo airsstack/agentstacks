@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-24
 milestone: foundation/02
 ---

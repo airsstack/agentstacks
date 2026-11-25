@@ -94,13 +94,27 @@ back. Single events and native hooks behave exactly as before.
 
 Batch review, 2026-11-25 (code: `claudestacks:reviewer`, 0🔴 for this plan; docs: `claudestacks:reviewer`, 0🔴). Workspace gate: `cargo make dod` → exit 0, 24 `test result: ok`, 0 FAILED/warning, lua 122 + 651 passed.
 
-- open 🟡 `crates/agentstacks/tests/runtime.rs:217` — no test asserts a native hook receives `args`, drops a native non-`may_block` block, or checks per-event args in a list.
-- open 🟡 `book/src/ch06-02-hooks.md:75-135` — nothing ties the §4 block to the asset; only the asset's hash is pinned (suggest `{{#include}}` or a diff test).
-- open 🔵 `crates/agentstacks/src/types/protocol/runtime.rs:15` — `RUNTIME_LUA` doc ("stays silent when the translator has none", "stops at the first block") is looser than the code; the text is the spec's, verbatim.
-- open 🔵 `crates/agentstacks/assets/runtime.lua:31` — a single event without an `event` key counts as an empty list; both official translators set `event`. Spec text, hash-pinned.
-- open 🔵 `crates/agentstacks/tests/fixtures/runtime/proj/.tool/agentstacks/translate.lua:1` — header comment omits the `{"paths":[...]}` payload.
-- open 🔵 `book/src/ch06-02-hooks.md:155,157,159` — rules table: the single-event row omits the dropped block; the block row implies `context` is always present; the dropped-block-only list case is not stated.
-- open 🔵 `book/src/ch06-02-hooks.md:222` vs `book/src/ch06-01-extensions.md:532` — ".js" vs "JavaScript or TypeScript" (each is its plan's wording); `CLAUDE.md:66` still says OpenCode plugins are TypeScript (plan 07 Task 2 owns it).
+- fixed 🟡 `crates/agentstacks/tests/runtime.rs:217` — no test asserts a native hook receives `args`, drops a native non-`may_block` block, or checks per-event args in a list.
+- fixed 🟡 `book/src/ch06-02-hooks.md:75-135` — nothing ties the §4 block to the asset; only the asset's hash is pinned (suggest `{{#include}}` or a diff test).
+- fixed 🔵 `crates/agentstacks/src/types/protocol/runtime.rs:15` — `RUNTIME_LUA` doc ("stays silent when the translator has none", "stops at the first block") is looser than the code; the text is the spec's, verbatim.
+- no change (spec text, hash-pinned) 🔵 `crates/agentstacks/assets/runtime.lua:31` — a single event without an `event` key counts as an empty list; both official translators set `event`. Spec text, hash-pinned.
+- fixed 🔵 `crates/agentstacks/tests/fixtures/runtime/proj/.tool/agentstacks/translate.lua:1` — header comment omits the `{"paths":[...]}` payload.
+- fixed 🔵 `book/src/ch06-02-hooks.md:155,157,159` — rules table: the single-event row omits the dropped block; the block row implies `context` is always present; the dropped-block-only list case is not stated.
+- no change (both statements true) 🔵 `book/src/ch06-02-hooks.md:222` vs `book/src/ch06-01-extensions.md:532` — ".js" vs "JavaScript or TypeScript" (each is its plan's wording); `CLAUDE.md:66` still says OpenCode plugins are TypeScript (plan 07 Task 2 owns it).
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
 
 ## Deviations
 

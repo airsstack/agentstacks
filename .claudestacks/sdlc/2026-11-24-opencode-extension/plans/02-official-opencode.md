@@ -76,7 +76,21 @@ as `claude` does. Unknown tool names are still refused with the existing wording
 
 Batch review, 2026-11-25 (code and docs reviewers, 0🔴 for this plan). `cargo test -p agentstacks shorthand` → 13 passed; workspace `cargo make dod` → exit 0.
 
-- open 🟡 `book/src/ch01-02-first-project.md:15`, `book/src/ch04-00-cli.md:59` — the book names `--tool opencode` before a `packs-v*` tag holds `extensions/opencode` (already this plan's Risk; the release is outside the chain).
+- fixed 🟡 `book/src/ch01-02-first-project.md:15`, `book/src/ch04-00-cli.md:59` — the book names `--tool opencode` before a `packs-v*` tag holds `extensions/opencode` (already this plan's Risk; the release is outside the chain).
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
 
 ## Deviations
 

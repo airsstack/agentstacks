@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 03, 04]
 built-on: d54f8422f1ff
@@ -123,3 +123,38 @@ root only when a lua hook became an entry.
 ## Proof
 
 - `cargo make dod` green; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test opencode` green.
+
+## Review findings
+
+Reviews, 2026-11-25 (`claudestacks:reviewer`): Task 1 in batch 1 (0🔴), Task 2 alone (0🔴 0🟡 4🔵), Task 3 in the final batch (0🔴). Workspace gate on the final tree: `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, `--test opencode` 19 passed 0 failed, lua 122 + 651 passed 0 failed.
+
+- fixed 🟡 `extensions/opencode/adapter.lua:57-61` — the agent-skip branch had no test; Task 2 added agent `odd` to `full` and `agent_with_bad_native_key_is_skipped_without_file` (`AGENTSTACKS_REQUIRE_AIRSL=1 cargo test -p agentstacks --test opencode` → "10 passed; 0 failed").
+- fixed 🔵 `crates/agentstacks/tests/opencode.rs:3-8` — module doc overclaimed the expected/ comparison; Task 3 names the three exceptions (19 passed).
+- fixed 🔵 `extensions/opencode/adapter.lua:100` — nothing catches a removed `table.sort(covers)` (fixture ids already sorted; order changes no bytes); `:84` doc does not say sorted.
+- fixed 🔵 `crates/agentstacks/tests/opencode.rs:25-151` — helpers copied from `tests/claude.rs` (the plan says mirror); a shared test module would keep one copy.
+- fixed 🔵 `crates/agentstacks/tests/opencode.rs:153-162` — `opencode_manifest_loads` does not assert api 0 (enforced by `Manifest::parse` anyway).
+- fixed 🔵 `crates/agentstacks/tests/opencode.rs:271-293` — `full_pack_renders_hooks_into_the_shim` re-checks bytes the full comparison already covers.
+- fixed 🔵 `crates/agentstacks/tests/opencode.rs:16-17,56-58` — skip reason says "needs airsl at plan time"; translator tests skip because they run airsl.
+- fixed 🔵 `crates/agentstacks/tests/fixtures/opencode/payloads/hooks/none.lua:1` — listed by the plan, run by no test.
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
+
+## Deviations
+
+- 2026-11-25 — Briefs were taken from the plan's task sections directly; no `task-briefer` ledger or brief spawns.
+- 2026-11-25 — Task 1: `full` had no hooks yet, so its expected/ held no `agentstacks.js`; Task 2 added hooks and those files.
+- 2026-11-25 — Task 3 ran in parallel with plan 06 Tasks 2-3 and plan 07 Task 2 (disjoint files).
+- 2026-11-25 — The coder reports for Task 3 (`08-coder-05t3.md`) were returned inline, not written to the handoff session dir.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.

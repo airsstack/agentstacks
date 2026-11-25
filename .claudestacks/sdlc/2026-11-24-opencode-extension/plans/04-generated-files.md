@@ -81,9 +81,23 @@ fixed body byte for byte, ending `};\n`. The body uses `stdio: ["pipe", "pipe", 
 
 Batch review, 2026-11-25 (`claudestacks:reviewer`, 0🔴). `airsl test extensions` → 122 passed, 0 failed; workspace `cargo make dod` → exit 0. `translate.lua` text compared with `cmp` against the spec §4.7 block: identical, 2937 bytes.
 
-- open 🔵 `extensions/opencode/lib/plugin.lua:1` — the header comment's `<root>` means the project root, unlike `values.lua`'s root.
-- open 🔵 `extensions/opencode/lib/plugin_test.lua:3` — "spec" vocabulary in test source (same as the claude extension's precedent).
-- open 🔵 `extensions/opencode/lib/translate_test.lua:14` — the tests pin text only; behaviour is left to plans 05 and 06 (the reviewer ran it on airsl 0.1.5 and it behaved as written).
+- fixed 🔵 `extensions/opencode/lib/plugin.lua:1` — the header comment's `<root>` means the project root, unlike `values.lua`'s root.
+- fixed 🔵 `extensions/opencode/lib/plugin_test.lua:3` — "spec" vocabulary in test source (same as the claude extension's precedent).
+- resolved (behaviour proven by the opencode.rs translator tests and opencode-check S4/S5) 🔵 `extensions/opencode/lib/translate_test.lua:14` — the tests pin text only; behaviour is left to plans 05 and 06 (the reviewer ran it on airsl 0.1.5 and it behaved as written).
+
+### Fix round, 2026-11-25
+
+All open findings above were fixed on the author's instruction ("fix all of findings"), by four
+parallel coders plus inline edits; one `claudestacks:reviewer` pass over the fixes (1🔴 F1: the
+first `--tool ../agentstacks/extensions/opencode` workaround is refused, `must stay inside the
+project`; fixed to copy the extension in and pass `--tool ext/opencode`, the form
+`init --tool ext/opencode --pack packs/check --yes` already proved, `applied: 14 written`). The
+reviewer's 🟡/🔵 on the fixes (CLAUDE.md claim and wraps, RUNTIME_LUA native-event wording, Lua
+lookup comments, `covers` doc, check.mjs header, per-directory PATH links, explicit mock env, stale
+`target/opencode-check/2.4.1/opencode`) were fixed inline. Gate after the round:
+`AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, 25 `test result: ok`, lua 122 + 651 passed
+0 failed; `cargo make opencode-check` → `opencode v2.4.1`, `ok S1` … `ok S7`; `cargo make
+book-build` → 0 `[ERROR]`; `crates/agentstacks/assets/runtime.lua` unchanged.
 
 ## Deviations
 
