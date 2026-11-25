@@ -73,35 +73,7 @@ The core writes `<root>/runtime.lua` when a pack of the tool has any lua hook, n
 whether or not the extension later skips it. This is its full text, byte for byte:
 
 ```lua
--- agentstacks hook runtime, api 0.
--- usage: airsl run ... runtime.lua <hook-module> <may_block: 0|1> <kind: neutral|native> [args...]
-local translate = require("translate")
-local name, may_block, kind = arg[1], arg[2] == "1", arg[3]
-local args = {}
-for i = 4, #arg do
-  args[#args + 1] = arg[i]
-end
-local payload = airsstack.hook.payload()
-local event
-if kind == "native" then
-  event = { payload = payload, args = args }
-else
-  event = translate.event(payload)
-  if event == nil then
-    return
-  end
-  event.args = args
-end
-local result = require(name)(event)
-if type(result) == "table" and result.block ~= nil and not may_block then
-  airsstack.stdio.error("agentstacks: hook " .. name .. " tried to block but is not declared may_block; reason: "
-    .. tostring(result.block) .. "\n")
-  result.block = nil
-end
-local out = translate.result(result, payload)
-if out ~= nil then
-  airsstack.stdio.write(out)
-end
+{{#include ../../crates/agentstacks/assets/runtime.lua}}
 ```
 
 What it does for each run:
@@ -117,6 +89,20 @@ What it does for each run:
 
 The table above is an example: claude extension (its `translate.lua`, with `tool_name=Edit` as the
 tool's own payload field). A real tool's translator decides the actual output text.
+
+`M.event` may return a list of events instead of one. The rules:
+
+| Case | Result |
+|---|---|
+| `M.event` returns a table with `event` set | one event; the result is what the hook returned, except that a `block` from a hook that is not `may_block` is dropped with the stderr line |
+| `M.event` returns a list (a table with no `event` key) | the hook runs once per element, in order; each gets `args` |
+| a list, `may_block` 1, an element blocks | the loop stops; the result is `{ block = <that block> }`, plus `context = <contexts so far, joined with "\n">` when any element returned one (the blocking element's context included) |
+| a list, `may_block` 0, an element blocks | the stderr line as above, the block dropped, the loop goes on |
+| a list where no hook returns context or block, where every block was dropped and no context came back, or an empty list | `M.result` gets `nil` |
+| native kind | one event `{ payload = <raw>, args = … }` |
+| a context that is not a string | in a list it is joined after `tostring`; a single event passes it through unchanged |
+
+The hook module is required only when a hook runs, so a translator returning `nil` never loads it.
 
 `airsstack.stdio` (`error`, `write`) and `airsstack.hook.payload` exist under `confined`.
 
@@ -149,8 +135,9 @@ hook).
 `<root>/translate.lua` is one file per tool, written by the extension. It returns a module with two
 functions:
 
-- `M.event(payload)` returns the neutral event, or `nil` for an event that is not for this runtime
-  (the hook is then not run).
+- `M.event(payload)` returns the neutral event, a list of neutral events, or `nil` for an event that
+  is not for this runtime (the hook is then not run). A list makes the runtime run the hook once per
+  event ([section 4](#4-runtimelua)).
 - `M.result(result or nil, payload)` returns the string to print, or `nil`. `payload` is the raw
   payload for neutral and native hooks alike. The runtime passes it because the payload can be read
   only once.
@@ -175,9 +162,9 @@ Message hooks (`kind = "message"`) never reach the runtime. The extension render
 ## 9. Shims for other hook languages
 
 When a tool demands another hook language, the extension writes a thin shim. Example: OpenCode
-plugins are TypeScript. The shim only runs the command line of [section 3](#3-command-line) and
-forwards the payload and the result. It is an ordinary `write`, shown in the plan like any other
-file: the core gives it nothing new.
+hooks are JavaScript plugins (`.js`), so its shim is JavaScript. The shim only runs the command line
+of [section 3](#3-command-line) and forwards the payload and the result. It is an ordinary `write`,
+shown in the plan like any other file: the core gives it nothing new.
 
 ## 10. airsl on the machine
 

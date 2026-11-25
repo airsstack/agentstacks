@@ -37,8 +37,8 @@ Paths, frontmatter and states: `{{var project_dir}}/{{root}}/references/artifact
 5. **Handoff.** Invoke `{{skill core/context-handoff}}` once; use the session tier.
 6. **Ledger.** Spawn `{{agent task-briefer}}` with `mode: ledger`, `plan: <path>`,
    `handoff: <session-dir>/01-task-briefer-ledger.md`, `handoff-protocol: <path>`. Put one
-   TodoWrite item per task. Never read the plan end to end. If the agent is missing, use
-   `grep -n '^### Task' <plan>`.
+   todo item per task, if you keep a todo list. Never read the plan end to end. If the agent is
+   missing, use `grep -n '^### Task' <plan>`.
 
 ## Build, batch by batch
 

@@ -1,0 +1,18 @@
+[control] turn2 shell: echo hi > out1.txt; echo $? > rc.txt
+    runs: 2 of 2 exit=0; messages 7, server-restarted messages 0
+    out1.txt: hi 
+    rc.txt: 0 
+[status] turn2 shell: opencode service status > out1.txt 2>&1; echo $? > rc.txt
+    runs: 2 of 2 exit=0; messages 7, server-restarted messages 0
+    out1.txt: stopped 
+    rc.txt: 0 
+[export] turn2 shell: opencode session export "$OPENCODE_SESSION_ID" > e.json 2> out1.txt; echo $? > rc.txt
+    runs: 2 of 2 exit=0; messages 10, server-restarted messages 1
+    out1.txt: 
+    rc.txt: 0 
+[export-server] turn2 shell: U=$(opencode service status); opencode session export --server "$U" "$OPENCODE_SESSION_ID" > e.json 2> out1.txt; echo "$? $U" > rc.txt
+    runs: 2 of 2 exit=0; messages 7, server-restarted messages 0
+    out1.txt: Could not reach server at stopped: Invalid URL 
+    rc.txt: 1 stopped 
+$ pgrep -fl scratchpad/tn/t6
+exit=1

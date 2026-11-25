@@ -1,0 +1,57 @@
+$ cp final/{claude,opencode}-session.md packs/journal/native/{claude,opencode}/skills/journal-capture/session.md; agentstacks apply --yes
+  create   .claude/skills/journal-capture/session.md       journal
+  delete   .claude/skills/journal-capture/transcript.md    journal
+  create   .opencode/skills/journal-capture/session.md     journal
+  delete   .opencode/skills/journal-capture/transcript.md  journal
+  skip     core/hook/3: claude shows no hook output to the model at session end
+  skip     core/hook/1: opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match
+  skip     core/hook/3: opencode has no hook when a session ends
+2 to write, 2 to delete, 266 unchanged, 7 skipped
+applied: 2 written, 2 deleted
+exit=0
+$ cat .claude/skills/journal-capture/session.md
+# Session key and transcript
+
+The journal's capture and note skills follow this file with the session id and
+the project directory they resolved.
+
+- `id8`: the first eight characters of the session id.
+- `tpath`: run
+
+  ```sh
+  airsl run --policy confined \
+    --allow-env CLAUDE_CONFIG_DIR --allow-env HOME --allow-env PWD \
+    --allow-read . --allow-read "$HOME/.claude" \
+    "<project_dir>/.claude/agentstacks/journal/scripts/transcript-path.lua" "<session_id>"
+  ```
+
+  and take its stdout as `tpath`. An empty result or a non-zero exit means no
+  transcript was found: pass an empty `tpath`.
+- `cleanup`: empty.
+$ cat .opencode/skills/journal-capture/session.md
+# Session key and transcript
+
+The journal's capture and note skills follow this file with the session id and
+the project directory they resolved.
+
+- `id8`: the last eight characters of the session id, in lower case. Its first
+  characters come from the time and repeat across sessions.
+- `tpath` and `cleanup`: run `opencode service status`.
+  - Exit 127 means `opencode` is not on `PATH`. Tell the user `opencode is not
+    on PATH, so the journal was written without the transcript`, and pass an
+    empty `tpath` and an empty `cleanup`.
+  - If it prints `stopped`, this session does not run on OpenCode's background
+    service, and an export would start the service, which marks this session
+    as restarted. Tell the user `this OpenCode session does not run on the
+    background service, so the journal was written without the transcript`,
+    and pass an empty `tpath` and an empty `cleanup`.
+  - Otherwise run `mktemp "${TMPDIR:-/tmp}/journal-XXXXXX"` and take its output
+    as `<export>`, then run
+
+    ```sh
+    opencode session export "<session_id>" > "<export>"
+    ```
+
+    On exit 0, `tpath` is `<export>` and `cleanup` is `rm -f "<export>"`. On a
+    non-zero exit, run `rm -f "<export>"` yourself, then pass an empty `tpath`
+    and an empty `cleanup`.

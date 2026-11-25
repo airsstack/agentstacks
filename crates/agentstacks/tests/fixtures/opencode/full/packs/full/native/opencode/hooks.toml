@@ -1,0 +1,25 @@
+# 0: a native lua hook on a tool event, for the shell tool only
+[[hooks]]
+kind = "lua"
+event = "tool.execute.before"
+match = ["shell"]
+run = "hooks/enforce.lua"
+
+# 1: a native message with an empty match: every tool
+[[hooks]]
+kind = "message"
+event = "tool.execute.after"
+match = []
+text = "Heads up"
+
+# 2: a native message on a prompt
+[[hooks]]
+kind = "message"
+event = "session.prompt"
+text = "Remember the plan"
+
+# 3: a native message on an event opencode has no hook for
+[[hooks]]
+kind = "message"
+event = "Notification"
+text = "Ping"

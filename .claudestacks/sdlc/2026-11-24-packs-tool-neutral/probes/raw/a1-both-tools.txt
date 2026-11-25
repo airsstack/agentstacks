@@ -1,0 +1,15 @@
+$ sh harness/ptn.sh <scratch>/ptn   # init --tool ext/claude --tool ext/opencode --pack packs/{core,sdlc,journal,guideline-rust,guideline-python} --yes
+exit=0
+$ grep -E "skip|airsl|to write|applied" init.out
+  create   .claude/agentstacks/core/scripts/install-airsl.sh                                     core
+  create   .opencode/agentstacks/core/scripts/install-airsl.sh                                   core
+  skip     core/hook/3: claude shows no hook output to the model at session end
+  skip     core/hook/1: opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match
+  skip     core/hook/3: opencode has no hook when a session ends
+  skip     core/hook/8: opencode has no hook when a subagent stops
+  skip     core/hook/9: opencode has no hook when a subagent stops
+  skip     journal/hook/1: opencode has no hook when a subagent stops
+  skip     sdlc/hook/1: opencode has no hook when a subagent stops
+  airsl    0.1.5 (new pin)
+266 to write, 0 to delete, 0 unchanged, 7 skipped
+applied: 266 written, 0 deleted

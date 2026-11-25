@@ -20,6 +20,10 @@ Install both:
 agentstacks init --tool claude --pack core --pack journal
 ```
 
+On OpenCode, pass `--tool opencode` (or both tools). `capture` and `note` read the session through
+`opencode session export`, which needs `opencode` on `PATH` and OpenCode's background service
+running; otherwise they write without the transcript and say why.
+
 ## Documentation
 
 The note format is in [`references/note-schema.md`](https://github.com/airsstack/agentstacks/blob/main/packs/journal/references/note-schema.md). Each command that

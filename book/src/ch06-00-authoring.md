@@ -176,8 +176,9 @@ Skip hooks until skills and agents work. Then, per hooks.md:
 3. **Message hooks** (`kind = "message"`) never reach the runtime: render them natively, for
    example as a command that prints the tool's context output.
 4. **`translate.lua`.** When any lua hook is covered by a write, write `<root>/translate.lua`. It
-   returns `M.event(payload)` (the tool's payload to the neutral event, or `nil`) and
-   `M.result(result, payload)` (the neutral result to the tool's output string, or `nil`).
+   returns `M.event(payload)` (the tool's payload to the neutral event, a list of neutral events when
+   one tool call holds several, or `nil`) and `M.result(result, payload)` (the neutral result to the
+   tool's output string, or `nil`).
 5. **Blocking.** A hook result `{ block = "<reason>" }` from a hook declared `may_block` must become
    the tool's own deny output. Map `{ context = "<text>" }` to the tool's context output.
 6. **Unsupported events** become skips with a reason.

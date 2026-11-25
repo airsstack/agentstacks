@@ -12,8 +12,8 @@ no scripts.
 agentstacks init --tool claude --pack guideline-python
 ```
 
-Add the `core` pack as well: its dispatcher is what points Claude at this skill, and its agents are
-what run the Definition of Done. On its own the skill still loads on request.
+Add the `core` pack as well: its dispatcher is what points the agent at this skill, and its agents
+are what run the Definition of Done. On its own the skill still loads on request.
 
 ## Documentation
 

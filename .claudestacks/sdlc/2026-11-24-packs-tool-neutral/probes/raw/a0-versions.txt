@@ -1,0 +1,8 @@
+$ agentstacks --version
+agentstacks 0.1.0
+$ airsl --version
+airsl 0.1.5
+$ opencode --version
+opencode v2.4.1
+$ git -C <worktree> rev-parse --short HEAD
+dffc959

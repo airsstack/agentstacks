@@ -1,11 +1,11 @@
 //! The five official packs installed together through the real `agentstacks` binary.
 //!
-//! Each install test copies the repository's `packs/` and `extensions/claude` into a temporary git
-//! project, runs `init` for all five packs and checks the result; the unit tests at the end only
-//! cover the version parse. Nothing here proves a rule on its own: the rules are proven in the
-//! library and the Lua tests, and these runs show that the packs install side by side, that every
-//! rendered hook runs under its prefixed module name, and that no rendered file keeps unconverted
-//! pack syntax.
+//! Each install test copies the repository's `packs/`, `extensions/claude` and `extensions/opencode`
+//! into a temporary git project, runs `init` for all five packs on one tool or on both and checks
+//! the result; the unit tests at the end only cover the version parse. Nothing here proves a rule
+//! on its own: the rules are proven in the library and the Lua tests, and these runs show that the
+//! packs install side by side, that every rendered hook runs under its prefixed module name, and
+//! that no rendered file keeps unconverted pack syntax.
 
 use std::error::Error;
 use std::fs;
@@ -110,7 +110,8 @@ fn copy_tree(from: &Path, to: &Path) -> TestResult {
     Ok(())
 }
 
-/// A temporary git project holding a copy of the official packs and the claude extension.
+/// A temporary git project holding a copy of the official packs and of the claude and opencode
+/// extensions, at `ext/claude` and `ext/opencode`.
 fn project() -> Result<TempDir, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let status = Command::new("git")
@@ -123,6 +124,10 @@ fn project() -> Result<TempDir, Box<dyn Error>> {
     copy_tree(
         &manifest.join("../../extensions/claude"),
         &dir.path().join("ext/claude"),
+    )?;
+    copy_tree(
+        &manifest.join("../../extensions/opencode"),
+        &dir.path().join("ext/opencode"),
     )?;
     Ok(dir)
 }
@@ -137,27 +142,33 @@ fn run(dir: &Path, args: &[&str]) -> Result<std::process::Output, Box<dyn Error>
         .output()?)
 }
 
+/// `init` for the claude and opencode extensions and all five packs, which must succeed.
+fn init_both(dir: &Path) -> TestResult {
+    init_tools(dir, &["./ext/claude", "./ext/opencode"])
+}
+
 /// `init` for the claude extension and all five packs, which must succeed.
 fn init_all(dir: &Path) -> TestResult {
-    let output = run(
-        dir,
-        &[
-            "init",
-            "--tool",
-            "./ext/claude",
-            "--pack",
-            "./packs/core",
-            "--pack",
-            "./packs/sdlc",
-            "--pack",
-            "./packs/journal",
-            "--pack",
-            "./packs/guideline-rust",
-            "--pack",
-            "./packs/guideline-python",
-            "--yes",
-        ],
-    )?;
+    init_tools(dir, &["./ext/claude"])
+}
+
+/// `init` for the given tool extensions and all five packs, which must succeed.
+fn init_tools(dir: &Path, tools: &[&str]) -> TestResult {
+    let mut args = vec!["init"];
+    for tool in tools {
+        args.extend(["--tool", tool]);
+    }
+    for pack in [
+        "./packs/core",
+        "./packs/sdlc",
+        "./packs/journal",
+        "./packs/guideline-rust",
+        "./packs/guideline-python",
+    ] {
+        args.extend(["--pack", pack]);
+    }
+    args.push("--yes");
+    let output = run(dir, &args)?;
     assert_eq!(
         output.status.code(),
         Some(0),
@@ -334,6 +345,13 @@ fn frontmatter_name(text: &str) -> Option<String> {
         .map(|value| value.trim().trim_matches(['"', '\'']).to_owned())
 }
 
+/// The rules of the `permissions:` line of an agent file, or `None` when it has no such line.
+fn permission_rules(text: &str) -> Option<Result<Vec<Value>, serde_json::Error>> {
+    text.lines()
+        .find_map(|line| line.strip_prefix("permissions:"))
+        .map(|rules| serde_json::from_str(rules.trim()))
+}
+
 #[test]
 fn five_packs_install() -> TestResult {
     if skip_without_airsl()? {
@@ -379,6 +397,72 @@ fn five_packs_install() -> TestResult {
 
     let agents = entry_names(&project.path().join(".claude/agents"))?;
     assert_eq!(agents.len(), 10, "{agents:?}");
+    Ok(())
+}
+
+#[test]
+fn five_packs_install_on_both_tools() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    init_both(project.path())?;
+
+    let plan = run(project.path(), &["plan"])?;
+    assert_eq!(
+        plan.status.code(),
+        Some(0),
+        "plan failed: {}",
+        String::from_utf8_lossy(&plan.stderr)
+    );
+    let stdout = String::from_utf8(plan.stdout)?;
+    let mut skips: Vec<&str> = stdout
+        .lines()
+        .filter_map(|line| line.trim_start().strip_prefix("skip "))
+        .map(str::trim_start)
+        .collect();
+    let mut expected = [
+        "core/hook/3: claude shows no hook output to the model at session end",
+        "core/hook/1: opencode runs session.start hooks only for a new session (source \"startup\"), which this hook does not match",
+        "core/hook/3: opencode has no hook when a session ends",
+        "core/hook/8: opencode has no hook when a subagent stops",
+        "core/hook/9: opencode has no hook when a subagent stops",
+        "journal/hook/1: opencode has no hook when a subagent stops",
+        "sdlc/hook/1: opencode has no hook when a subagent stops",
+    ];
+    skips.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(skips, expected, "{stdout}");
+    Ok(())
+}
+
+#[test]
+fn opencode_agents_reach_outside_the_project() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    init_both(project.path())?;
+
+    let dir = project.path().join(".opencode/agents");
+    let agents = entry_names(&dir)?;
+    assert!(!agents.is_empty(), "no agent under {}", dir.display());
+    for file in agents {
+        let path = dir.join(&file);
+        let text = fs::read_to_string(&path)?;
+        let rules = permission_rules(&text)
+            .ok_or_else(|| format!("{} has no permissions line", path.display()))??;
+        assert_eq!(
+            rules.first(),
+            Some(&json!({"action": "*", "effect": "deny", "resource": "*"})),
+            "{file}: {rules:?}"
+        );
+        assert_eq!(
+            rules.get(1),
+            Some(&json!({"action": "external_directory", "effect": "allow", "resource": "*"})),
+            "{file}: {rules:?}"
+        );
+    }
     Ok(())
 }
 
@@ -681,6 +765,141 @@ fn journal_session_start_hook_renders_the_card() -> TestResult {
     Ok(())
 }
 
+/// Each tool's `journal-capture/session.md` lands in that tool's skill directory, with `{{root}}`
+/// and `{{var tmpdir}}` rendered and nothing else changed, and the rendered capture and note
+/// skills read it from that same path.
+#[test]
+fn journal_session_lookup_is_per_tool() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    let root = project.path();
+    init_both(root)?;
+    let source = |tool: &str| {
+        fs::read_to_string(root.join(format!(
+            "packs/journal/native/{tool}/skills/journal-capture/session.md"
+        )))
+    };
+    let claude = source("claude")?.replace("{{root}}", ".claude/agentstacks/journal");
+    let opencode = source("opencode")?.replace("{{var tmpdir}}", "${TMPDIR:-/tmp}");
+    assert_eq!(
+        fs::read_to_string(root.join(".claude/skills/journal-capture/session.md"))?,
+        claude
+    );
+    assert_eq!(
+        fs::read_to_string(root.join(".opencode/skills/journal-capture/session.md"))?,
+        opencode
+    );
+    for tool in ["claude", "opencode"] {
+        let session = format!(".{tool}/skills/journal-capture/session.md");
+        for skill in ["capture", "note"] {
+            let path = root.join(format!(".{tool}/skills/journal-{skill}/SKILL.md"));
+            let text = fs::read_to_string(&path)?;
+            assert!(
+                text.contains(&session),
+                "{} does not read {session}",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The names pack text gate 4 keeps out of neutral pack text, read from its pattern in the
+/// `[tasks.lua]` table of `Makefile.toml`, so the rendered output is checked against the same list.
+fn gate4_names() -> Result<Vec<String>, Box<dyn Error>> {
+    let makefile =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Makefile.toml"))?;
+    let lua = make_task(&makefile, "lua")?;
+    let gate = &lua[lua
+        .find("# Gate 4")
+        .ok_or("[tasks.lua] has no `# Gate 4` block")?..];
+    let pattern = gate
+        .split_once("grep -rnE '")
+        .and_then(|(_, rest)| rest.split_once('\''))
+        .map(|(pattern, _)| pattern)
+        .ok_or("gate 4 has no `grep -rnE '<pattern>'`")?;
+    Ok(literal_alternatives(pattern))
+}
+
+/// Every literal string an extended regex of plain alternatives matches: `a|b` gives `a` and `b`,
+/// one group `x(a|b)y` gives `xay` and `xby`, and `\.` stands for `.`.
+fn literal_alternatives(pattern: &str) -> Vec<String> {
+    let mut alternatives = Vec::new();
+    let mut depth = 0_usize;
+    let mut from = 0;
+    for (at, character) in pattern.char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '|' if depth == 0 => {
+                alternatives.push(&pattern[from..at]);
+                from = at + 1;
+            }
+            _ => {}
+        }
+    }
+    alternatives.push(&pattern[from..]);
+
+    let mut names = Vec::new();
+    for alternative in alternatives {
+        let alternative = alternative.replace("\\.", ".");
+        match (alternative.find('('), alternative.rfind(')')) {
+            (Some(open), Some(close)) if open < close => {
+                let (head, tail) = (&alternative[..open], &alternative[close + 1..]);
+                for inner in alternative[open + 1..close].split('|') {
+                    names.push(format!("{head}{inner}{tail}"));
+                }
+            }
+            _ => names.push(alternative),
+        }
+    }
+    names
+}
+
+/// No skill, agent or command rendered under `.opencode/` names a Claude Code tool, hook event or
+/// store path from pack text gate 4. `doc-comment-discipline.md` is skipped, as the gate skips it:
+/// it lists such names as words to keep out of source comments.
+#[test]
+fn opencode_instructions_name_no_claude_tools() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    let root = project.path();
+    init_both(root)?;
+    let names = gate4_names()?;
+    for known in ["subagent_type", "`Agent`", ".claude/"] {
+        assert!(
+            names.iter().any(|name| name == known),
+            "gate 4's names lack {known}: {names:?}"
+        );
+    }
+
+    let mut hits = Vec::new();
+    for kind in ["skills", "agents", "commands"] {
+        for file in files_under(&root.join(".opencode").join(kind))? {
+            if file
+                .file_name()
+                .is_some_and(|name| name == "doc-comment-discipline.md")
+            {
+                continue;
+            }
+            let text = String::from_utf8_lossy(&fs::read(&file)?).into_owned();
+            for (number, line) in text.lines().enumerate() {
+                for name in &names {
+                    if line.contains(name.as_str()) {
+                        hits.push(format!("{}:{}: {name}", file.display(), number + 1));
+                    }
+                }
+            }
+        }
+    }
+    assert!(hits.is_empty(), "{}", hits.join("\n"));
+    Ok(())
+}
+
 #[test]
 fn rendered_files_keep_no_pack_syntax_and_names_match_their_paths() -> TestResult {
     if skip_without_airsl()? {
@@ -748,7 +967,7 @@ fn the_lua_gate_tests_the_packs_and_is_part_of_dod() -> TestResult {
         runs_over_packs("airsl test"),
         "[tasks.lua] does not run `airsl test` over packs"
     );
-    for gate in 1..=3 {
+    for gate in 1..=4 {
         let message = format!("pack text gate {gate}");
         assert!(lua.contains(&message), "[tasks.lua] has no `{message}`");
     }
@@ -763,7 +982,7 @@ fn the_lua_gate_tests_the_packs_and_is_part_of_dod() -> TestResult {
 }
 
 mod tests {
-    use super::{Version, frontmatter_name, parse_version};
+    use super::{Version, frontmatter_name, literal_alternatives, parse_version};
 
     const fn version(core: (u32, u32, u32), pre_release: bool) -> Version {
         Version { core, pre_release }
@@ -810,5 +1029,14 @@ mod tests {
         );
         assert_eq!(frontmatter_name("---\ndescription: d\n---\nname: z"), None);
         assert_eq!(frontmatter_name("no frontmatter"), None);
+    }
+
+    #[test]
+    fn expands_the_gate_pattern_into_literal_names() {
+        assert_eq!(
+            literal_alternatives("a b|`(Read|Task)`|\\.claude/|x(1|2)y"),
+            ["a b", "`Read`", "`Task`", ".claude/", "x1y", "x2y"]
+        );
+        assert_eq!(literal_alternatives("single"), ["single"]);
     }
 }

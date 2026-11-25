@@ -1,0 +1,57 @@
+# a11: the amended gate 4 block (probes/final/gate4.sh: new comment, no --exclude=docstring-discipline.md)
+# run by /bin/sh -e over packs/ of dffc959 (the tree F7 ran on, from git archive), then over this worktree's packs/
+$ cd <dffc959 export> && /bin/sh -e probes/final/gate4.sh
+packs/journal/agents/capture.md:5:  session transcript JSONL and distils a grounded storytelling session note
+packs/journal/agents/capture.md:22:- `tpath` — absolute path to the transcript JSONL (resolved by the skill via
+packs/journal/agents/capture.md:28:1. If `tpath` is non-empty and readable, read it (the full transcript JSONL)
+packs/journal/agents/note.md:22:- `tpath` — absolute path to the transcript JSONL, or empty if none.
+packs/journal/skills/note/SKILL.md:31:  --allow-env CLAUDE_CONFIG_DIR --allow-env HOME --allow-env PWD \
+packs/journal/skills/note/SKILL.md:63:6. Spawn the `{{agent note}}` subagent (Task / Agent tool,
+packs/journal/skills/note/SKILL.md:64:   `subagent_type: {{agent note}}`), passing `topic`, `session_id`, `id8`,
+packs/journal/skills/capture/SKILL.md:31:  --allow-env CLAUDE_CONFIG_DIR --allow-env HOME --allow-env PWD \
+packs/journal/skills/capture/SKILL.md:64:5. Spawn the `{{agent capture}}` subagent (Task / Agent tool,
+packs/journal/skills/capture/SKILL.md:65:   `subagent_type: {{agent capture}}`), passing `session_id`, `id8`, `stem`,
+packs/journal/skills/recall/SKILL.md:40:3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
+packs/journal/skills/recall/SKILL.md:41:   `subagent_type: {{agent recall}}`), passing `query`, `project`, and
+packs/journal/skills/link/SKILL.md:46:3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
+packs/journal/skills/link/SKILL.md:47:   `subagent_type: {{agent recall}}`), passing `query`, `project`, `mode=link`,
+packs/journal/skills/review/SKILL.md:69:5. Spawn the `{{agent curator}}` subagent (`subagent_type: {{agent curator}}`), passing `scope`, the
+packs/journal/skills/review/SKILL.md:85:   If this exits non-zero, report that the next SessionStart staleness check
+packs/core/agents/reviewer.md:19:Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to load the rules you enforce and the DoD command set you must re-run. If none is installed, review for correctness only and say the stack rules were unavailable.
+packs/core/agents/reviewer.md:42:Get the diff via `git diff` / `git log -p` / `git show`. `Bash` is for those and the DoD tooling only — no mutating commands.
+packs/core/agents/reviewer.md:100:- You are a leaf: you have no `Agent` tool; do not spawn agents.
+packs/core/agents/explorer.md:26:Use `Grep` / `Glob` to find, `Read` to confirm the exact line, `Bash` for read-only inspection (`git ls-files`, `git grep`, `ls`) only — never a mutating command.
+packs/core/agents/explorer.md:61:- Read-only: you have no `Edit`/`Write`. You change nothing.
+packs/core/agents/explorer.md:62:- You are a leaf: you have no `Agent` tool; do not attempt to spawn agents.
+packs/core/agents/coder.md:18:The stack's rules and Definition of Done are not in your context by default. At task start, invoke the installed guidelines skill via `Skill` to load them — e.g. `rust-guidelines` for Rust, or whichever `*-guidelines` skill matches the project's language. It gives you the rules to follow and the exact DoD command set to pass.
+packs/core/agents/coder.md:71:- You are a leaf: you have no `Agent` tool; do not attempt to spawn other agents.
+packs/core/scripts/install-airsl.sh:7:# than the problem it solves. The SessionStart preflight names this script instead of running it.
+packs/core/skills/snapshot-save/SKILL.md:155:- Write to Claude's native memory store (`~/.claude/projects/.../memory/` or any `MEMORY.md`). This
+packs/core/skills/process-guidelines/references/agent-orchestration.md:23:- A spawned agent does NOT spawn another agent — none of them carry the `Agent` tool.
+packs/core/skills/process-guidelines/references/agent-orchestration.md:74:  `Agent` tool.
+packs/core/skills/process-guidelines/references/model-routing.md:3:Governs **delegated agents only** — anything spawned via the `Agent` tool. It cannot change the main
+packs/core/skills/process-guidelines/references/model-routing.md:20:Effort is definition-only — the `Agent` tool's spawn parameters expose `model` but not `effort`, so a
+packs/core/skills/orchestrate/SKILL.md:8:The driver for the `coder → reviewer` pipeline. The pack agents are **leaves** — they have no `Agent` tool and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
+packs/core/skills/orchestrate/SKILL.md:18:Named {{agent coder}}, {{agent reviewer}}, and so on. Spawn each via the `Agent` tool's `subagent_type`. Both dials are set in each agent's frontmatter — the spawn can override `model:`, but effort comes from the definition only.
+packs/core/skills/orchestrate/SKILL.md:67:Run each verification once, at the point it is meaningful, and then trust it. The stack's Definition of Done runs **once for the batch**, not once per task — a green gate is not re-run to confirm it is still green. A file you just wrote through `Edit` or `Write` is not read back; the tool would have failed. The reviewer's own DoD run is the one deliberate duplication in this flow, and it replaces any auditing pass of yours over the coder's receipt — there is no third run. A verification that cannot change what you do next is not a verification.
+packs/core/skills/orchestrate/SKILL.md:136:- An agent spawning another agent (recursion hides steps, bypasses the gate). Agents have no `Agent` tool — keep it that way.
+packs/core/skills/context-handoff/references/protocol.md:104:source. `{{agent coder}}` writes with its `Write` tool. The read-only agents (`{{agent explorer}}`,
+packs/core/skills/context-handoff/references/protocol.md:105:`{{agent reviewer}}`) carry `Write` **scoped by instruction** to the handoff directory only —
+packs/core/skills/context-handoff/SKILL.md:25:cannot compute it: the project directory is not a variable in the environment of a `Bash` tool
+packs/sdlc/agents/chain-reader.md:22:`Glob` enumerates, `Grep` locates, `Read` pulls the lines. `Bash` is read-only (`ls`,
+packs/sdlc/agents/chain-reader.md:60:- Read-only toward the corpus; `Write` is for your report file alone.
+packs/sdlc/agents/chain-reader.md:62:- Leaf: no `Agent` tool.
+packs/sdlc/agents/artifact-reviewer.md:43:- Spawning an agent (you have no `Agent` tool).
+packs/sdlc/agents/artifact-reviewer.md:92:- `Bash` is read-only (`ls`, `git ls-files`, `git grep`, `git log`), plus re-running a
+packs/sdlc/agents/artifact-reviewer.md:95:- `Write` is for your report file only.
+packs/sdlc/agents/artifact-reviewer.md:96:- Leaf: no `Agent` tool.
+packs/sdlc/agents/task-briefer.md:89:`Bash` is read-only (`ls`, `cat`, `sed -n`, `git ls-files`).
+packs/sdlc/skills/execute/SKILL.md:40:   TodoWrite item per task. Never read the plan end to end. If the agent is missing, use
+pack text gate 4: tool-specific names in neutral pack text
+exit 1
+$ grep -c '^packs/' <output above>
+46
+$ diff <(grep '^packs/' a3-gate-candidate.txt | sort) <(grep '^packs/' <output above> | sort)
+identical
+$ cd <worktree> && /bin/sh -e probes/final/gate4.sh
+exit 0

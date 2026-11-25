@@ -1,0 +1,14 @@
+$ sh harness/t1.sh standalone <port>
+exit=0
+--- live.rc
+0
+--- live-sa.rc
+$ sh harness/oc.sh <dir> service status   # after the run
+http://127.0.0.1:49374
+exit=0
+$ sh harness/oc.sh <dir> service stop
+exit=0
+$ sh harness/oc.sh <dir> service status
+stopped
+exit=0
+pgrep exit=1

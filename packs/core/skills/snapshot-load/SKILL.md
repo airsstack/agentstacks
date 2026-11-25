@@ -10,15 +10,14 @@ working on now." Operates the timestamped snapshot store written by `{{skill sna
 for the layout, filename, and schema). Pulls the relevant snapshots into context and reports where
 work stands.
 
-This reads the project **snapshot** store only — **not** Claude's native memory tool. The native
-store has size limits we are working around; the snapshot store lives outside the repo at the path
-below.
+This reads the project **snapshot** store only — **not** the agent tool's own memory store. The
+snapshot store lives outside the repo at the path below.
 
 ## Snapshot store
 
 The store lives **outside the repo**, namespaced per project, at
 `${AIRSSTACK_HOME:-~/.airsstack}/snapshots/<project-key>/`. `index.md` there is the index (one line per
-snapshot — NOT Claude's `MEMORY.md`); the timestamped snapshot files live alongside it. See
+snapshot — never `MEMORY.md`); the timestamped snapshot files live alongside it. See
 `{{skill snapshot-save}}` for the layout and the exact `<project-key>` resolution — compute it the **same way**
 (from `git rev-parse --git-common-dir`, so every worktree of one repo loads the same store). If the
 store dir does not exist yet, there is nothing to load — report that and stop.
@@ -66,7 +65,7 @@ the selection **mode**:
 
 ## Must NOT do
 
-- Read Claude's native memory store. Only this snapshot store.
+- Read the agent tool's own memory store. Only this snapshot store.
 - Read every snapshot file unconditionally (token waste). Select by branch/topic + recency.
 - In **no-topic** mode, load snapshots from other branches (stay on the current branch).
 - In **topic** mode, ignore a strong cross-branch topic match just because it is off the current

@@ -5,7 +5,7 @@
 # invisible).
 # Every path exits 0: when airsl is missing the command's model fallback
 # derives the board instead, and deliberately no `exec` — that would hand
-# airsl's status back to Claude Code.
+# airsl's status back to the agent tool.
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || exit 0
 [ -n "$DIR" ] || exit 0

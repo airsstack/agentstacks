@@ -1,0 +1,2 @@
+$ pgrep -fl scratchpad/tn; pgrep -fl mock.mjs
+exit=1

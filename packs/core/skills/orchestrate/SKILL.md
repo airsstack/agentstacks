@@ -5,7 +5,7 @@ description: Use when driving a scoped implementation task through the review pi
 
 # Orchestrate
 
-The driver for the `coder → reviewer` pipeline. The pack agents are **leaves** — they have no `Agent` tool and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
+The driver for the `coder → reviewer` pipeline. The pack agents are **leaves** — they cannot spawn and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
 
 ## The three agents
 
@@ -15,7 +15,7 @@ The driver for the `coder → reviewer` pipeline. The pack agents are **leaves**
 | `{{agent coder}}` | sonnet · high | Implements one scoped task with strict TDD, runs the active stack's DoD, leaves changes in the working tree. Never commits. |
 | `{{agent reviewer}}` | opus · high | One combined report: re-runs the DoD + reviews the diff for style/correctness, AND reviews against the spec/plan intent. Report-only. |
 
-Named {{agent coder}}, {{agent reviewer}}, and so on. Spawn each via the `Agent` tool's `subagent_type`. Both dials are set in each agent's frontmatter — the spawn can override `model:`, but effort comes from the definition only.
+Named {{agent coder}}, {{agent reviewer}}, and so on. Spawn each as a subagent by that name. Both dials are set in each agent's frontmatter — a spawn may set `model:`, but effort comes from the definition only.
 
 ## The flow
 
@@ -64,7 +64,7 @@ If no installed guideline matches the stack, settle it in the brief rather than 
 
 ## Verification budget — do not over-verify
 
-Run each verification once, at the point it is meaningful, and then trust it. The stack's Definition of Done runs **once for the batch**, not once per task — a green gate is not re-run to confirm it is still green. A file you just wrote through `Edit` or `Write` is not read back; the tool would have failed. The reviewer's own DoD run is the one deliberate duplication in this flow, and it replaces any auditing pass of yours over the coder's receipt — there is no third run. A verification that cannot change what you do next is not a verification.
+Run each verification once, at the point it is meaningful, and then trust it. The stack's Definition of Done runs **once for the batch**, not once per task — a green gate is not re-run to confirm it is still green. A file you just wrote or edited is not read back; the tool would have failed. The reviewer's own DoD run is the one deliberate duplication in this flow, and it replaces any auditing pass of yours over the coder's receipt — there is no third run. A verification that cannot change what you do next is not a verification.
 
 ## Review budget — do not over-review
 
@@ -133,7 +133,7 @@ This skill assumes the core pack agents are installed. If they are not (the agen
 
 ## Anti-patterns
 
-- An agent spawning another agent (recursion hides steps, bypasses the gate). Agents have no `Agent` tool — keep it that way.
+- An agent spawning another agent (recursion hides steps, bypasses the gate). Agents cannot spawn — keep it that way.
 - A coder diff going straight to commit without a reviewer pass.
 - A reviewer that edits files instead of reporting.
 - Any agent running `git commit`.

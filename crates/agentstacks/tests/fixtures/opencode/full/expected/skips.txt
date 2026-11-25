@@ -1,0 +1,7 @@
+full/agent/odd: native.opencode key "bad key" cannot be written as frontmatter
+full/hook/1: opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match
+full/hook/6: opencode has no hook when a session ends
+full/hook/7: opencode has no hook when a subagent stops
+full/hook/8: opencode runs hook commands through sh, which would expand the literal $ in argument "^a$"
+full/native-hook/3: opencode has no native hook event "Notification" (use tool.execute.before, tool.execute.after or session.prompt)
+full/skill/odd: native.opencode key "bad key" cannot be written as frontmatter

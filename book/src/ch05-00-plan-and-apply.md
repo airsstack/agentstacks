@@ -371,7 +371,8 @@ A binary required by both a pack and an extension is reported once for each.
 
 The installed airsl version is written to `[airsl] version`. A newer version in range moves the pin,
 and the plan shows `airsl 0.1.4 → 0.1.5`. A missing airsl after install is caught in two ways: the
-tool's own error for a missing command, and `doctor` ([section 8](#8-doctor)).
+tool's own error for a missing command (under OpenCode, the shim's one-time notice to the model,
+see [OpenCode](ch06-03-opencode.md#41-missing-airsl)), and `doctor` ([section 8](#8-doctor)).
 
 ## 12. Where a refusal is located
 

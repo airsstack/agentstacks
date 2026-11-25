@@ -1,0 +1,28 @@
+$ ls <scratch>/ptn/proj/.opencode/agentstacks/journal/scripts/   # after a1
+build-index.lua
+bump-helped.lua
+daily-link.lua
+graph-health.lua
+journal-backup.lua
+lib
+orientation.lua
+project-key.lua
+provision.lua
+session-start.lua
+transcript-path.lua
+$ grep -rln "packs/" crates/claudevs/tests crates/claudevs-cli/tests
+exit=1
+$ grep -rln "fixtures/" crates/claudevs/tests | head -1   # control: the same search finds a path it does read
+crates/claudevs/tests/corpus/corpus.toml
+$ grep -n "OPENCODE =\|PATH" crates/agentstacks-cli/tests/opencode-check/check.mjs
+25:  "agentstacks: airsl is not on PATH, so the agentstacks Lua hooks are not running. " +
+33:const OPENCODE = path.resolve(opencodeArg);
+141:    PATH: process.env.PATH ?? "",
+186:    env: { PATH: process.env.PATH ?? "" },
+257:    PATH: process.env.PATH ?? "",
+273:// PATH with airsl made unresolvable and nothing else taken away: each PATH directory that holds
+277:  const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+299:  if (out.some(hasAirsl)) throw new Failure("airsl is still resolvable on the S7 PATH");
+493:    const serverEnv = isolatedEnv(home, mock.port, { OPENCODE_PASSWORD: password, PATH: noAirsl });
+524:    assert(!second.includes("airsl is not on PATH"), `prompt 2 holds the notice: ${clip(second)}`);
+535:  const version = spawnSync(OPENCODE, ["--version"], { env: { PATH: process.env.PATH ?? "", HOME: SCRATCH } });

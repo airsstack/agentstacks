@@ -1,0 +1,12 @@
+$ /bin/sh -e final/gate4.sh   # today's packs/
+exit=1
+stdout lines: 46
+stderr: pack text gate 4: tool-specific names in neutral pack text
+$ diff <(gate 4 stdout) <(the 46 lines of a4/a3 with the native filter)
+diff exit=0
+$ cd <tree with a native hit, a CHANGELOG hit, and a neutral hit whose text holds /native/>; /bin/sh -e final/gate4.sh
+packs/x/skills/b.md:1:see packs/x/native/ for `Agent`
+pack text gate 4: tool-specific names in neutral pack text
+exit=1
+$ rm packs/x/skills/b.md; /bin/sh -e final/gate4.sh   # only the native and CHANGELOG hits left
+exit=0

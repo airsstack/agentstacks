@@ -101,8 +101,8 @@ gate are unchanged.
 ## Report-write mechanism
 
 Every spawn writes exactly one handoff file — its own, never another agent's, never
-source. `{{agent coder}}` writes with its `Write` tool. The read-only agents (`{{agent explorer}}`,
-`{{agent reviewer}}`) carry `Write` **scoped by instruction** to the handoff directory only —
+source. `{{agent coder}}` writes it like any other file. The read-only agents (`{{agent explorer}}`,
+`{{agent reviewer}}`) may write **scoped by instruction** to the handoff directory only —
 writing the report is a first-class duty, distinct from mutating source, which they still
 must never do.
 

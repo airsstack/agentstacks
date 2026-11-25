@@ -22,7 +22,7 @@ handoff-protocol: <the protocol path above, exactly as it appears>
 ```
 
 By the time you read this file the placeholder is already an absolute path — copy it. An agent
-cannot compute it: the project directory is not a variable in the environment of a `Bash` tool
+cannot compute it: the project directory is not a variable in the environment of a shell tool
 call.
 
 `{{agent coder}}`, `{{agent explorer}}` and `{{agent reviewer}}` live in the core pack and cite the path in their own

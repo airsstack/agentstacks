@@ -20,7 +20,7 @@ fix the flow so every delegated change passes through review and through the use
 
 ## Agents are leaves
 
-- A spawned agent does NOT spawn another agent — none of them carry the `Agent` tool.
+- A spawned agent does NOT spawn another agent — none of them can spawn.
 - All chaining lives in the orchestrator: the main thread, or a one-level workflow script.
 - A reviewer never calls a coder. The orchestrator takes the reviewer's findings and spawns a *fresh*
   coder. Every result passes through the orchestrator, so the gate is never bypassed.
@@ -70,8 +70,8 @@ on it.
 
 ## Anti-patterns
 
-- An agent spawning another agent (recursion hides steps, bypasses the gate). Forbidden — agents have no
-  `Agent` tool.
+- An agent spawning another agent (recursion hides steps, bypasses the gate). Forbidden — agents
+  cannot spawn.
 - A coder diff going straight to commit without a review pass.
 - A reviewer that edits files or proposes large refactors instead of reporting.
 - Any agent running `git commit`. The user is the commit gate.

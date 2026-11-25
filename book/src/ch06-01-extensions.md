@@ -529,5 +529,5 @@ tool knows its own config:
 - **Filter by `match` and `agents`** in the tool's own config. The runtime does not filter.
 - **Render message hooks natively.** A message hook never reaches the runtime.
 - **Write a shim with `write`** when the tool demands another hook language. Example: OpenCode
-  plugins are TypeScript, so the extension writes a thin TypeScript shim that only runs the argv and
-  forwards the payload and result ([hooks.md](ch06-02-hooks.md#9-shims-for-other-hook-languages)).
+  plugins are JavaScript or TypeScript; the opencode extension writes a JavaScript shim that only
+  runs the argv and forwards the payload and result ([hooks.md](ch06-02-hooks.md#9-shims-for-other-hook-languages)).

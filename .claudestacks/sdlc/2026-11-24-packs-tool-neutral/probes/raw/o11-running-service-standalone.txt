@@ -1,0 +1,26 @@
+$ opencode service start
+http://127.0.0.1:49374
+exit=0
+$ opencode service status
+http://127.0.0.1:49374
+exit=0
+$ opencode run --standalone --session ses_zzzzprobe0000000000000008 "first prompt"
+exit=0
+$ opencode run --standalone --session ses_zzzzprobe0000000000000008 "second prompt"
+exit=0
+inside the session: service status = http://127.0.0.1:49374; export rc = 0; e.err = 
+$ opencode session export ses_zzzzprobe0000000000000008   # through the running service, after both turns
+exit=0
+messages 7, server-restarted messages 0
+  user 
+  assistant text
+  idle 
+  user 
+  assistant tool:shell
+  assistant text
+  idle 
+in-session export: messages 4 (user assistant idle user)
+$ opencode service stop
+exit=0
+$ pgrep -fl scratchpad/tn/t8
+exit=1

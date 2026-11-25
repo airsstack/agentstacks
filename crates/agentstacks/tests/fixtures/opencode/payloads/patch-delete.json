@@ -1,0 +1,1 @@
+{"hook":"tool.before","session_id":"s1","parent_id":null,"cwd":"/p","match":null,"agent":"build","tool":"patch","input":{"patchText":"*** Begin Patch\n*** Delete File: gone.txt\n*** End Patch"}}

@@ -64,7 +64,7 @@ List every claim the task makes about something it does not create:
 - a count or exhaustive list;
 - a field or key name in a JSON payload, manifest or config;
 - a negative ("there is no such flag");
-- any statement about the `claude` binary, Claude Code's documented behaviour, or another
+- any statement about an outside tool's binary or documented behaviour, or another
   system this repository does not own.
 
 One line each: `<the claim, quoted> — <step or line it appears in>`.
@@ -86,7 +86,7 @@ Never: assess correctness, completeness, ordering or merit; verify an asserted f
 up a symbol; run any command the plan names; edit, create or delete any file but your
 handoff; implement any part of a task; suggest a fix, reordering or alternative.
 
-`Bash` is read-only (`ls`, `cat`, `sed -n`, `git ls-files`).
+Shell commands are read-only (`ls`, `cat`, `sed -n`, `git ls-files`).
 
 If asked for any of these, reply exactly:
 `Out of scope — I extract, I don't interpret or execute. The calling skill does that.`

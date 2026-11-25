@@ -4,7 +4,7 @@
 # User-invoked, never automatic. It first runs airsl's own prebuilt-binary installer, which
 # downloads a binary. If that cannot run or does not complete, it builds airsl from source with
 # cargo, which takes minutes — a session-start hook that silently triggered either would be worse
-# than the problem it solves. The SessionStart preflight names this script instead of running it.
+# than the problem it solves. The session-start preflight names this script instead of running it.
 #
 # Pure POSIX sh with no airsl dependency, because the situation it exists for is "airsl is missing".
 #

@@ -66,7 +66,7 @@ airsl run --policy confined \
 
    `${TMPDIR:-/tmp}/journal-curator-review.md`
 
-5. Spawn the `{{agent curator}}` subagent (`subagent_type: {{agent curator}}`), passing `scope`, the
+5. Spawn the `{{agent curator}}` subagent, passing `scope`, the
    `vault` root, the `health_report` temp path, the literal
    `${TMPDIR:-/tmp}/journal-curator-review.md` from step 4 as `handoff`, and the protocol path
    from step 4 as `handoff-protocol`. The curator applies its additive edits and returns a
@@ -82,7 +82,7 @@ airsl run --policy confined \
   "{{var project_dir}}/{{root}}/scripts/build-index.lua"
    ```
 
-   If this exits non-zero, report that the next SessionStart staleness check
+   If this exits non-zero, report that the next session-start staleness check
    will rebuild — do not fail the review (the curator's edits persist).
 
 7. Report.

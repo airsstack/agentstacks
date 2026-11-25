@@ -4,8 +4,9 @@
 each tool's own format.**
 
 > **Status: pre-release (0.1.0).** The CLI and the Claude Code extension are released, with the
-> five official packs (`packs-v0.1.0`). OpenCode is not here yet. The extension API is `api = 0` and
-> will change. Coming from the claudestacks plugins? See
+> five official packs (`packs-v0.1.0`). The OpenCode extension is built and ships with the next
+> `packs-v*` release. The extension API is `api = 0` and will change. Coming from the claudestacks
+> plugins? See
 > [the migration guide](https://airsstack.github.io/agentstacks/ch03-00-migration.html).
 
 Every agentic coding tool wants its setup in its own shape: Claude Code reads `.claude/`, OpenCode
@@ -103,7 +104,7 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 | Tool | Status |
 |---|---|
 | Claude Code | Released (`extensions/claude`, `packs-v0.1.0`) |
-| OpenCode | Planned |
+| OpenCode | Built (`extensions/opencode`), ships with the next `packs-v*` release |
 | Your own | Write a tool extension against the public API: [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html) |
 
 There is no plugin marketplace. Every tool is set up through the CLI, in that tool's native
@@ -130,7 +131,8 @@ enough for real tools.
 Extensions run under [airsl](https://github.com/airsstack/airsl) with no file, network, or process
 access. An extension only *proposes* operations; the Rust core validates them, `plan` shows them,
 and the executor applies them. A third-party command never runs unannounced. The extension API is
-unstable (`api = 0`) until both official tools run on it.
+unstable (`api = 0`); both official tools run on it, and it stays `api = 0` until it is frozen as
+`api = 1` in M3.
 
 To write a tool extension, give your coding agent the guide
 [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html), or its raw link:
@@ -146,8 +148,8 @@ Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch0
   plan, and a refusal names what was missing.
 - **The human owns the intent.** `agentstacks.toml` is the committed record of what a project uses.
 - **Lua is the only scripting language.** Hook logic is Lua run by airsl. Where a tool demands
-  another language (OpenCode plugins are TypeScript), the extension generates a thin shim that only
-  forwards events to airsl.
+  another language (OpenCode hooks are JavaScript plugins), the extension generates a thin shim
+  that only forwards events to airsl.
 - **Unsupported is visible.** An item a tool can't express is reported as skipped, never dropped
   silently.
 
@@ -160,7 +162,7 @@ agentstacks/
 │  ├─ agentstacks-cli/   init · plan · apply · doctor · update                       built
 │  ├─ claudevs/          deterministic test engine for Claude Code setups            built (moved from claudestacks)
 │  └─ claudevs-cli/      the claudevs binary                                         built
-├─ extensions/           official tool extensions: claude/ built · opencode/ planned
+├─ extensions/           official tool extensions: claude/ built · opencode/ built
 ├─ packs/                official packs: core · sdlc · journal · guideline-*         built
 ├─ install/              installer scripts, served on Pages                          built
 ├─ book/                 the agentstacks book (mdBook), on airsstack.github.io/agentstacks   built
@@ -179,7 +181,7 @@ dependency rule, where logic lives, and how it is tested.
 
 ```text
 M1  claude extension (api = 0) ✓ released (0.1.0); the claudestacks plugins are packs
-M2  opencode extension on the same API
+M2  opencode extension on the same API ✓ built; ships with the next packs release
 M3  freeze api = 1; docs for writing packs and extensions; ext add / ext test
 ```
 

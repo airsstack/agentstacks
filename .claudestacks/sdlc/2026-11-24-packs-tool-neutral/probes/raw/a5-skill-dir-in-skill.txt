@@ -1,0 +1,20 @@
+$ printf "
+PROBE capture={{skill_dir journal/capture}}
+" >> packs/journal/skills/capture/SKILL.md
+$ printf "
+PROBE note={{skill_dir journal/capture}}
+" >> packs/journal/skills/note/SKILL.md
+$ agentstacks apply --yes
+  update   .claude/skills/journal-capture/SKILL.md    journal
+  update   .claude/skills/journal-note/SKILL.md       journal
+  update   .opencode/skills/journal-capture/SKILL.md  journal
+  update   .opencode/skills/journal-note/SKILL.md     journal
+  skip     journal/hook/1: opencode has no hook when a subagent stops
+4 to write, 0 to delete, 264 unchanged, 7 skipped
+applied: 4 written, 0 deleted
+exit=0
+$ grep -h PROBE {.claude,.opencode}/skills/journal-{capture,note}/SKILL.md
+PROBE capture=.claude/skills/journal-capture
+PROBE note=.claude/skills/journal-capture
+PROBE capture=.opencode/skills/journal-capture
+PROBE note=.opencode/skills/journal-capture

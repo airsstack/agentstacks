@@ -4,6 +4,12 @@ All notable changes to `agentstacks-cli` (the `agentstacks` binary) are recorded
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `init --tool opencode`.
+
 ## [0.1.0] - 2026-11-24
 
 Initial release.

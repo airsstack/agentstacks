@@ -43,8 +43,7 @@ for link-worthiness.
    That covers every block below, not only this one. Resolve each with a plain `echo`
    first — plain commands may use variables — and paste the absolute paths in.
 
-3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
-   `subagent_type: {{agent recall}}`), passing `query`, `project`, `mode=link`,
+3. Spawn the `{{agent recall}}` subagent, passing `query`, `project`, `mode=link`,
    and `subject_stem`. The subagent excludes the subject and ranks plausible
    `[[link]]` targets.
 

@@ -1,0 +1,2 @@
+[ { "tool": "shell", "args": { "command": "env | grep -i opencode | sort > env.txt; echo \"$PATH\" > path.txt; command -v opencode > which.txt; echo $? > which.rc; opencode session export \"$OPENCODE_SESSION_ID\" > live.json 2> live.err; echo $? > live.rc; echo ok" } },
+  { "text": "done" } ]

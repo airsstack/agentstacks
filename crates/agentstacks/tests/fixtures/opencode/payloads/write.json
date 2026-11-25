@@ -1,0 +1,1 @@
+{"hook":"tool.before","session_id":"s1","parent_id":null,"cwd":"/p","match":["write"],"agent":"build","tool":"write","input":{"path":"/p/b.txt","content":"x"}}

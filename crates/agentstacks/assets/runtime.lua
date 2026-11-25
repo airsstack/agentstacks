@@ -7,21 +7,51 @@ for i = 4, #arg do
   args[#args + 1] = arg[i]
 end
 local payload = airsstack.hook.payload()
-local event
+local hook
+
+-- Runs the hook on one event; a block from a hook that is not may_block is dropped with a line.
+local function run(event)
+  hook = hook or require(name)
+  event.args = args
+  local result = hook(event)
+  if type(result) == "table" and result.block ~= nil and not may_block then
+    airsstack.stdio.error("agentstacks: hook " .. name .. " tried to block but is not declared may_block; reason: "
+      .. tostring(result.block) .. "\n")
+    result.block = nil
+  end
+  return result
+end
+
+local result
 if kind == "native" then
-  event = { payload = payload, args = args }
+  result = run({ payload = payload })
 else
-  event = translate.event(payload)
+  local event = translate.event(payload)
   if event == nil then
     return
   end
-  event.args = args
-end
-local result = require(name)(event)
-if type(result) == "table" and result.block ~= nil and not may_block then
-  airsstack.stdio.error("agentstacks: hook " .. name .. " tried to block but is not declared may_block; reason: "
-    .. tostring(result.block) .. "\n")
-  result.block = nil
+  if event.event ~= nil then
+    result = run(event)
+  else
+    -- A list of events: the hook runs once per event, in order, until one blocks.
+    local contexts = {}
+    for _, each in ipairs(event) do
+      local one = run(each)
+      if type(one) == "table" then
+        if one.context ~= nil then
+          contexts[#contexts + 1] = tostring(one.context)
+        end
+        if one.block ~= nil then
+          result = { block = one.block }
+          break
+        end
+      end
+    end
+    if #contexts > 0 then
+      result = result or {}
+      result.context = table.concat(contexts, "\n")
+    end
+  end
 end
 local out = translate.result(result, payload)
 if out ~= nil then

@@ -1,0 +1,47 @@
+[pack]
+name = "check"
+version = "0.1.0"
+api = 0
+description = "Fixed inputs for the opencode-check run against a real OpenCode"
+
+[requires]
+airsl = ">=0.1.5"
+
+[[hooks]]
+kind = "message"
+event = "session.start"
+match = ["startup"]
+text = "CHECK-WELCOME"
+
+[[hooks]]
+kind = "lua"
+event = "session.start"
+run = "hooks/start.lua"
+
+[[hooks]]
+kind = "lua"
+event = "prompt.submit"
+run = "hooks/prompt.lua"
+
+[[hooks]]
+kind = "lua"
+event = "tool.before"
+match = ["write"]
+may_block = true
+run = "hooks/before.lua"
+
+[[hooks]]
+kind = "lua"
+event = "tool.after"
+match = ["read"]
+run = "hooks/after.lua"
+
+[[hooks]]
+kind = "message"
+event = "session.end"
+text = "CHECK-END"
+
+[[hooks]]
+kind = "lua"
+event = "agent.stop"
+run = "hooks/stop.lua"
