@@ -1,0 +1,317 @@
+Packages and capabilities | Muse Code Developer DocsSkip to content
+## 
+# Packages and capabilities
+After reading this page you can lay out a plugin directory, write its
+manifest, and choose the right capability family for each thing you want
+the plugin to contribute. The exact field tables live in the
+Manifest reference; this page explains the
+model behind them. The plugin surface is part of the Developer Preview and
+may change.
+## A package is one directory with one manifestSection titled “A package is one directory with one manifest”
+A plugin package is a directory. One manifest inside it names the plugin
+and points at the files that make up its capabilities. Everything the
+manifest points at lives at the package root or below it: SKILL.md files,
+Markdown command templates, hook scripts, MCP server entry points.
+notes/
+├── .muse-plugin/
+│   └── plugin.json
+├── skills/
+│   └── meeting-notes/
+│       └── SKILL.md
+├── commands/
+│   └── summarize.md
+├── hooks/
+│   └── log-prompts.sh
+└── mcp/
+    └── server.py
+When you install a package, Muse Code copies it into an immutable cache
+under your data directory and records its digest. Plugin processes find
+that copy through MUSE_PLUGIN_ROOT and get a writable per-plugin
+directory through MUSE_PLUGIN_DATA_DIR. The MUSE_PLUGIN_DATA_DIR
+directory may not exist yet, so create it before writing to it.
+Only the manifest lives in the marker directory. Putting skills or scripts
+under .muse-plugin/ is the most common layout mistake; every path in
+the manifest is relative to the package root, not to the manifest.
+## Four manifest markers, one winnerSection titled “Four manifest markers, one winner”
+Muse Code recognises four manifest locations. It selects exactly one per
+package and never falls back to another one if the selected manifest turns
+out to be invalid.
+Marker | 
+Format | 
+Selected when | 
+plugin.json at the package root | 
+Agent Plugins 1.0.0 | 
+Its $schema is exactly https://agent-plugins.org/schemas/1.0.0/plugin.schema.json. A root plugin.json without $schema is not a marker at all. | 
+.muse-plugin/plugin.json | 
+Native | 
+No Agent Plugins root is present. | 
+.claude-plugin/plugin.json | 
+Claude Code | 
+No Agent Plugins root and no .muse-plugin/ marker. | 
+.codex-plugin/plugin.json | 
+Codex | 
+No Agent Plugins root and no other nested marker. | 
+The selection rule in one sentence: an Agent Plugins root wins outright;
+otherwise the nested markers are ranked .muse-plugin/ first,
+.claude-plugin/ second, .codex-plugin/ third. A package that carries
+more than one nested marker still validates, and Muse Code reports one
+multiple-manifests warning that names the winner and the markers it
+ignored:
+Terminal window
+muse plugins validate ./both-notes
+diagnostic=multiple-manifests severity=warning path=./both-notes message=selected `.muse-plugin/plugin.json`; ignoring `.claude-plugin/plugin.json`
+valid  both-notes  native  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=1
+A package with no marker fails with missing-manifest. What Muse Code
+imports from each foreign format is the subject of
+Compatibility with other plugin formats. The rest of
+this page describes the native manifest.
+## The native manifestSection titled “The native manifest”
+The native manifest is .muse-plugin/plugin.json. Here is a complete one
+for the notes package above. It declares one capability of each of the
+four families you are likely to use and leaves reminders empty.
+notes/.muse-plugin/plugin.json
+{
+  "schemaVersion": 1,
+  "name": "notes",
+  "displayName": "Notes",
+  "version": "0.1.0",
+  "description": "Example plugin: a meeting-notes skill, a summarize command, a hook, and a stdio MCP server.",
+  "compat": {
+    "source": "native",
+    "manifestDir": ".muse-plugin"
+  },
+  "capabilities": {
+    "skills": [
+      {
+        "id": "meeting-notes",
+        "path": "skills/meeting-notes/SKILL.md",
+        "enabledDefault": true
+      }
+    ],
+    "commands": [
+      {
+        "id": "summarize",
+        "path": "commands/summarize.md"
+      }
+    ],
+    "hooks": [
+      {
+        "id": "log-prompts",
+        "event": "UserPromptSubmit",
+        "command": ["sh", "hooks/log-prompts.sh"],
+        "timeoutMs": 5000,
+        "statusMessage": "Logging prompt"
+      }
+    ],
+    "mcpServers": [
+      {
+        "id": "notes-index",
+        "transport": "stdio",
+        "command": ["python3", "mcp/server.py"]
+      }
+    ],
+    "reminders": []
+  }
+}
+The top-level keys are:
+schemaVersion: always the integer 1.
+name: the plugin id. Users type it in muse plugins approve <name> and in
+/<name>:<capability>.
+displayName: optional, for listings and the /plugins panel.
+version: a label Muse Code shows and never compares.
+description: one sentence.
+compat.manifestDir: must equal the directory the manifest sits in;
+compat.source is informational.
+capabilities: an object whose families are arrays; an absent family
+counts as empty.
+when: optional; loads the plugin only while named environment variables
+hold given values.
+Manifest gives each key its type, default and
+rules.
+The manifest must be UTF-8 JSON with an object root and at most 256 KiB.
+Any top-level key outside this set produces an unsupported-field warning
+and is ignored, with one exception described under
+Unsupported families.
+Validate a package with muse plugins validate <path>; it reads the
+manifest and checks that every path resolves, and it never runs anything.
+For the notes package above:
+Terminal window
+muse plugins validate ./notes
+valid  notes  native  skills=1 commands=1 hooks=1 mcp=1 reminders=0 diagnostics=0
+Add --json for the full report, including a compatibility object whose
+summary is full when every declaration is supported. The
+Validation diagnostics page lists every
+code the report can contain.
+## Ids and pathsSection titled “Ids and paths”
+Every plugin id and every capability id follows one grammar: lowercase
+ASCII letters, digits, ., _ and -; the first character is a letter or
+digit; at most 80 characters. notes, meeting-notes, v2.summarize and
+log_prompts are valid; Notes, -notes and my notes are not. A bad
+plugin name fails with invalid-plugin-id, a bad capability id with
+invalid-capability-id.
+One exception: a command imported from a Claude plugin’s command Markdown
+files (the commands/ folder or command paths its manifest declares) takes
+its name from the file name or its frontmatter name, and that name may
+also use upper-case ASCII letters (reviewPullRequest). It runs only by its
+exact spelling. Two such commands in one plugin whose names differ only in
+letter case are both left inactive with an unsupported-capability warning
+and the rest of the plugin installs; a plugin with nothing else to install is
+refused.
+Ids must be unique within their family, and skills, commands and reminders
+also share one namespace inside a plugin: a command may not reuse a skill
+id, and a reminder may not reuse a skill or command id
+(duplicate-capability-id). Hooks and MCP servers are checked within their
+own kind only. Avoid plugin ids that belong to built-in plugins, such as
+loop, muse-core and the other built-in ids the /plugins panel lists;
+a plugin that reuses one installs but contributes nothing.
+Every path in a manifest follows the same rules: it is relative to the
+package root and written with / separators, it contains no .., leading
+/ or drive prefix (otherwise unsafe-path), and it resolves to an existing
+regular file inside the package (otherwise missing-capability-path). A
+symlink anywhere in the package is refused at install.
+Manifest lists the path rules as a table.
+Hook and MCP command arrays are argv arrays, not shell strings. Muse Code
+looks through the array for exactly one element that spells a relative path
+declared in the package, such as hooks/log-prompts.sh, checks that the
+file exists, and at run time rewrites that one element to point at the
+installed copy. No other element is touched: there is no placeholder or
+variable substitution in native commands, so $MUSE_PLUGIN_ROOT or
+${PLUGIN_ROOT} written into an argv element arrives literally. Read
+MUSE_PLUGIN_ROOT inside your script when you need other files. Two hooks
+may not name the same script file (duplicate-hook-source).
+## The five capability familiesSection titled “The five capability families”
+The capabilities object has five families that Muse Code runs. They fall
+into two tiers, described in
+Trust, review and scopes: skills and
+commands work as soon as the plugin is installed and enabled, while hooks,
+MCP servers and reminders stay inactive until you approve them with
+muse plugins approve and then load in a new session.
+Family | 
+Key | 
+Entry points at | 
+Needs review | 
+Skills | 
+skills | 
+A SKILL.md file | 
+No | 
+Commands | 
+commands | 
+A Markdown template | 
+No | 
+Hooks | 
+hooks | 
+An argv command and an event | 
+Yes | 
+MCP servers | 
+mcpServers | 
+A stdio command or an HTTP URL | 
+Yes | 
+Reminders | 
+reminders | 
+A Markdown duty file plus a decision declaration | 
+Yes | 
+### SkillsSection titled “Skills”
+A skill is a directory with a SKILL.md. The entry is
+{"id", "path", "enabledDefault"?}; enabledDefault defaults to true.
+The front matter is what the model sees in its skill catalog at session
+start; the body is loaded only when a user runs /<skill-id> (or
+/<plugin-id>:<skill-id> when the name collides) or when the model decides
+the skill is relevant. description is required, name is optional and
+defaults to the directory name, and metadata.short-description gives the
+/ palette a short label. user-invocable: false hides the slash
+shortcut; disable-model-invocation: true stops the model from loading it
+on its own. A SKILL.md larger than 256 KiB is refused. The format is the
+same as a standalone skill’s; Skills documents
+every front-matter field and the muse skills command.
+muse plugins validate only checks that the file exists, so run
+muse skills validate <skill-dir> on each skill as well:
+Terminal window
+muse skills validate ./notes/skills/meeting-notes
+valid  meeting-notes
+### CommandsSection titled “Commands”
+A command is a Markdown prompt template. The entry is
+{"id", "path", "enabledDefault"?}. Optional front matter description
+and argument-hint drive the / palette; no other front matter key is
+read. When a user types /summarize docs/plan.md, the transcript shows
+exactly that line and the model receives the template body with every
+literal $ARGUMENTS replaced, in one pass, by docs/plan.md. A body with
+no $ARGUMENTS gets the arguments appended after a blank line. A command
+is reachable as /<command-id> unless a built-in command or another
+provider owns that name, and always as /<plugin-id>:<command-id>.
+notes/commands/summarize.md
+---
+description: Summarize a file or pasted text in five bullets
+argument-hint: <path or text>
+---
+Summarize the following in at most five bullets. If it is a file path, read
+the file first.
+$ARGUMENTS
+### HooksSection titled “Hooks”
+A hook is a program Muse Code runs when a session event fires. The entry
+names an event (one of the 17 names in
+Hook events and payloads), an argv
+command, and optionally timeoutMs (default 600 seconds, values under
+1000 are raised to 1 second), a statusMessage for the terminal UI, and
+async: true for an observation-only hook whose output is ignored. Native
+hooks have no matcher field; a hook runs on every occurrence of its event
+and reads tool_name or other fields from the JSON object on its stdin to
+decide what to do. The hook answers with its exit code and, optionally, a
+JSON object on stdout. The Hooks page covers the runtime
+contract.
+### MCP serversSection titled “MCP servers”
+An MCP server entry is {"id", "transport", "command"} for a stdio server
+or {"id", "transport": "http", "url"} for an HTTP server; transport
+defaults to stdio. Plugin MCP server entries have no env, headers or
+credentials, so a server that needs a token belongs in settings.json
+instead. After approval the server starts with each new session and its
+tools appear as mcp__plugin_<pluginId>_<serverId>__<tool>. The
+MCP servers page has the details.
+### RemindersSection titled “Reminders”
+Reminders are an advanced capability that no shipped plugin declares today.
+An entry needs a Markdown duty file and a large
+decision declaration that is not covered on this site. Leave
+"reminders": [] in a third-party plugin.
+Native packages can also ship Markdown agent definitions under agents/
+without a manifest entry. They are reviewed like hooks and are an advanced
+topic; see Trust, review and scopes.
+## Unsupported familiesSection titled “Unsupported families”
+Six capability keys are recognised but not run: tools, agents,
+outputStyles, settings, apps and developerPrompts. Declaring one,
+either under capabilities or at the top level of the manifest, produces
+an unsupported-capability diagnostic per entry. Each entry must still be
+an object with a valid id, and its path, if present, must resolve. The
+package validates and installs as long as it also declares something
+Muse Code can run; the report then shows "summary": "partial" and lists
+the unsupported entries as inactive:
+Terminal window
+muse plugins validate ./tools-notes
+diagnostic=unsupported-capability severity=warning path=./tools-notes/.muse-plugin/plugin.json message=plugin tools capabilities are not supported in this phase
+valid  tools-notes  native  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=1
+A package whose only declarations are unsupported has nothing to run.
+muse plugins install refuses it with the message that its compatibility
+is unsupported because it has no supported behavior capabilities. Any
+other unknown key under capabilities is a warning (unsupported-field)
+and is ignored.
+Note
+Custom model tools are provided through an MCP server. There is no tools
+capability that Muse Code runs.
+## Size limitsSection titled “Size limits”
+A manifest may be at most 256 KiB and one SKILL.md at most 256 KiB; a
+package may hold at most 4,096 files and directories nested at most 16
+levels deep; an id may be at most 80 characters. The
+Manifest reference has the full table. Keep
+node_modules, virtual environments and build output out of the package
+directory; they are the usual reason a package that validated yesterday now
+trips the entry limit.
+## Next stepsSection titled “Next steps”
+Manifest has the complete field tables for
+every entry type.
+Trust, review and scopes explains the two
+tiers and what approval binds to.
+Hooks and MCP servers cover the two
+families that run code.
+Compatibility with other plugin formats describes
+what Muse Code imports from Claude Code, Codex and Agent Plugins packages.
+Quickstart: your first plugin builds a package
+like the one on this page step by step, and
+The weather plugin shows the finished files.

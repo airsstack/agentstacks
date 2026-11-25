@@ -1,0 +1,17 @@
+PWD=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p1
+--- ENV
+_=/usr/bin/env
+HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/home
+LANG=en_US.UTF-8
+LOGNAME=hiraq
+MUSE_SESSION_ID=01a211fe-fd13-79e3-ad2d-3be726e69f3f
+MUSE_THREAD_ID=01a211fe-fd13-79e3-ad2d-3be726e69f3f
+PWD=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p1
+SHELL=/bin/zsh
+SHLVL=1
+TERM=xterm-256color
+TMPDIR=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/tmp
+TRACEPARENT=00-01a211ff01667e32983c19859edf2d87-4cd5f655183dd4cc-01
+USER=hiraq
+--- STDIN
+{"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"echo: hello root","session_id":"01a211fe-fd13-79e3-ad2d-3be726e69f3f","turn_id":"01a211ff-0166-7e32-983c-19859edf2d87","cwd":"/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p1","transcript_path":null,"model":"unknown","permission_mode":"default"}

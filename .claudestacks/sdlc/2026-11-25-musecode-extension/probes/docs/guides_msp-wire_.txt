@@ -1,0 +1,72 @@
+MSP wire-level implementer's guide | Muse Code Developer DocsSkip to content
+## 
+# MSP wire-level implementer's guide
+This guide teaches you to build a Muse Session Protocol (MSP) client from
+the wire up. MSP is how a client program talks to a Muse Code session host: the
+client spawns muse serve, writes JSON-RPC 2.0 messages to its stdin, and
+reads JSON-RPC 2.0 messages from its stdout, one message per line. If you
+are writing a client in Swift, Rust, Python, or any language without an
+official SDK, this guide plus the schema export and the transcript corpus
+are your implementation surface.
+## How these pages relate to the referenceSection titled “How these pages relate to the reference”
+These pages are the narrative: what the frames look like, why the rules
+exist, and how to verify your work. The per-surface truth — the exact
+parameters, fields, stability markers and raw schema of every method,
+notification, error and type — lives in the generated
+Wire protocol reference, which is rendered directly
+from the schema bundle the server binary ships. When a page here describes a
+method or an error, it links the reference page for it; read both.
+## What these pages coverSection titled “What these pages cover”
+Envelope and ids — the four frame shapes, the
+server timestamp member, and who mints which identifier.
+Framing and caps — transports, line framing, and
+the frame size limit.
+Backpressure — what happens when either side cannot
+keep up.
+Errors — the error envelope and the typed error kinds a
+client must handle.
+Conformance — validating your client against the golden
+transcript corpus.
+Session lifecycle, turns, the item stream and approvals are covered
+conceptually in the MSP concepts guide, and
+surface-by-surface in the generated reference.
+## VersioningSection titled “Versioning”
+The protocol is pre-1.0. Until v1 is declared it may change
+non-additively, and no protocol changelog is published yet — the schema
+fingerprint is your change detector. Pin the fingerprint your client was
+built against; the server reports its own fingerprint in the initialize
+result, so a client can detect a mismatch on the first frame it reads
+rather than on the first field it fails to parse.
+Spawning, restarting and supervising hosts in production is a host-operations
+concern; this guide covers only what the wire itself specifies about process
+exit, which is on the concepts guide’s
+exit classification page.
+## The machine-readable schema exportSection titled “The machine-readable schema export”
+The protocol schema is pinned to the server binary and exported by two
+subcommands:
+Terminal window
+muse schema generate-ts --out DIR
+muse schema generate-json-schema --out DIR
+generate-ts writes TypeScript declarations; generate-json-schema writes
+the equivalent JSON Schema bundle plus a manifest carrying the bundle’s
+fingerprint — the same fingerprint the server reports during the handshake.
+The reference pages on this site are rendered from exactly that bundle, so
+the export you generate and the pages you read describe the same surface.
+The complete description of what travels on the wire is the JSON Schema
+bundle plus the conformance transcript corpus: the bundle says what each
+frame may contain, and the corpus shows real connections frame by frame.
+The Conformance page describes the corpus format and its
+distribution status.
+## Where to startSection titled “Where to start”
+Read Framing and caps and
+Envelope and ids — together they are the whole
+byte-level story.
+Implement the handshake: the client sends an
+initialize request, reads the
+result, then sends the
+initialized
+notification; until then the server rejects every other request and sends
+no notifications.
+Wire your client to the canned fixture host and replay the corpus —
+Conformance shows how. You can develop a full client
+against recorded transcripts before ever running a live host.

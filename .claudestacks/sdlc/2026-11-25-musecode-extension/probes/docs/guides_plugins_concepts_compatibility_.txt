@@ -1,0 +1,237 @@
+Compatibility with other plugin formats | Muse Code Developer DocsSkip to content
+## 
+# Compatibility with other plugin formats
+After reading this page you can predict what muse plugins validate will
+say about a plugin written for another host, which parts of it will run in
+Muse Code, and what to add to turn it into a native package. The plugin
+surface is part of the Developer Preview and may change.
+## How the format is chosenSection titled “How the format is chosen”
+Muse Code identifies a package by one marker file and parses it with the
+adapter for that format. It never mixes formats and never falls back to a
+second manifest when the first is invalid.
+Format | 
+Marker | 
+Label in validate output | 
+Agent Plugins 1.0.0 | 
+Root plugin.json whose $schema is exactly https://agent-plugins.org/schemas/1.0.0/plugin.schema.json | 
+agent-plugins | 
+Native | 
+.muse-plugin/plugin.json | 
+native | 
+Claude Code | 
+.claude-plugin/plugin.json | 
+claude-compatible | 
+Codex | 
+.codex-plugin/plugin.json | 
+codex-compatible | 
+A root plugin.json with a different $schema, or one that cannot be
+parsed, is reported as ignored-root-manifest and the nested markers are
+consulted as usual. A root plugin.json whose $schema is another URI
+under https://agent-plugins.org/schemas/ rejects the whole package with
+unsupported-agent-schema, with no fallback.
+A manifest under .claude-plugin/ or .codex-plugin/ goes through the
+foreign adapter only when it has none of schemaVersion, compat and
+capabilities. A native-shaped manifest may live under either directory;
+it is then parsed as native, and compat.manifestDir must name that
+directory.
+### Nested-marker precedenceSection titled “Nested-marker precedence”
+When a package has more than one nested marker, Muse Code picks
+.muse-plugin/ over .claude-plugin/ over .codex-plugin/, ignores the
+others without parsing them, and adds one warning:
+Terminal window
+muse plugins validate ./both-notes
+diagnostic=multiple-manifests severity=warning path=./both-notes message=selected `.muse-plugin/plugin.json`; ignoring `.claude-plugin/plugin.json`
+valid  both-notes  native  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=1
+If the selected manifest is invalid the package fails; the ignored marker
+is never tried. The precedence makes it safe to ship a native manifest next
+to a Claude Code one so that both hosts can install the same directory.
+## Placeholders in foreign packagesSection titled “Placeholders in foreign packages”
+Native commands get no placeholder substitution. Foreign packages do,
+within narrow limits, because the plugins that exist today rely on it.
+Where | 
+What is expanded | 
+MCP server command and args in a Claude Code or Codex package | 
+Exactly ${CLAUDE_PLUGIN_ROOT}, ${PLUGIN_ROOT}, ${CLAUDE_PLUGIN_DATA} and ${PLUGIN_DATA}, replaced once when the server starts. Any other ${...} token rejects the server and blocks installation. | 
+Hook command strings in a Claude Code or Codex package | 
+Nothing by Muse Code. The string runs through the shell with CLAUDE_PLUGIN_ROOT, PLUGIN_ROOT, CLAUDE_PLUGIN_DATA and PLUGIN_DATA set in the environment, alongside MUSE_PLUGIN_ID, MUSE_PLUGIN_ROOT and MUSE_PLUGIN_DATA_DIR, so the shell expands them. | 
+*_ROOT names point at the installed copy of the package; *_DATA names
+point at the plugin’s writable data directory, which may not exist yet.
+## Claude Code pluginsSection titled “Claude Code plugins”
+A Claude Code plugin has .claude-plugin/plugin.json with at least a
+name. Muse Code imports the four component kinds it can run and reports
+everything else.
+Component | 
+What Muse Code does | 
+name, version, description, displayName | 
+Imported. name must fit the plugin id grammar; version defaults to 0.0.0 and description to empty. interface.displayName is read as a fallback for displayName. | 
+Skills | 
+Imported. Without a skills key the skills/ directory is scanned recursively for SKILL.md; with one, each listed path must be a SKILL.md or a directory containing at least one. The skill id is the front matter name, else the directory name. disable-model-invocation: true makes the skill user-invocable only. | 
+Commands | 
+Imported. Without a commands key the commands/ directory is used; with one, it must be an array of paths. Each .md file becomes a command whose id is the front matter name or the file stem. description and argument-hint are read; disable-model-invocation: true is honoured (honored-declaration warning); allowed-tools is checked for syntax — a declaration Muse Code can represent exactly is published as a review candidate (muse plugins approve), and once approved, matching tool calls on that command’s own turns skip the approval prompt; a declaration it cannot represent stays an inactive row and grants nothing. | 
+Hooks | 
+Imported from the manifest hooks value (inline object, one path, or an array of paths to files shaped {"hooks": {...}}) plus the conventional hooks/hooks.json. Groups carry matcher, description and hooks; handlers carry type: "command", command, timeout in seconds (default 600), statusMessage, async, description, silent and if. All 17 events are accepted and PreUserTurn is an alias for UserPromptSubmit. if accepts Bash selectors such as Bash, Bash(git *) or Bash(npm test) on PreToolUse, PermissionRequest and PostToolUse; any other selector leaves that one hook inactive. The hook id is derived from the source file, event and definition, in the form hook-<16 hex characters>. | 
+MCP servers | 
+Imported from .mcp.json and from the manifest mcpServers (inline, path or path list); manifest entries win on duplicate ids. Only stdio servers are admitted. A server object may contain only type, transport, command, args, url and env; a url, or a type or transport other than stdio, rejects it; env must be absent or empty; and only the four placeholders above may appear. | 
+author, homepage, repository, license, keywords, tags, interface | 
+Warned as presentation-only (unsupported-field) and otherwise ignored. | 
+agents and a conventional agents/ directory, lspServers, outputStyles, settings, userConfig | 
+Listed as unsupported declarations; they install but stay inactive. | 
+Hook event Setup | 
+Skipped with a warning; do any setup it would have done by hand. | 
+dependencies, requiredPlugins | 
+Listed as unsupported; the plugin still installs. validate and install add one warning per listed plugin that says whether it is installed. Muse Code never downloads them; install missing ones yourself or from their marketplace. | 
+An MCP server that is not stdio, has a non-empty env, an unknown key, or an unknown ${...} placeholder | 
+Rejected with unsupported-capability and blocks installation, even when the rest of the package is fine. | 
+disable-model-invocation or allowed-tools at the top level of the manifest | 
+Error. These keys belong in a command’s front matter. | 
+Any other top-level key | 
+Warned as not modelled and ignored. | 
+A Claude Code plugin with a skill, a command, a hook file that also
+declares a Setup event, an agents/ directory and an author field
+validates like this (absolute paths are shortened, and the Setup message
+is cut after its first clause):
+Terminal window
+muse plugins validate ./claude-notes
+diagnostic=unsupported-capability severity=warning path=<absolute path to claude-notes>/hooks/hooks.json message=Claude hook event `Setup` is recognized but is not run…
+diagnostic=unsupported-capability severity=warning path=./claude-notes/.claude-plugin/plugin.json message=Claude conventional source `agents/` declares unsupported behavior
+diagnostic=unsupported-field severity=warning path=./claude-notes/.claude-plugin/plugin.json message=Claude manifest field `author` is presentation-only and is not imported
+diagnostic=unsupported-field severity=warning path=./claude-notes/.claude-plugin/plugin.json message=Claude manifest field `keywords` is presentation-only and is not imported
+valid  claude-notes  claude-compatible  skills=1 commands=1 hooks=1 mcp=1 reminders=0 diagnostics=4
+With --json the same report shows "summary": "partial" and lists
+hook:hooks/hooks.json:Setup and agent:agents as unsupported
+declarations next to the four supported ones. After
+muse plugins install ./claude-notes, muse plugins inspect claude-notes
+lists the hook and the MCP server for review:
+runtime-capability  plugin:claude-notes:hook:hook-60897b00182775e0  status=review_needed
+runtime-capability  plugin:claude-notes:mcp_server:notes-index  status=review_needed
+A .mcp.json server that carries credentials validates with a warning
+but cannot be installed:
+Terminal window
+muse plugins validate ./env-notes
+muse plugins install ./env-notes
+diagnostic=unsupported-capability severity=warning path=<absolute path to env-notes>/.mcp.json message=Claude MCP server `api` rejected: non-empty-env
+valid  env-notes  claude-compatible  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=1
+plugin declares a retained unsupported MCP boundary
+Move such a server to settings.json, where credentials are supported, or
+remove it from the package.
+Note
+Claude Code agent definitions are not published by Muse Code. An agents/
+directory in a Claude Code package installs but contributes nothing.
+Importing a Claude Code or Codex plugin
+walks through one real Claude Code package and one real Codex package from
+validation to approval.
+## Codex pluginsSection titled “Codex plugins”
+A Codex plugin has .codex-plugin/plugin.json. The adapter is smaller
+than the Claude Code one.
+Component | 
+What Muse Code does | 
+name, version, description, displayName | 
+Imported. name is optional and defaults to the package directory name; version defaults to 0.0.0 and description to empty. | 
+Skills | 
+Imported from the skills key, which must be a single string path to a directory that contains at least one SKILL.md (searched to depth 16 and 4,096 entries). Each skill id is its parent directory name. | 
+Hooks | 
+Imported from the hooks key (inline, path or path array) or, when there is no hooks key, from hooks/hooks.json. Same group and handler shape as Claude Code but without if. Four events are rejected with unsupported-hook-event: Notification, PostToolUseFailure, StopFailure and PostToolBatch. | 
+MCP servers | 
+Imported under the same stdio-only, no-env, four-placeholder rules as Claude Code. | 
+Commands | 
+Not part of the Codex format; none are imported. | 
+apps | 
+Must be a string path to an existing file; listed as an unsupported app:<name> declaration and stays inactive. | 
+tools, agents, outputStyles, settings, developerPrompts | 
+Listed as unsupported, in the same array-of-objects shape as a native manifest. | 
+interface, author, homepage, repository, license, keywords | 
+Accepted without a warning; interface.displayName is read. | 
+Any other key | 
+Warned as unsupported-field and ignored. | 
+A manifest with no skills, no mcpServers and no .mcp.json | 
+Rejected with invalid-manifest-schema; there is nothing to import. | 
+Terminal window
+muse plugins validate ./codex-notes
+valid  codex-notes  codex-compatible  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=0
+The same example page that imports a Claude Code package installs a Codex
+package with a skill and a hook beside it, and lists the differences a
+Codex author will notice.
+## Agent Plugins 1.0.0 packagesSection titled “Agent Plugins 1.0.0 packages”
+Muse Code supports Agent Plugins 1.0.0 packages for the Agent Skills
+component. MCP and Muse Code client extensions are listed separately and may be
+unsupported.
+Component | 
+What Muse Code does | 
+Root plugin.json | 
+Validated against the bundled 1.0.0 rules, offline. name is required: 1 to 64 characters of a-z, 0-9, . and -, starting and ending with a letter or digit, with no -- or ... version defaults to 0.0.0; description, homepage, repository and license are optional strings; author may hold only name, email and url; keywords is an array of strings. A wrong type on any of these rejects the package. Unknown top-level fields are warned and ignored. | 
+Skills | 
+Imported from the immediate children of skills/: each skills/<dir>/SKILL.md becomes a skill whose id is <dir>. A child that is not a valid id, has no SKILL.md, or fails the skill checks is skipped with an agent-skill-skipped warning while its siblings continue. | 
+Root mcp.json | 
+Recognised only when its $schema is exactly https://agent-plugins.org/schemas/1.0.0/mcp.schema.json. Every valid server is listed as an unsupported declaration and stays inactive; a malformed document disables the MCP component with an agent-component-invalid warning and does not affect the skills. | 
+extensions | 
+Ignored without validation, as long as each member is an object. | 
+A nested .muse-plugin/, .claude-plugin/ or .codex-plugin/ marker beside the root | 
+The highest-precedence one becomes an inactive overlay. Its name must equal the root name; each of its other keys is reported as agent-overlay-inactive, and nothing in it runs. | 
+Hooks, commands, reminders | 
+Not part of the format; none are imported. | 
+An Agent Plugins package with one skill and an mcp.json:
+Terminal window
+muse plugins validate ./agent-notes
+diagnostic=unsupported-capability severity=warning path=<absolute path to agent-notes>/mcp.json message=Agent Plugins MCP server "notes-index" is not supported in this release; it stays visible and inactive
+valid  agent-notes  agent-plugins  skills=1 commands=0 hooks=0 mcp=0 reminders=0 diagnostics=1
+Because MCP is the only other component, an Agent Plugins package that
+ships mcp.json and no skills has nothing Muse Code can run. The same
+diagnostic becomes an error and the package is refused:
+Terminal window
+muse plugins validate ./agent-mcp-only
+invalid  ./agent-mcp-only  diagnostics=1
+diagnostic=unsupported-capability severity=error path=<absolute path to agent-mcp-only>/mcp.json message=Agent Plugins MCP server "notes-index" is not supported in this release; it stays visible and inactive
+plugin validation reported diagnostics
+## What the three formats have in commonSection titled “What the three formats have in common”
+Rule | 
+Applies to | 
+Skills and commands run after install and enable; hooks and MCP servers wait for muse plugins approve | 
+All formats | 
+Plugin MCP server entries have no credentials; anything with env, headers or a token belongs in settings.json | 
+All formats | 
+The compatibility summary in --json is full, partial or unsupported; unsupported packages cannot be installed | 
+All formats | 
+Text with terminal control characters in a manifest, hook file, MCP file, command or SKILL.md is rejected | 
+Foreign formats | 
+No symlinks in the package; 4,096 entries and 16 levels at most | 
+All formats | 
+## Converting an existing pluginSection titled “Converting an existing plugin”
+To make a Claude Code or Codex plugin native, add .muse-plugin/plugin.json
+and leave the content files where they are. Directory scanning stops: the
+native manifest lists every capability explicitly.
+Start the manifest with "schemaVersion": 1, the name, version,
+description, and
+"compat": {"source": "native", "manifestDir": ".muse-plugin"}.
+List each SKILL.md under capabilities.skills and each command
+template under capabilities.commands as {"id", "path"}. The Markdown
+files need no changes; a skill’s disable-model-invocation front matter
+keeps working, and a command’s name front matter is ignored in favour
+of the manifest id.
+Turn each hook handler into one flat entry with an id, its event,
+and a command argv array. Convert timeout seconds to timeoutMs.
+Drop matcher and if; a native hook runs on every occurrence of its
+event and reads tool_name and tool_input from stdin to decide. Replace
+${CLAUDE_PLUGIN_ROOT}/scripts/check.sh with the relative path
+scripts/check.sh as its own argv element, and read MUSE_PLUGIN_ROOT
+inside the script for any other file.
+Turn each .mcp.json server into {"id", "transport": "stdio", "command": [...]} with the executable and arguments flattened into one
+array, again using a relative path element instead of a placeholder.
+Servers that need env cannot move into the plugin.
+Run muse plugins validate <dir> and muse skills validate on each
+skill directory. You may keep .claude-plugin/plugin.json beside the
+new manifest for other hosts; Muse Code will select the native one and
+print the multiple-manifests warning.
+The Manifest reference has the exact entry
+shapes, and Packages and capabilities
+explains the id and path rules the new manifest must follow.
+## Next stepsSection titled “Next steps”
+Importing a Claude Code or Codex plugin
+shows a real import end to end.
+Packages and capabilities describes the
+native package model.
+Hook events and payloads lists the 17
+events, which formats accept each, and what each hook receives.
+Validation diagnostics explains every
+code that appears in the outputs above.
+Trust, review and scopes covers approving
+the imported hooks and MCP servers.

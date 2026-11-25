@@ -1,0 +1,155 @@
+Plugins | Muse Code Developer DocsSkip to content
+## 
+# Plugins
+A plugin packages skills, commands, hooks and MCP (Model Context Protocol)
+servers into one directory that you install with one command. This guide
+explains how plugins work and walks through building one. It also documents
+the manifest, the hook events, the muse plugins command and its
+diagnostics. The plugin surface is part of the Developer Preview and may
+change.
+## Pick your pathSection titled “Pick your path”
+You are not sure a plugin is the right form. Read
+Extending Muse Code first; it compares plugins with
+standalone skills, hooks and
+MCP servers, which you configure in settings and
+project files without installing a package.
+You want to install and manage plugins someone else wrote. Stay on this
+page, then read Trust, review and scopes
+before you approve a hook or an MCP server.
+You want to write a plugin. Read
+Quickstart: your first plugin; it builds a small native
+plugin from scratch and installs it.
+You already have a plugin written for Claude Code or Codex. Install it
+as it is: Muse Code reads .claude-plugin/plugin.json and
+.codex-plugin/plugin.json directly, so muse plugins install <dir> needs
+no rewrite. Read
+Compatibility with other plugin formats for
+what each format imports, what stays inactive and what is refused, and
+Importing a Claude Code or Codex plugin for a
+walkthrough from validation to approval.
+You are building a client with the SDK. Read
+Plugins in SDK sessions to see what
+installed plugins expose on the wire.
+## One mental modelSection titled “One mental model”
+Three ideas carry most of the plugin surface:
+One directory, one manifest, declared capabilities. A plugin is a
+directory with a manifest at .muse-plugin/plugin.json. The manifest names
+the plugin and points at the files behind each skill, command, hook and MCP
+server; everything else in the directory is ordinary content that those
+files use.
+Two trust tiers. Skills and commands work as soon as the plugin is
+installed and enabled; a running terminal session picks them up on the next
+prompt. Hooks, MCP servers, reminders and agent definitions stay inactive
+until you approve them with muse plugins approve, and they load in a new
+session. An approval binds to the exact definition you reviewed, so any
+change to the package returns those capabilities to modified.
+Management is local, effects reach every session. Installing, approving
+and removing plugins happens on one machine, in your own user store, with
+muse plugins on the command line or by typing /plugins in a session,
+which opens a panel whose tabs cover the same actions without any verbs. Every session that machine runs
+reads that store, including sessions served to SDK clients by muse serve.
+## What a plugin can contributeSection titled “What a plugin can contribute”
+The Extend overview defines each kind.
+This table adds when each one starts working inside a plugin.
+Capability | 
+Works when | 
+Read more | 
+Skills | 
+Installed and enabled | 
+Packages and capabilities | 
+Commands (Markdown prompt templates; text after /<command-id> replaces $ARGUMENTS) | 
+Installed and enabled | 
+Packages and capabilities | 
+Hooks | 
+Approved, in a new session | 
+Hooks | 
+MCP servers | 
+Approved, in a new session | 
+MCP servers | 
+Reminders and agent definitions are two further capability kinds. They also
+need review and are advanced; no plugin that ships with Muse Code uses the
+manifest reminder form today.
+Packages and capabilities says what
+little you need to know about them.
+## The pagesSection titled “The pages”
+Packages and capabilities: the
+directory layout, the manifest, capability ids, and how skills, commands and
+the advanced kinds appear in a session.
+Trust, review and scopes: the two
+tiers, the review statuses, what an approval binds to, and how install scope
+differs from capability review.
+Hooks: what a plugin hook receives, how its command
+is run, how it blocks or allows a tool call, and how to test one offline.
+MCP servers: stdio and HTTP entries, tool
+naming, approvals, and why plugin servers carry no credentials.
+Marketplaces and updates: adding
+a catalog, installing from a snapshot, refreshing, and updating or removing a
+plugin.
+Compatibility with other plugin formats:
+which Claude Code, Codex and Agent Plugins packages Muse Code imports and
+what it ignores.
+Plugins in SDK sessions: plugin
+skills in skill/list, the skill input part, and plugin MCP tools as
+ordinary tool calls.
+## ExamplesSection titled “Examples”
+Each example page shows every file in full and the commands that exercised it.
+Plugin examples: what the examples cover and how to run them.
+The weather plugin: one skill, one command and one
+hook, the directory the quickstart builds.
+A guard hook that blocks risky tool calls: a
+PreToolUse hook that denies a tool call and reports why.
+An MCP server in a plugin: a stdio server, its
+approval, and the tool names it produces.
+Importing a Claude Code or Codex plugin: a
+.claude-plugin package and a .codex-plugin package as Muse Code sees
+them, from muse plugins validate to an approved hook.
+## ReferenceSection titled “Reference”
+Manifest: every field of .muse-plugin/plugin.json
+with types, defaults and limits.
+Hook events and payloads: the event names, the
+JSON each hook reads on stdin, and what it may write back.
+The muse plugins command: every subcommand, flag, exit
+code and --json shape.
+Validation diagnostics: every diagnostic code
+that muse plugins validate, install, list and inspect can report.
+## Where plugins are storedSection titled “Where plugins are stored”
+This layout is informational. Do not edit these files by hand; the format may
+change between releases.
+~/.local/share/muse/plugins/ (or $XDG_DATA_HOME/muse/plugins/) holds:
+installed.json, the list of installed plugins;
+cache/local/<plugin-id>/<digest>/package/, an immutable copy of each
+installed package;
+data/<plugin-id>/, the plugin’s writable data directory;
+marketplaces.json and marketplaces/<name>/, the marketplace snapshots.
+~/.config/muse/settings.json (or $XDG_CONFIG_HOME/muse/settings.json)
+holds your review decisions under runtime_capabilities. trust.json
+beside it holds the workspace trust decisions that --scope project checks.
+Plugin processes receive the package path as MUSE_PLUGIN_ROOT and the data
+path as MUSE_PLUGIN_DATA_DIR. The MUSE_PLUGIN_DATA_DIR directory may not
+exist yet, so create it before writing to it.
+## Not supported yetSection titled “Not supported yet”
+Credentials for plugin MCP servers. Plugin MCP server entries have no
+env, headers or credentials, so authenticated servers belong in
+settings.json instead; MCP servers covers that
+form.
+A public catalog. There is no public catalog to browse yet. You install
+from a local path or from a marketplace you added yourself.
+Plugin management over the wire. An SDK client sees the skills and MCP
+tools of plugins installed on the host machine, but the
+Muse Session Protocol has no method to install, approve or remove a plugin.
+Manage plugins with muse plugins on the machine that runs muse serve.
+## Next stepsSection titled “Next steps”
+Quickstart: your first plugin walks through a minimal
+native plugin with one skill and one command, then adds a hook.
+Trust, review and scopes explains
+what to check before you approve a third-party hook or MCP server.
+Plugins in SDK sessions explains how
+installed plugins reach a client of the Muse Session Protocol.
+Approvals explains how a client answers the
+approval requests that plugin MCP tools can raise.
+Extending Muse Code is the place to choose between a plugin
+and the standalone forms: Skills for a SKILL.md in
+your home directory or a repository, Hooks for the
+hooks member of settings.json and .muse/hooks.json, and
+MCP servers for mcpServers entries, the only
+place a server can carry credentials.

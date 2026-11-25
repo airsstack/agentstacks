@@ -1,0 +1,473 @@
+MCP servers | Muse Code Developer DocsSkip to content
+## 
+# MCP servers
+After this page you can declare a local or remote MCP (Model Context Protocol)
+server in your settings or in a project file, predict which environment and
+credentials it receives, sign in to a remote server, and read what /mcp
+tells you when something goes wrong. Every output block on this page was
+produced with Muse Code 1.3.0.
+This page covers servers you configure yourself. A server that ships inside a
+plugin follows different rules, described in
+MCP servers in plugins and compared
+below.
+## What an MCP server addsSection titled “What an MCP server adds”
+An MCP server gives the model tools that run outside Muse Code: a database
+query, an issue tracker, a documentation index, an internal API. Muse Code
+starts or connects to each configured server when a session starts, asks it
+for its tools, and registers them before the first model request. From then on
+the model calls them like any other tool, under the usual approval rules.
+Caution
+MCP tools are not sandboxed. A stdio server is an ordinary child process and a
+remote server is a direct network connection, both outside the filesystem and
+network sandbox that contains the agent’s own shell commands. Approval still
+applies; containment does not. Only connect servers you trust.
+## Configure servers in settings.jsonSection titled “Configure servers in settings.json”
+Your settings file lives at $XDG_CONFIG_HOME/muse/settings.json, or
+~/.config/muse/settings.json when XDG_CONFIG_HOME is unset. Servers go
+under the mcpServers key. Each entry names one server; the key is the server
+name you will see in /mcp and in tool names.
+This file declares one stdio server and one streamable HTTP server:
+{
+  "schema_version": 1,
+  "mcpServers": {
+    "docs": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["/opt/docs-mcp/server.py", "--stdio"],
+      "env": {
+        "DOCS_TOKEN": "${DOCS_TOKEN}",
+        "DOCS_ROOT": "${DOCS_ROOT:-/srv/docs}"
+      },
+      "cwd": "/opt/docs-mcp",
+      "required": false,
+      "tool_timeout_sec": 120
+    },
+    "issues": {
+      "type": "streamable-http",
+      "url": "https://issues.example.com/mcp",
+      "headers": { "X-Team": "platform" },
+      "startup_timeout_sec": 15
+    }
+  }
+}
+A stdio server is a program Muse Code runs and talks to over its stdin and
+stdout. A streamable HTTP server is a URL Muse Code connects to. You may omit
+type: an entry with command is stdio and an entry with url is streamable
+HTTP. An entry with both, or neither, is invalid.
+Note
+schema_version must be present and set to 1. Without it, Muse Code
+refuses to start and names the file:
+malformed settings file at /tmp/mcp-page-scratch/config/muse/settings.json: missing field `schema_version` at line 1 column 2
+### Per-server fieldsSection titled “Per-server fields”
+Field | 
+Type | 
+Default | 
+Meaning | 
+type | 
+string | 
+inferred | 
+"stdio" or "streamable-http". In settings.json only, "http" is accepted and treated as "streamable-http". | 
+command | 
+string | 
+none | 
+stdio only. The program to run. It is executed directly, not through a shell. | 
+args | 
+array of strings | 
+[] | 
+stdio only. Arguments for command. Every element is kept, including empty strings. | 
+env | 
+object of strings | 
+{} | 
+stdio only. Variables added to the child’s environment. Values may use ${VAR} references; see Environment. | 
+cwd | 
+string | 
+session working directory | 
+stdio only. An absolute path is used unchanged; a relative path is resolved from the session working directory. | 
+framing | 
+string | 
+"auto" | 
+stdio only. "auto", "line_delimited_json" or "content_length"; see Framing. Any value other than "auto" on a streamable HTTP server is an error. | 
+url | 
+string | 
+none | 
+streamable HTTP only. The endpoint. | 
+headers | 
+object of strings | 
+{} | 
+streamable HTTP only. Extra request headers. Names must be valid HTTP header names, and two names that differ only by case collide. Values are literal; ${VAR} is not expanded here. | 
+enabled | 
+boolean | 
+true | 
+false keeps the entry but never starts it. | 
+required | 
+boolean | 
+false | 
+true makes a startup failure block the session’s model turns; see Required and optional servers. | 
+startup_timeout_sec | 
+number | 
+30 | 
+Budget, in seconds, for the initialize handshake and for each initial list of tools, resources and prompts. | 
+tool_timeout_sec | 
+number | 
+300 | 
+Budget, in seconds, for each tool call, resource read and prompt fetch. A slower call is reported to the model as a failure. | 
+A server name that is empty or has surrounding whitespace is rejected. env
+and headers keys and values are trimmed; a key that is blank after trimming
+is rejected. enabled_tools and disabled_tools (arrays of strings) are also
+accepted without a warning; Muse Code 1.3.0 records them but does not act on
+them. Any other field not in this table produces a warning at startup and is
+otherwise ignored.
+### Legacy spellingsSection titled “Legacy spellings”
+Older configurations, and the current user manual, use different spellings.
+Muse Code 1.3.0 still accepts them in settings.json:
+Legacy | 
+Canonical | 
+Notes | 
+"mcp_servers" (root key) | 
+"mcpServers" | 
+Either works. A file with both keys is ambiguous: MCP is disabled for that session and a configuration diagnostic names the file. | 
+"transport": "stdio" | 
+"type": "stdio" | 
+Same meaning. | 
+"transport": "streamable_http" | 
+"type": "streamable-http" | 
+Note the underscore in the legacy value and the hyphen in the canonical one. | 
+"mode": "required" | 
+"required": true | 
+ | 
+"mode": "optional" | 
+"required": false | 
+ | 
+A single server that carries both a legacy key and its canonical counterpart
+(transport with type, or mode with required) is ambiguous and disables
+MCP for the session. Legacy spellings are accepted only in settings.json;
+a project .mcp.json must use the canonical names.
+## Project configuration with .mcp.jsonSection titled “Project configuration with .mcp.json”
+To share servers with everyone who works in a repository, put a .mcp.json
+file in the project. It carries the same mcpServers object, optionally with
+a $schema string. Any other root key produces a warning.
+{
+  "mcpServers": {
+    "issues": {
+      "type": "streamable-http",
+      "url": "https://issues.example.com/mcp"
+    }
+  }
+}
+### TrustSection titled “Trust”
+Project files run code and open connections on your behalf, so Muse Code
+reads them only from a trusted workspace. On the first interactive start in a
+workspace with no stored decision, the terminal UI asks Do you trust this workspace? and offers Trust and continue or Quit. Quitting records
+nothing. A decision is stored in trust.json, next to settings.json. To
+trust a workspace for one run without storing anything, pass
+--trust-workspace (or --yolo, which also disables approval and the
+sandbox) to muse or muse exec.
+A trust grant covers the nearest repository root and every directory from
+that root down to the session working directory. Muse Code reads a
+.mcp.json from each of those directories. Without a repository it reads
+only the working directory’s file. A Git worktree uses its own files, not the
+main checkout’s. An untrusted workspace contributes no project configuration;
+the session still runs with your settings servers.
+### Merge order and what winsSection titled “Merge order and what wins”
+Layers are merged in this order, later layers winning:
+settings.json
+.mcp.json at the repository root
+.mcp.json in each directory closer to the session working directory
+Within one server entry, objects merge by key and everything else replaces
+the inherited value:
+A project args array replaces the whole user array.
+A project env.REGION replaces that one key and keeps the other user
+env entries.
+A project can complete a partial user entry, for example add a url to an
+entry that only had headers.
+A project can flip enabled.
+When type is omitted, the final command or url decides the transport.
+Variable references are expanded after the merge, so a user value containing
+${MISSING} that a project replaces never causes an error. Project values are
+never written back to settings.json.
+An admitted .mcp.json that is not valid JSON, has a non-object mcpServers,
+or contains a null anywhere disables MCP for that session and shows a
+configuration diagnostic naming the file. A missing file contributes nothing.
+The file may be a symlink to a regular file; a dangling symlink counts as
+missing.
+## Environment and variable referencesSection titled “Environment and variable references”
+### What a stdio child receivesSection titled “What a stdio child receives”
+A stdio server starts with a cleared environment built from three layers, in
+order:
+Layer | 
+Contents | 
+Allowlist | 
+HOME, PATH, USER, LOGNAME, TMPDIR, TEMP, TMP, SHELL, LANG, LC_ALL and TERM, copied from Muse Code’s own environment when set, and PROVENANCE_PROVIDER_SCOPE when the process that launched Muse Code set it. On Windows, COMSPEC, PATHEXT, SystemRoot and WINDIR are added and names match case-insensitively. This is the same list hooks get; see Hook events and payloads. | 
+Configured env | 
+The server’s env map, after expansion. These values override the allowlist. | 
+MUSE_SESSION_ID | 
+The id of the session that started the child, set last. It replaces any configured or inherited value of that name, including after a resume. | 
+Nothing else reaches the child. Proxy settings, language toolchain variables
+and API keys are all stripped unless you pass them through env.
+### ${VAR} referencesSection titled “${VAR} references”
+Only stdio env values are expanded. The user manual says server configs
+support ${VAR} interpolation; in Muse Code 1.3.0 that applies to env
+values alone. command, args, url, headers and the env keys
+themselves stay literal, so a ${TOKEN} in headers is sent as the text
+${TOKEN}.
+Form | 
+Result | 
+${NAME} | 
+The value of NAME from the environment Muse Code was started in, including an empty value. A missing NAME is a configuration error. | 
+${NAME:-default} | 
+The literal default when NAME is absent or empty. ${NAME:-} tolerates a missing variable by producing an empty string. | 
+$$ | 
+One literal $, so $${NAME} produces the text ${NAME}. | 
+$ followed by anything else | 
+Left unchanged. | 
+Names match [A-Za-z_][A-Za-z0-9_]*. Substituted values are not expanded
+again, and no shell runs. Any other ${...} form is an error.
+An expansion error disables MCP for that session, including servers that
+were fine, and the diagnostic names the server and the env key but never
+the value. The session and the model remain usable. Expanded values exist
+only in memory; the references stay in your file.
+## Required and optional serversSection titled “Required and optional servers”
+Servers are optional by default. The user manual says mode defaults to
+required; in Muse Code 1.3.0 an entry that sets neither required nor
+mode is optional, and only an explicit "required": true (or the legacy
+"mode": "required") makes a startup failure block model turns. When an
+optional server fails to start, the session continues without its tools. The terminal UI shows a collapsed notice
+counting the unavailable optional servers, and /mcp shows the server as
+failed with the reason, for example that the configured command is
+unavailable, the startup operation timed out, or the server requires an OAuth
+sign-in.
+Set "required": true for a server the session must not run without. When a
+required server fails to start, the session opens but model turns are refused
+with the startup failure message until you fix the configuration and start a
+new session. In a headless run the first turn fails and muse exec exits
+with code 1. With the docs entry above, whose cwd /opt/docs-mcp does
+not exist on this machine:
+Terminal window
+muse exec --provider echo "hello"
+agent loop failed: invalid run configuration: Required MCP server `docs` failed during startup: the process could not be started or the server could not be reached.
+A command that is not found at all reports the configured command is unavailable. instead. A command that starts but exits before answering
+initialize (for example python3 given a script path that does not exist)
+reports the transport closed unexpectedly. --provider echo is a built-in
+provider that echoes the prompt without calling a model; startup lines that
+do not concern MCP are cut from the output above.
+Caution
+Muse Code 1.3.0 rewrites settings.json whenever it saves its own state
+there: muse skills enable, user-only and disable, muse plugins approve and reject, and the one-time notice it records after showing you
+that it found Claude Code or Codex context. In each mcpServers entry the
+rewrite keeps command, args, env, url and headers, keeps enabled
+only when it is false and framing only when it is not "auto", keeps the
+legacy mode and transport spellings, and drops type, cwd, required,
+startup_timeout_sec and tool_timeout_sec. After
+muse skills disable plan --scope built-in, a docs entry declared with
+type, cwd, "framing": "auto", "enabled": true, "required": true and
+both timeouts, and a cl entry declared with "framing": "content_length"
+and "enabled": false, came back as:
+"mcpServers": {
+  "cl": {
+    "enabled": false,
+    "command": "python3",
+    "framing": "content_length"
+  },
+  "docs": {
+    "command": "python3",
+    "args": [
+      "/opt/docs-mcp/server.py",
+      "--stdio"
+    ],
+    "env": {
+      "DOCS_TOKEN": "${DOCS_TOKEN:-x}"
+    }
+  }
+}
+The hooks, managed_hooks_path, managed_hooks_env_vars and
+mcp_oauth_dynamic_client_registration members survived the same rewrite
+unchanged. A server that lost required is silently optional from the next
+session on, and a server that lost cwd starts in the session working
+directory. Re-check your entries after any command that writes settings, or
+keep servers that need those fields in a project .mcp.json, which
+Muse Code never rewrites.
+Startup failures are one class of problem. Configuration problems, such as an
+ambiguous key, an invalid project file or an expansion error, disable MCP for
+the whole session but leave the model usable, whatever required says.
+## Stdio framingSection titled “Stdio framing”
+A stdio server may frame each message either as one JSON object per line
+(the MCP specification’s framing) or with LSP-style Content-Length headers.
+With the default "framing": "auto", Muse Code tries newline-delimited JSON
+first and Content-Length second, giving each probe up to 5 seconds (or the
+server’s startup_timeout_sec, if smaller). If both probes time out it makes
+a final newline-delimited attempt with the full startup budget.
+Set "framing": "content_length" for a Content-Length-only server that is
+slow to answer its first request, and "framing": "line_delimited_json" to
+skip probing entirely. An explicit mode never tries the other framing and gets
+the full startup budget.
+## Sign in to a remote server with OAuthSection titled “Sign in to a remote server with OAuth”
+A streamable HTTP server may require an OAuth sign-in. Muse Code handles the
+flow from the command line and stores the tokens for you:
+Terminal window
+muse mcp --help
+muse mcp — log in to or out of an MCP server (OAuth)
+Usage: muse mcp login <server> [--oauth-client-id <CLIENT_ID>] [--scope <SCOPE>]...
+                      [--headless] [--callback-port <PORT>]
+       muse mcp logout <server>
+<server> is a streamable-HTTP entry under mcpServers in settings.json.
+Run `muse mcp login --help` or `muse mcp logout --help` for details.
+Terminal window
+muse mcp login --help
+muse mcp login — authorize an MCP server with OAuth (browser or headless)
+Usage: muse mcp login <server> [OPTIONS]
+Options:
+  --oauth-client-id <CLIENT_ID>  Use this public client ID (wins over dynamic
+                                 client registration)
+  --scope <SCOPE>                Request this scope (repeatable or
+                                 comma-separated); default: discovered
+  --headless                     Print the URL, do not open a browser, and
+                                 paste the final redirect URL (echo off)
+  --callback-port <PORT>         Loopback callback port; default: ephemeral
+                                 127.0.0.1:0
+muse mcp login <server> discovers the authorization server, registers a
+client dynamically unless you pass --oauth-client-id, opens the browser (or
+prints the URL with --headless), and stores the grant. muse mcp logout <server> attempts a best-effort remote revocation and then removes the local
+credentials; the local removal always succeeds and repeating it is harmless.
+Some rules about which servers qualify:
+The server must be a streamable HTTP entry under mcpServers in
+settings.json. A server that exists only in a project .mcp.json cannot
+be signed in to from the command line.
+A disabled server is refused for both commands.
+A stdio server is refused:
+Terminal window
+muse mcp login docs
+MCP server `docs` is a stdio server; OAuth login applies only to streamable-HTTP servers
+A server whose headers already carry Authorization uses that static
+header and no OAuth token is attached to its requests. muse mcp login
+refuses it, and muse mcp logout still removes any stored credential:
+Terminal window
+muse mcp login issues
+MCP server `issues` sets a static Authorization header in settings.json; remove it to use OAuth login (the static header keeps working without login)
+At runtime, Muse Code reads the stored credential for each request, so a
+sign-in completed in another terminal is picked up by a running session
+without a restart. When a server answers 401 and no credential is stored,
+the startup failure says the server requires an OAuth sign-in and names the
+exact muse mcp login <server> command. When a credential exists but the
+server still answers 401 after one token refresh, the tool call fails with
+the same instruction.
+To stop muse mcp login from registering clients dynamically, set this at
+the root of settings.json:
+{
+  "schema_version": 1,
+  "mcp_oauth_dynamic_client_registration": false
+}
+With it set, muse mcp login requires --oauth-client-id and otherwise
+fails with a message naming the setting. The setting is read from your user
+settings only; a project file cannot change it.
+## How tools appearSection titled “How tools appear”
+### To the modelSection titled “To the model”
+Each tool is registered as mcp__<server>__<tool>. Every character of the
+server name or tool name that is not an ASCII letter, digit or underscore
+becomes _. A server named docs with a tool search_pages is
+mcp__docs__search_pages; a server named my-issues with a tool
+issue.get is mcp__my_issues__issue_get. If two tools collapse to the same
+name, the later one receives a hashed suffix. Names are recorded with the
+session, so a resumed session keeps the same names.
+Write approval rules and tool filters against the registered name, not
+against a name you rebuild from the configuration.
+### To youSection titled “To you”
+Run /mcp in an interactive session to see the live inventory. It prints one
+block per server with SERVER, STATUS (starting, connected,
+reconnecting, failed, closed, stopped or interrupted), REQUIRED
+when set, the TOOLS the server exposed, and an ERROR line with the
+startup failure reason when there is one. With no servers configured it says
+No MCP servers configured.
+### ApprovalSection titled “Approval”
+MCP tool calls go through the same approval policy as every other tool; see
+Approvals for how a client observes and
+answers them. One rule is specific to MCP: under the on-request approval
+mode, a call to a tool whose server declared it read-only (the readOnlyHint
+annotation in its tool list) runs without a prompt when no explicit rule
+matches it. An explicit deny or prompt rule still wins, and other approval
+modes are unchanged. The server makes that declaration about itself, so treat
+it as one more reason to connect only servers you trust.
+## When configuration takes effectSection titled “When configuration takes effect”
+A process reads its MCP configuration once, when it starts. Editing
+settings.json or a .mcp.json changes nothing for a running process:
+/mcp, later turns, /clear, /new and resuming inside the running
+terminal UI all keep the servers the process started with. Your edits apply
+to the next process:
+A new muse or muse exec process.
+muse resume from the shell, which is a new process and therefore reads
+the current files.
+## Settings servers versus plugin serversSection titled “Settings servers versus plugin servers”
+The same server can often be declared either way. The differences decide
+which to use:
+ | 
+settings.json or .mcp.json | 
+Plugin capabilities.mcpServers | 
+Who gets it | 
+You (settings) or anyone who trusts the project (.mcp.json). | 
+Anyone who installs and approves the plugin, in every session on that machine. | 
+env, headers, cwd, args | 
+All supported. | 
+Not read from a plugin entry. | 
+Credentials | 
+env and headers carry them; muse mcp login handles OAuth. | 
+None today. A plugin server cannot receive a token, and muse mcp login refuses plugin servers. | 
+Review | 
+Workspace trust for .mcp.json; none for your own settings. | 
+Per-server approval with muse plugins approve, bound to the definition hash. | 
+Working directory | 
+cwd, or the session working directory. | 
+Fixed by the plugin. | 
+Tool names | 
+mcp__<server>__<tool> | 
+mcp__plugin_<pluginId>_<serverId>__<tool> | 
+Prefer a settings entry for any server that needs a credential or a
+machine-specific path. Prefer a plugin when you want to distribute a
+self-contained server with its own review trail. Details for the plugin side
+are in MCP servers in plugins, with a
+complete example in
+An MCP server in a plugin.
+Clients of the SDK can also pass per-session servers when they start a
+session; Plugins in SDK sessions
+covers how those names must not collide with host or plugin servers.
+## TroubleshootingSection titled “Troubleshooting”
+Symptom | 
+Likely cause | 
+What to do | 
+The server’s tools never appear and /mcp shows nothing for it. | 
+The process started before you saved the configuration, or the workspace is untrusted so .mcp.json was skipped. | 
+Start a new muse process; trust the workspace or pass --trust-workspace. | 
+/mcp shows an ERROR naming settings.json and no servers at all. | 
+Both mcpServers and mcp_servers are present, a server carries both type and transport (or required and mode), the file has a null, or an env reference failed to expand. | 
+Keep one spelling, remove the null, and define the referenced variable or give it a :- default. | 
+/mcp shows failed with “the configured command is unavailable”. | 
+command is not on the child’s PATH or the path is wrong. | 
+Use an absolute path, or remember that only the allowlisted PATH reaches the child. | 
+/mcp shows failed with “the startup operation timed out”. | 
+The server takes longer than startup_timeout_sec to answer, or it expects Content-Length framing and is slow. | 
+Raise startup_timeout_sec, or set framing explicitly. | 
+/mcp shows failed with “message framing could not be negotiated”. | 
+Neither framing produced a valid initialize response. | 
+Check that the server writes one JSON object per line and flushes, or set framing to match it. | 
+The failure says the server requires an OAuth sign-in. | 
+No stored credential, or the stored one was rejected after a refresh. | 
+Run the muse mcp login <server> command from the message, then start a new session. | 
+A tool call fails after five minutes. | 
+The call exceeded tool_timeout_sec. | 
+Raise the budget for that server. | 
+The child cannot see a variable you expected. | 
+The environment is cleared apart from the allowlist. | 
+Pass it through env, with ${VAR} if you want the value from your shell. | 
+Model turns are refused with an MCP message. | 
+A required server failed to start. | 
+Fix the server or set required to false, then start a new session. | 
+required, cwd, type or a timeout disappeared from settings.json. | 
+A command that saves settings rewrote the file; see the caution under Required and optional servers. | 
+Add the fields back, or move the entry to a project .mcp.json. | 
+## Next stepsSection titled “Next steps”
+Compare the other extension points in Extending Muse Code.
+Read MCP servers in plugins before
+packaging a server for distribution.
+Wire a shell command into the session lifecycle with Hooks.
+Drive sessions, including their MCP tool calls and approvals, from your own
+client with the SDK quickstart.
+The user manual covers installing
+Muse Code and day-to-day use in the terminal.

@@ -1,0 +1,497 @@
+Quickstart: your first plugin | Muse Code Developer DocsSkip to content
+## 
+# Quickstart: your first plugin
+By the end of this page you will have written a native plugin called
+weather, installed it from a local directory, used its skill and command in
+a session, added a hook, approved and tested that hook, and cleaned up. Every
+command and output block below was run against Muse Code 1.3.0. The plugin
+surface is part of the Developer Preview and may change. You do not need to
+read anything first. For the model behind each step,
+Packages and capabilities explains
+the pieces; the finished directory is on
+The weather plugin.
+Note
+Already have a plugin written for Claude Code or Codex? You do not need to
+rewrite it: muse plugins install reads those formats directly.
+Importing a Claude Code or Codex plugin installs
+one of each unchanged, and
+Compatibility with other plugin formats says
+what each format can carry. This page builds a native plugin from scratch.
+## What you will buildSection titled “What you will build”
+weather/
+├── .muse-plugin/
+│   └── plugin.json
+├── skills/
+│   └── forecast/
+│       └── SKILL.md
+├── commands/
+│   └── forecast-brief.md
+└── hooks/
+    └── log-tool-use.sh
+A skill, forecast, that teaches the model how to explain a weather
+forecast. You invoke it as /forecast; the model can also read it on its
+own.
+A command, forecast-brief, a prompt template you run as
+/forecast-brief Lisbon tomorrow.
+A hook, log-tool-use, a shell script that appends one line to a log
+file every time a tool call finishes.
+Every file is shown in full below, so you can type the plugin in as you go.
+## What you needSection titled “What you need”
+A muse binary on your PATH. Run muse --version to see which release
+you have.
+A scratch directory. Run every command on this page from inside it; the
+plugin is copied into your plugin cache when you install it, so the
+directory can live anywhere.
+Nothing else in that directory. Keep node_modules, virtual environments
+and build output out of the plugin: a package with more than 4,096 entries
+or nested deeper than 16 levels is refused.
+## Step 1: Make the directory and the manifestSection titled “Step 1: Make the directory and the manifest”
+Create the directory and the manifest that names the plugin and points at its
+files:
+Terminal window
+mkdir -p weather/.muse-plugin weather/skills/forecast weather/commands weather/hooks
+Write weather/.muse-plugin/plugin.json. This is the version without the
+hook; you add the hook entry in Step 5.
+weather/.muse-plugin/plugin.json
+{
+  "schemaVersion": 1,
+  "name": "weather",
+  "displayName": "Weather",
+  "version": "0.1.0",
+  "description": "Example plugin: a forecast skill, a forecast-brief command, and a hook that logs tool use.",
+  "compat": {
+    "source": "native",
+    "manifestDir": ".muse-plugin"
+  },
+  "capabilities": {
+    "skills": [
+      {
+        "id": "forecast",
+        "path": "skills/forecast/SKILL.md",
+        "enabledDefault": true
+      }
+    ],
+    "commands": [
+      {
+        "id": "forecast-brief",
+        "path": "commands/forecast-brief.md",
+        "enabledDefault": true
+      }
+    ],
+    "hooks": [],
+    "mcpServers": [],
+    "reminders": []
+  }
+}
+Field | 
+What it must be | 
+schemaVersion | 
+The integer 1. | 
+name | 
+The plugin id. Lowercase letters, digits, ., _ and -; starts with a letter or digit; at most 80 characters. | 
+displayName | 
+Optional. Shown in muse plugins list and the /plugins panel. | 
+version | 
+Any non-empty string. Muse Code treats it as a label and never compares versions. | 
+description | 
+A non-empty sentence. | 
+compat.manifestDir | 
+Exactly the directory the manifest sits in, here .muse-plugin. compat.source is informational. | 
+capabilities | 
+An object whose arrays point at files relative to the plugin root. Absent arrays count as empty. | 
+Every capability id follows the same grammar as name. Skill, command and
+reminder ids share one namespace within a plugin; hook and MCP server ids are
+checked within their own kind. Manifest has every
+field with its type, default and limits.
+Caution
+Only the manifest lives in .muse-plugin/. Skills, commands and scripts sit
+at the plugin root, and every path in the manifest is relative to that
+root. A path that is absolute or contains .. fails validation, and so does
+any symlink inside the package.
+Avoid plugin ids that belong to built-in plugins, such as loop and
+muse-core; the /plugins panel’s Installed tab shows the full set as
+built-in rows. A plugin that reuses one installs but contributes nothing.
+## Step 2: Add a skill and a commandSection titled “Step 2: Add a skill and a command”
+A skill is a directory with a SKILL.md. The front matter is what the model
+sees in its skill catalog at session start; the body is loaded only when the
+skill is invoked or the model decides it is relevant.
+weather/skills/forecast/SKILL.md
+---
+name: forecast
+description: Explain a weather forecast for a place and date in plain language. Use when the user asks what the weather will be like, whether to bring an umbrella, or how to read a forecast they pasted.
+metadata:
+  short-description: Explain a weather forecast in plain language
+---
+# Forecast
+Turn forecast data the user already has (a pasted forecast, a screenshot they
+described, or numbers they typed) into a short, practical answer. This skill
+does not fetch live weather; if the user gives you no data, ask for the place,
+the date, and where the forecast came from.
+## How to answer
+1. Restate the place and the date range you are covering.
+2. Give the headline in one sentence: for example "Cool and wet, clearing by
+   evening."
+3. List the numbers that matter: high and low temperature, chance of rain,
+   wind, and anything unusual (frost, heat, storms).
+4. End with one practical line: what to wear or carry, or whether to move an
+   outdoor plan.
+Keep the whole answer under 120 words unless the user asks for detail. Use the
+units the user used. If the data is incomplete, say what is missing rather
+than guessing.
+description is required and is what the model uses to decide when the skill
+applies, so say both what it does and when to use it. name is optional and
+defaults to the directory name. Set metadata.short-description too: when
+many skills are installed, the startup catalog compresses rows, and a plugin
+skill without a short description is reduced to its id and path.
+A command is a Markdown prompt template. The front matter drives the /
+palette; the body is the prompt the model receives.
+weather/commands/forecast-brief.md
+---
+description: Write a two-line forecast brief for a place
+argument-hint: <place> [date]
+---
+Write a two-line weather brief for: $ARGUMENTS
+Line 1: the place and date, then the headline conditions.
+Line 2: one practical recommendation (what to wear, carry, or reschedule).
+Use only forecast data already present in this conversation. If there is none,
+reply with one line asking for the forecast source instead of inventing numbers.
+When you type /forecast-brief Lisbon tomorrow, every literal $ARGUMENTS
+in the body is replaced by Lisbon tomorrow and the expanded body is sent to
+the model. The transcript shows only what you typed. If a template has no
+$ARGUMENTS, the arguments are appended after a blank line.
+Both capabilities have a short form and a qualified form:
+Capability | 
+Short form | 
+Qualified form | 
+Skill forecast | 
+/forecast | 
+/weather:forecast | 
+Command forecast-brief | 
+/forecast-brief <args> | 
+/weather:forecast-brief <args> | 
+The short form works when nothing else owns that name. A project skill, a
+user skill, a built-in skill or a built-in slash command with the same name
+takes the short form, and only the qualified form reaches your plugin.
+## Step 3: ValidateSection titled “Step 3: Validate”
+Validation reads the package and reports problems. It never runs anything.
+Validate in two layers, because muse plugins validate checks that each
+skill file exists but does not read its front matter.
+First each skill directory:
+Terminal window
+muse skills validate weather/skills/forecast --json
+{
+  "valid": true,
+  "id": "forecast",
+  "diagnostics": [],
+  "compatibility": {
+    "profile": "agent-skills-common-subset",
+    "result": "compatible",
+    "known_fields": ["description", "metadata", "name"],
+    "unknown_fields": [],
+    "unsupported_fields": []
+  }
+}
+Then the whole plugin:
+Terminal window
+muse plugins validate weather --json
+{
+  "valid": true,
+  "plugin": {
+    "id": "weather",
+    "display_name": "Weather",
+    "version": "0.1.0",
+    "manifest_family": "native",
+    "compatibility": {
+      "summary": "full",
+      "declarations": [
+        { "id": "skill:forecast", "kind": "skill", "classification": "supported" },
+        { "id": "command:forecast-brief", "kind": "command", "classification": "supported" }
+      ]
+    }
+  },
+  "diagnostics": []
+}
+Both outputs are trimmed to the fields worth reading:
+valid is true when there is no error-severity diagnostic. Warnings do
+not make it false.
+diagnostics lists every problem with a code, a severity, a message
+and the path it concerns. Treat warnings as things to fix: a clean plugin
+has an empty array.
+compatibility.summary is full when Muse Code can run every declared
+capability, partial when some are unsupported, and unsupported when
+none are. An unsupported package validates but cannot be installed.
+Without --json you get one line per validator, which is enough while you
+iterate:
+valid  forecast
+valid  weather  native  skills=1 commands=1 hooks=0 mcp=0 reminders=0 diagnostics=0
+When something is wrong the first word is invalid, the exit code is 1, and
+each diagnostic follows on its own line. Fix the first one and validate again;
+Validation diagnostics explains every code.
+## Step 4: Install and try itSection titled “Step 4: Install and try it”
+Terminal window
+muse plugins install weather
+installed  weather  0.1.0  enabled=true  trust=user-local  provenance=native-local  cache=<data dir>/plugins/cache/local/weather/b954d7cc…/package
+The cache path is shortened here: <data dir> is ~/.local/share/muse (or
+$XDG_DATA_HOME/muse), and the digest is the package’s SHA-256; the “Where
+plugins are stored” section of Plugins has the full layout. Install
+validated the directory again,
+copied it into your plugin cache, and recorded it as enabled. trust=user-local
+says the plugin was installed into your own user store; provenance=native-local
+says it came from a local native package. Installing never runs plugin code.
+muse plugins list now shows it:
+weather  0.1.0  enabled=true active=true trust=user-local provenance=native-local valid=true diagnostics=0
+Open a Muse Code session in any directory (answer the workspace-trust prompt
+if it is a directory you have not opened before) and try both capabilities:
+/forecast-brief Lisbon tomorrow
+/forecast
+/forecast-brief expands the template and sends it. /forecast invokes the
+skill directly; the model also has it in its catalog and can read it on its
+own when a question about weather comes up. Skills and commands are live as
+soon as the plugin is installed and enabled. If a session was already open
+when you installed, it picks the plugin up on your next prompt. Both also
+work without the terminal UI: muse exec "/forecast-brief Lisbon tomorrow"
+runs one turn and prints the reply.
+muse plugins install <path> records the plugin in your own user store, and
+install scope is separate from capability review.
+Trust, review and scopes explains
+when --scope project applies.
+## Step 5: Add the hook and approve itSection titled “Step 5: Add the hook and approve it”
+Hooks run programs on session events. This one runs after every tool call and
+appends a line to a log file. Write the script first:
+weather/hooks/log-tool-use.sh
+#!/bin/sh
+# PostToolUse hook: append one line per tool call to a log file in the
+# plugin's data directory. Reads the JSON payload from stdin, never blocks.
+set -u
+payload=$(cat)
+# Muse Code advertises the data directory but does not create it. Create it
+# before writing. Exit quietly if the variable is missing (for example when
+# the script is run by hand).
+[ -n "${MUSE_PLUGIN_DATA_DIR:-}" ] || exit 0
+mkdir -p "$MUSE_PLUGIN_DATA_DIR" || exit 0
+tool=$(printf '%s' "$payload" | sed -n 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+[ -n "$tool" ] || tool=unknown
+printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$tool" >> "$MUSE_PLUGIN_DATA_DIR/tool-use.log"
+exit 0
+Terminal window
+chmod +x weather/hooks/log-tool-use.sh
+The execute bit is optional here because the manifest runs the file through
+sh; set it anyway so the script also runs by hand while you debug it.
+The hook receives one JSON object on stdin. For PostToolUse it carries
+hook_event_name, session_id, cwd, tool_name, tool_input and
+tool_response, among other keys. Exit 0 means success; any other exit code,
+or a timeout, marks the hook failed and the session continues. On events that
+can block, exit 2 with a message on stderr blocks the action; on
+PostToolUse that message becomes feedback to the model.
+Hook events and payloads lists every event with
+its stdin keys and the output it accepts.
+The process starts with a cleared environment plus a small allowlist such as
+HOME and PATH, and three plugin variables: MUSE_PLUGIN_ID,
+MUSE_PLUGIN_ROOT (the read-only installed copy of the package) and
+MUSE_PLUGIN_DATA_DIR (a writable directory kept per plugin). The
+MUSE_PLUGIN_DATA_DIR directory may not exist yet, so create it before
+writing, as the script does.
+Now declare the hook. Replace "hooks": [] in the manifest with:
+"hooks": [
+  {
+    "id": "log-tool-use",
+    "event": "PostToolUse",
+    "command": ["sh", "hooks/log-tool-use.sh"],
+    "timeoutMs": 5000,
+    "statusMessage": "Logging tool use"
+  }
+]
+Field | 
+Meaning | 
+id | 
+The capability id, same grammar as the plugin id. | 
+event | 
+One of the 17 hook events in Hook events and payloads, in PascalCase, such as PreToolUse, PostToolUse and Stop. | 
+command | 
+An argv array, run directly with no shell. A relative path in it must name a regular file inside the plugin. | 
+timeoutMs | 
+Optional. Defaults to 600000 (ten minutes); values below 1000 are raised to 1000. | 
+statusMessage | 
+Optional. Shown in the terminal UI while the hook runs. | 
+async | 
+Optional. true makes the hook observation-only: it runs concurrently and its output is ignored. | 
+Native hook and MCP commands get no placeholder or variable substitution.
+Muse Code rewrites exactly one argv element: the one that spells a relative
+path declared in the manifest, which it points at the installed copy. For any
+other file, read MUSE_PLUGIN_ROOT inside your script and build the path
+yourself. There is no matcher field: native hooks key on event, and the
+script decides what to do with the payload. Hooks
+explains the runtime contract in full.
+Validate, then push the change to the installed copy:
+Terminal window
+muse plugins validate weather
+muse plugins update weather
+valid  weather  native  skills=1 commands=1 hooks=1 mcp=0 reminders=0 diagnostics=0
+updated  weather  sha256:b0cf4aec…  trust=user-local  previous=sha256:1f0b4c3a…
+warning  third-party plugin: hooks require review before activation; skills and commands are active without review while the plugin is enabled
+The warning is the point of this step. Skills and commands were live the
+moment you installed; a hook needs your review first. Inspect the plugin to
+see it waiting:
+Terminal window
+muse plugins inspect weather
+weather  0.1.0  enabled=true active=true trust=user-local valid=true skills=1 commands=1 hooks=1 mcp=0 reminders=0 cache=<data dir>/plugins/cache/local/weather/bacc26ed…/package
+warning  third-party plugin: hooks require review before activation; skills and commands are active without review while the plugin is enabled
+runtime-capability  plugin:weather:hook:log-tool-use  status=review_needed
+The runtime-capability row names the hook by its stable id and shows
+status=review_needed. Approve it with the short selector
+<plugin-id>:<kind>:<capability-id>, or approve every reviewable capability
+of the plugin at once with muse plugins approve weather:
+Terminal window
+muse plugins approve weather:hook:log-tool-use --json
+{
+  "decision": "approve",
+  "runtime_capabilities": [
+    {
+      "stable_id": "plugin:weather:hook:log-tool-use",
+      "trusted_definition_hash": "sha256:7e0a2e74…",
+      "enabled": true
+    }
+  ]
+}
+Your approval is tied to trusted_definition_hash, a digest that covers the
+hook’s definition and the installed package it came from; its value differs
+from machine to machine, unlike the package digests above.
+muse plugins inspect weather now shows status=trusted_enabled; the
+generic warning third-party plugin line above it is printed for every
+third-party plugin that has hooks and does not mean anything is still
+waiting. Hooks are wired at session start, so start a new Muse Code session;
+from then on every finished tool call appends a line to tool-use.log in the
+plugin’s data directory. Expect names such as read_skill for the skill load
+and submit_reminder_decision for the host’s built-in reminder agents, not
+only tools you asked for.
+Note
+You can do this step without leaving a session. Type /plugins, with
+nothing after it, to open the plugins panel: the Installed tab shows
+weather as needs review, Enter opens its details, Tab reaches the
+Runtime tab, and Enter approves log-tool-use. Every verb on this page has
+a panel equivalent;
+the muse plugins command lists
+them.
+You can also exercise the hook without a session. Write a fixture that
+carries the event name and the stdin payload:
+fixture.json
+{
+  "event": "PostToolUse",
+  "stdin": {
+    "hook_event_name": "PostToolUse",
+    "session_id": "test-session",
+    "cwd": "/tmp",
+    "tool_name": "read_file",
+    "tool_input": { "path": "README.md" },
+    "tool_response": { "ok": true }
+  }
+}
+Terminal window
+muse plugins hook test weather:log-tool-use --fixture fixture.json --json
+Trimmed to the fields worth reading; the real document carries more
+decision and terminal fields and a top-level records array.
+{
+  "decision": { "should_block": false, "should_stop": false },
+  "terminals": [
+    {
+      "hook_key": "plugin:weather:log-tool-use",
+      "event": "post_tool_use",
+      "status_message": "Logging tool use",
+      "status": "completed",
+      "duration_ms": 40,
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}
+Read terminals[0].status: completed means the script exited 0 within its
+timeout. Without --json the same run prints one line,
+hook-test	weather:log-tool-use	status=completed. After this run the log
+file has one line ending in read_file.
+Caution
+muse plugins hook test runs the hook’s command on your machine whether or
+not you have approved the hook, and even while it shows review_needed or
+modified. It only refuses when the plugin is not installed or is disabled.
+Do not run it on a plugin whose hook scripts you have not read.
+## Step 6: Iterate and clean upSection titled “Step 6: Iterate and clean up”
+The development loop is: edit the plugin directory in place, then run
+muse plugins update weather. Skill and command changes reach a running
+session on your next prompt. Any update that changes the package content,
+even an edit to SKILL.md alone, returns the hook to review, because the
+approval hash covers the installed package. The digest that update prints
+is the manifest’s, so an edit that touches only SKILL.md shows the same
+value for sha256 and previous=. The package digest still changed, which
+is why the next line reports:
+runtime-capability  plugin:weather:hook:log-tool-use  status=modified
+A modified hook does not run until you approve it again with
+muse plugins approve weather. An update that finds nothing changed keeps
+the approval. Trust, review and scopes
+explains what the approval binds to and lists all six review statuses.
+To turn the plugin off without deleting anything:
+Terminal window
+muse plugins disable weather
+disable  weather  enabled=false  trust=user-local
+A disabled plugin contributes nothing: no skills, no commands, and no hooks,
+and muse plugins hook test refuses to run its hooks.
+muse plugins enable weather turns it back on.
+To remove it completely, including the log file the hook wrote:
+Terminal window
+muse plugins remove weather --delete-data --json
+{
+  "removed": "weather",
+  "cache_path": "<data dir>/plugins/cache/local/weather/9516854…/package",
+  "data_path": "<data dir>/plugins/data/weather",
+  "warning": null,
+  "lockfile_path": "<data dir>/plugins/installed.json"
+}
+Removing deletes the installed record and the cached copy and forgets your
+approvals for the plugin. Without --delete-data the data directory stays
+behind, and a later reinstall finds it again. A reinstalled plugin starts at
+review_needed.
+## Common mistakesSection titled “Common mistakes”
+Symptom | 
+Cause | 
+Fix | 
+manifest-family-mismatch: compat.manifestDir does not match the actual manifest directory | 
+The manifest says one directory and lives in another. | 
+Set compat.manifestDir to .muse-plugin and keep the manifest at .muse-plugin/plugin.json. | 
+missing-capability-path: plugin file is not readable | 
+A path in the manifest points at a file that is not there, often because the file was put under .muse-plugin/ instead of the plugin root. | 
+Keep skills, commands and scripts at the plugin root and make paths relative to it. | 
+unsafe-path: plugin capability path must stay inside plugin root | 
+A path uses .. or is absolute. | 
+Move the file into the plugin directory. | 
+invalid-plugin-id: plugin id is invalid | 
+The name has uppercase letters, spaces, or starts with a symbol. | 
+Use lowercase letters, digits, ., _ and -, starting with a letter or digit. | 
+The plugin installs but nothing appears; muse plugins list shows a bundled_plugin_id_reserved warning | 
+The name is a built-in plugin id such as loop or muse-core. | 
+Rename the plugin; remove and reinstall it to change its id. | 
+invalid-plugin-package with the message Agent Definition inventory derivation failed closed on a directory that validated yesterday | 
+node_modules, a virtual environment or build output pushed the package past 4,096 entries or 16 levels. | 
+Keep dependencies and build output outside the plugin directory. | 
+invalid-plugin-package: Agent Definition inventory derivation failed closed, followed by a warning about symlink entries | 
+A symlink inside the plugin directory. | 
+Replace the symlink with a regular file (copy the target in). | 
+Hook-specific mistakes, such as a literal $MUSE_PLUGIN_ROOT in the argv, a
+missing data directory, or a hook that never runs after approval, are listed
+under Hooks.
+## Next stepsSection titled “Next steps”
+Plugins is the overview of the track, and
+Packages and capabilities and
+Trust, review and scopes explain
+the capability kinds and the two trust tiers you met here.
+The muse plugins command documents every verb, flag
+and --json shape used on this page, and the /plugins panel is described
+under Trust, review and scopes.
+A guard hook that blocks risky tool calls is the
+natural next hook to write: a PreToolUse hook that stops a tool call.
+Plugins in SDK sessions shows how a client
+of muse serve discovers and invokes the skill you just installed.
+Skills covers the same SKILL.md format outside
+a plugin, in your home directory or a repository, and
+MCP servers covers settings-level servers,
+the right home for anything that needs credentials.
+Quickstart: your first session if you have not yet run
+a session through the SDK.

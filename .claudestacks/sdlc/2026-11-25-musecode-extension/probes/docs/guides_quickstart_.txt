@@ -1,0 +1,392 @@
+Quickstart: your first session | Muse Code Developer DocsSkip to content
+## 
+# Quickstart: your first session
+This is the shortest complete path from nothing to a working SDK program:
+start the host, run a turn, answer its permission request, cancel a
+turn, reload the session in a new process, and shut down. Follow it top to
+bottom. You do not need to read the SDK source. Every code step carries a
+TypeScript, a Python and a Rust tab; pick your language once and the tabs
+follow you down the page.
+The TypeScript and Python journeys ship as runnable packages — the
+@muse-code/sdk-quickstart package and its Python twin — and a Rust port of
+the same journey runs beside them. Each runs against a release-built host:
+the TypeScript journey on every change to the TypeScript SDK and these docs,
+the Python and Rust journeys on every change to their SDKs. It
+asserts what the protocol is specified to do, so every step below is one a
+release-built host satisfies today. If a step ever regresses, the journey
+marks it blocked and fails loudly, and this page gains a caveat saying which
+step and on what open issue.
+## What you needSection titled “What you need”
+TypeScript
+Python
+Rust
+Node 20 or newer.
+The @muse-code/sdk package, published on npm:
+Terminal window
+npm install @muse-code/sdk
+It has zero runtime dependencies — the only thing it needs at run time is
+a muse binary to talk to. TypeScript users also want @types/node, because
+the SDK’s types name Node’s own (ChildProcess, Readable) on its spawn and
+stream surfaces.
+Python 3.10 or newer.
+The muse-code-sdk package (import muse_code), published on PyPI; it
+brings its generated wire-types companion muse-code-msp (import
+muse_code_msp) with it, pinned to the same version:
+Terminal window
+pip install muse-code-sdk
+The compatibility page’s Python section
+lists the published wheels.
+The SDK declares exactly two runtime dependencies (muse-code-msp at
+the SDK’s own version and an exact-pinned pydantic), ships py.typed, and passes mypy --strict — your editor
+and type checker see the full surface.
+Rust 1.97 or newer, and a Tokio runtime: the SDK runs on yours and never
+starts its own.
+The muse-code-sdk crate, published on crates.io, at the exact version
+muse --version prints, plus the crates the snippets below use:
+Terminal window
+cargo add muse-code-sdk@=X.Y.Z serde_json
+cargo add tokio --features macros,rt
+cargo add uuid --features v7
+The snippets below run inside
+#[tokio::main(flavor = "current_thread")] async fn main() -> Result<(), Box<dyn std::error::Error>>,
+which these tokio features cover; a plain #[tokio::main] also needs
+rt-multi-thread.
+The crate’s version is the Muse Code release it pairs with, so pin it
+exactly. If muse updates itself past your pin and that release changed
+the protocol, the connection reports fingerprint_warning and stays open,
+but calls whose shape changed can fail. Either way, move your pin to the
+version muse --version prints.
+A muse binary. Install Muse Code with
+curl https://dev.meta.ai/install.sh | bash, which puts a checksum-verified
+muse launcher in ~/.local/bin and keeps it up to date, or follow the
+user manual. Its MSP surface is what
+your program talks to; the MSP concepts guide explains
+the model behind every call you are about to make.
+A configured provider: run muse once and log in, or point your program’s
+HOME at a profile that already has credentials. A host with no
+credentials fails every turn.
+## 1. Spawn the hostSection titled “1. Spawn the host”
+Spawning starts your own muse serve child. In TypeScript and Python one call
+also completes the handshake and hands back a client that is ready to use;
+you cannot send anything before the handshake completes.
+clientInfo.name must be a machine identifier: lowercase letters, digits and
+_ only ([a-z0-9_]+), at most 64 characters. The host refuses any other
+name at initialize. The workspace root you pass to session/start
+(workspaceRoot, Python workspace_root) must be an absolute path.
+TypeScript
+Python
+Rust
+import { MuseClient } from "@muse-code/sdk";
+const client = await MuseClient.spawn({
+  args: ["serve"],
+  clientInfo: { name: "my_app", version: "1.0.0" },
+});
+Leave out museBin and the SDK runs the first muse on your PATH; pass
+museBin to pick a binary.
+from muse_code import MuseClient, MuseClientSpawnOptions
+client = await MuseClient.spawn(MuseClientSpawnOptions(
+    muse_bin=None,  # None runs the first `muse` on your PATH
+    args=["serve"],
+    client_info={"name": "my_app", "version": "1.0.0"},
+))
+Pass a path as muse_bin to pick a binary.
+use muse_code_sdk::connection::{Connection, StdioTransport};
+use muse_code_sdk::handshake::Handshake;
+use muse_code_sdk::msp::{ClientInfo, InitializeParams};
+use muse_code_sdk::spawn::{SpawnOptions, spawn_muse};
+use serde_json::json;
+use uuid::Uuid;
+let mut options = SpawnOptions::default();
+options.muse_bin = Some(muse_bin.into());
+options.cwd = Some(workspace_root.into());
+let mut host = spawn_muse(options)?;
+let transport = StdioTransport::new(
+    host.take_stdin().ok_or("no stdin")?,
+    host.take_stdout().ok_or("no stdout")?,
+);
+let (connection, driver) = Connection::new(transport);
+tokio::spawn(driver.run());
+The connection runs on your Tokio runtime: driver.run() is its read and
+write loop. The handshake in step 2 takes the connection, so send nothing on
+it before then.
+args: ["serve"] starts the protocol host; a bare muse is the interactive
+app. Pass env if you want a specific HOME; the quickstart packages do, so
+they never touch your real sessions. If the host exits immediately instead of
+answering, the exit code tells you why (in TypeScript and Python, spawn
+rejects with a MuseHostStartError that carries it) — see
+exit classification. In particular,
+code 5 means that build’s experimental SDK tier is switched off and no
+invocation of that binary will serve.
+## 2. Check who answeredSection titled “2. Check who answered”
+TypeScript
+Python
+Rust
+import { EXPECTED_SCHEMA_FINGERPRINT } from "@muse-code/sdk";
+const { serverInfo, sessionDurability, schema } = client.initializeResult;
+if (schema.fingerprint !== EXPECTED_SCHEMA_FINGERPRINT) {
+  // built from a different schema: a warning, not an error
+}
+client.initializeResult tells you who answered: serverInfo, museHome,
+sessionDurability, and the protocol schema.fingerprint. A fingerprint that
+differs from the one the SDK was built against is a warning, never an
+error — an older SDK keeps working against a newer host.
+The client owns the connection from here on: it routes every event the host
+pushes to the session it belongs to, so there is no handler to install.
+result = client.initialize_result
+server_info = result["serverInfo"]
+client.initialize_result tells you who answered: serverInfo, museHome,
+sessionDurability, and the protocol schema.fingerprint. The Python SDK’s
+fingerprint posture is deliberately strict: a host serving a schema the
+SDK was not built against fails spawn with a typed
+MuseHostMismatchError naming the required host version — so if you got
+here, they match. The compatibility page
+explains the posture and the fix (update either side to a matching pair).
+The client owns the connection from here on: it routes every event the host
+pushes to the session it belongs to, so there is no handler to install.
+let initialized = Handshake::new(connection)
+    .initialize(InitializeParams {
+        client_info: ClientInfo {
+            name: "my_app".into(),
+            version: "1.0.0".into(),
+            title: None,
+        },
+        capabilities: None,
+    })
+    .await?;
+let connection = initialized.connection().clone();
+initialized.initialize_result tells you who answered: server_info,
+muse_home, session_durability, and the protocol schema.fingerprint. The
+SDK compares that fingerprint to the one it was built against and sets
+initialized.fingerprint_warning if they differ. The difference is a
+warning, not a handshake failure, but calls whose shape changed can fail;
+move your pin to the version muse --version prints.
+From here on you talk through the connection. Subscribe to notifications
+right away: anything the host pushes before you subscribe is dropped, not
+buffered.
+use tokio::sync::broadcast::error::RecvError;
+let mut notifications = connection.subscribe_notifications();
+tokio::spawn(async move {
+    loop {
+        match notifications.recv().await {
+            Ok(notification) => { /* ... */ }
+            Err(RecvError::Lagged(_)) => { /* some were dropped: re-read the session's state */ }
+            Err(RecvError::Closed) => break,
+        }
+    }
+});
+In Rust each subscribe_notifications() call gets its own receiver, so more
+than one part of your program can listen. A receiver still sees only what
+arrives after it subscribes, and it holds a bounded backlog: if your loop
+falls behind, recv() reports how many notifications were dropped and keeps
+going, so re-read the session (for example with session/read) rather than
+stopping.
+## 3. Start a sessionSection titled “3. Start a session”
+TypeScript
+Python
+Rust
+const session = await client.startSession({ workspaceRoot });
+const sessionId = session.sessionId;
+from muse_code import StartSessionOptions
+session = await client.start_session(StartSessionOptions(workspace_root=workspace_root))
+session_id = session.session_id
+async fn command(
+    connection: &Connection,
+    method: &str,
+    mut params: serde_json::Value,
+) -> Result<serde_json::Map<String, serde_json::Value>, muse_code_sdk::connection::ConnectionError> {
+    if params.get("commandId").is_none() {
+        params["commandId"] = json!(Uuid::now_v7().to_string());
+    }
+    connection.request(method, params.as_object().cloned()).await
+}
+let result = command(&connection, "session/start", json!({ "workspaceRoot": workspace_root })).await?;
+let session_id = result["session"]["sessionId"].as_str().unwrap_or_default().to_owned();
+The Rust connection has no command of its own, so this helper adds the
+commandId a state-changing call needs, a fresh UUIDv7, unless the params
+already carry one. To be able to retry after a dropped reply, put your own
+commandId (Uuid::now_v7().to_string()) in the params and call command
+again with the same params; the host joins the original command instead of
+starting a second one.
+The host also pushes a session/started notification with the same session —
+it can land in the same read as the command’s reply, which is why you
+subscribed back in step 2.
+Starting a session changes state, so it is sent as a command with a
+commandId. The TypeScript and Python clients mint it for you and remember
+it, so a retry after a dropped reply joins the original command instead of
+starting a second one — the
+commands and idempotency guide
+explains why that matters. The host’s reply, including the viewCursor that
+marks your position in the session’s event stream, is on
+session.opening.result.
+## 4. Send a prompt and read the answerSection titled “4. Send a prompt and read the answer”
+TypeScript
+Python
+Rust
+const result = await session.run("Reply with the single word: hello");
+// result.outcome.kind === "completed"; result.finalText === "hello"
+run sends the prompt and resolves once the turn has ended, with the
+outcome, the final answer (finalText), the turn’s items, and its token
+usage. A turn that failed or was cancelled still resolves: read
+result.outcome to tell.
+To show the answer while it is still being written, send the turn yourself
+and read its items as they arrive:
+const turn = await session.sendUserTurn({
+  input: [{ type: "text", text: "Reply with the single word: hello" }],
+});
+for await (const item of turn.items()) {
+  // render each item: the prompt, tool calls, the agent's messages
+}
+const outcome = await turn.completed;
+result = await session.run("Reply with the single word: hello")
+# result.outcome.kind == "completed"; result.final_text == "hello"
+run sends the prompt and returns once the turn has ended, with the
+outcome, the final answer (final_text), the turn’s items, and its token
+usage. A turn that failed or was cancelled still returns: read
+result.outcome to tell.
+To show the answer while it is still being written, send the turn yourself
+and read its items as they arrive:
+from muse_code import SendUserTurnOptions
+turn = await session.send_user_turn(SendUserTurnOptions(
+    input=[{"type": "text", "text": "Reply with the single word: hello"}],
+))
+async for item in turn.items():
+    ...  # render each item: the prompt, tool calls, the agent's messages
+outcome = await turn.completed
+let ack = command(
+    &connection,
+    "turn/start",
+    json!({ "sessionId": session_id, "input": [{ "type": "text", "text": "Reply with the single word: hello" }] }),
+)
+.await?;
+// ack["status"] == "accepted"; ack["turnId"]
+The ack means the turn was admitted, not finished: the answer arrives as the
+notifications below.
+Underneath, the answer arrives as notifications. The TypeScript and Python
+sessions fold them into the items you read; in Rust you read them yourself:
+notification | 
+what it means | 
+turn/started | 
+the turn is running | 
+item/started | 
+a new item (e.g. the agent’s message) has begun | 
+item/delta | 
+more text for that item | 
+item/completed | 
+that item is final | 
+turn/completed | 
+the turn is over; terminal says how it ended | 
+Accumulate item/delta for live output, and treat the item/completed text
+as authoritative. The turn’s terminal (on turn/completed, and on a
+completed outcome as outcome.params.terminal) says how the turn ended:
+"completed", "cancelled" or "failed" today, but it is an open set —
+treat any unknown value as terminal. On "failed" it carries
+error (kind, message, retryable) and usually a display-only reason;
+a turn the host died during carries reason and no error
+(sessions and turns). An error.kind
+of authRequired means the host has no usable credential — see
+What you need.
+## 5. Answer a permission requestSection titled “5. Answer a permission request”
+When the agent wants to do something that needs your consent, the host
+pushes approval/requested.
+Answer it:
+TypeScript
+Python
+Rust
+session.onApproval(() => ({ choiceId: "allow_once" }));
+Register the handler before you send the turn. The choices are offered by the
+host on the request (request.availableChoices); a choice the request did not
+offer is refused and reported to session.onApprovalError instead of being
+sent.
+from muse_code import ApprovalDecisionInput
+session.on_approval(lambda request: ApprovalDecisionInput(choice_id="allow_once"))
+Register the handler before you send the turn. The choices are offered by the
+host on the request (request["availableChoices"]); a choice the request did
+not offer is refused and reported to session.on_approval_error instead of
+being sent.
+let decided = command(
+    &connection,
+    "approval/decide",
+    json!({
+        "sessionId": session_id,
+        "approvalId": approval_id,
+        "requirementId": { "approvalId": approval_id, "sourceIndex": 0 },
+        "choiceId": "allow_once",
+        "feedback": null,
+    }),
+)
+.await?;
+// decided["terminal"] == true
+approval/resolved follows, naming the same approvalId. The turn then
+continues. The approvals guide covers the full
+requirement and choice model.
+## 6. Cancel a running turnSection titled “6. Cancel a running turn”
+TypeScript
+Python
+Rust
+await turn.cancel();
+const outcome = await turn.completed;   // outcome.params.terminal === "cancelled"
+To stop a run, pass it an AbortSignal:
+session.run(prompt, { signal: AbortSignal.timeout(60_000) }).
+await turn.cancel()
+outcome = await turn.completed   # outcome.params["terminal"] == "cancelled"
+To stop a run, cancel the task that awaits it.
+command(&connection, "turn/cancel", json!({ "sessionId": session_id, "turnId": turn_id })).await?;
+Cancellation is not instant and it is not an error. Wait for the turn to end;
+its terminal will be "cancelled".
+## 7. Shut the host down cleanlySection titled “7. Shut the host down cleanly”
+TypeScript
+Python
+Rust
+await client.close();
+const exit = await client.exit;   // { kind: "cleanShutdown" }
+await client.close()
+exit_ = await client.exit   # exit_.kind == "cleanShutdown"
+connection.close().await;
+let exit = host.close().await?;   // exit.exit_code == Some(0), exit.kind == ExitKind::CleanShutdown
+Closing sends stdin EOF, and the host drains and exits. The session’s writer
+lease is released with it — which is what lets a later process load the same
+session.
+## 8. Reload the session in a new processSection titled “8. Reload the session in a new process”
+Spawn exactly as before, then:
+TypeScript
+Python
+Rust
+const session = await client.resumeSession({ sessionId, excludeItems: false });
+const resumed = session.opening.result;
+from muse_code import ResumeSessionOptions
+session = await client.resume_session(
+    ResumeSessionOptions(session_id=session_id, exclude_items=False)
+)
+resumed = session.opening.result
+let resumed = command(
+    &connection,
+    "session/resume",
+    json!({ "sessionId": session_id, "excludeItems": false }),
+)
+.await?;
+You get back:
+resumed.session — the same sessionId, its workspaceRoot, status,
+turnCount, providerId and modelId.
+resumed.viewCursor — where the session now is.
+resumed.history — the conversation so far. history.mode says what was
+actually served: for a session this small it is { mode: "inline", items: [...] };
+long or compacted sessions get a snapshot with items: null instead — check
+mode before reading items (see the resume guide).
+resumed.pendingRequests — approvals and questions still waiting for you.
+In TypeScript and Python, pass your approval handler to the resume call
+itself (onApproval / on_approval) so a waiting approval reaches it.
+Pass cursor instead to resume from a specific point. The
+resume guide explains the cursor and history
+contract.
+## 9. Shut down againSection titled “9. Shut down again”
+Same close. Same clean exit.
+## Where to go nextSection titled “Where to go next”
+MSP concepts — sessions, turns, approvals, resume, and
+exit codes as one mental model.
+MSP wire protocol — the bytes underneath, if you are
+building a client without the SDK.
+The generated MSP reference — one page
+per method, notification, error and type used above — plus the
+TypeScript SDK reference (every @muse-code/sdk
+export) and the Python SDK reference (every
+muse_code facade export).

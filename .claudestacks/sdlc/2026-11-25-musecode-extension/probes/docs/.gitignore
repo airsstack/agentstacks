@@ -1,0 +1,5 @@
+# Copies of Meta material with no license found: kept local, never committed (see SOURCES.md).
+user-*.txt
+changelog.txt
+install.sh
+launcher.sh
