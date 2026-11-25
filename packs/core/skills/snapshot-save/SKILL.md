@@ -8,8 +8,8 @@ description: Use when ending a work session, before /clear, or when the user say
 Codifies the snapshot-save ceremony so it runs the same way every time. A **snapshot** is a short
 capture of the current conversation — a curated session summary plus a few key snippets — written as
 one timestamped file in the project-local snapshot store **outside the repo**. This is the
-project snapshot memory; it is **deliberately separate from Claude's native memory tool**, whose store has
-size limits we are working around.
+project snapshot memory; it is **deliberately separate from the agent tool's own memory store**
+(Claude Code's has size limits we are working around).
 
 ## Argument
 
@@ -34,7 +34,7 @@ The store lives at:
 
 ```
 ${AIRSSTACK_HOME:-~/.airsstack}/snapshots/<project-key>/
-├── index.md                          # custom index — one line per snapshot (NOT Claude's MEMORY.md)
+├── index.md                          # custom index — one line per snapshot (never MEMORY.md)
 ├── 2026-06-15-143012-<branch>.md     # one snapshot per save, timestamped
 ├── 2026-06-14-090530-<branch>.md
 └── ...
@@ -152,7 +152,7 @@ Omit this section if nothing is worth quoting.>
 
 ## Must NOT do
 
-- Write to Claude's native memory store (`~/.claude/projects/.../memory/` or any `MEMORY.md`). This
+- Write to the agent tool's own memory store, or to any `MEMORY.md`. This
   skill owns the snapshot store only.
 - Dump the raw session transcript — capture a curated summary + key snippets, not everything.
 - Save what the repo already records (code structure, fixes already in git, project docs).

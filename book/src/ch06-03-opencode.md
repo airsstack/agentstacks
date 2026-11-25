@@ -30,7 +30,7 @@ The root for pack files is `.opencode/agentstacks`. A skill `<p>/<s>` lives in
 | skill `SKILL.md` | `.opencode/skills/<p>-<s>/SKILL.md`, with frontmatter and the text |
 | the skill's command | `.opencode/commands/<p>-<s>.md`; a skipped skill gets no command |
 | other skill file | copied next to `SKILL.md` |
-| agent | `.opencode/agents/<p>-<a>.md`, with frontmatter and the text |
+| agent | `.opencode/agents/<p>-<a>.md`, with frontmatter and the text. Its `tools` become `permissions`: deny everything, allow paths outside the project, then allow each listed tool. |
 | native file | `native/opencode/<rel>` is copied to `.opencode/<rel>` |
 | hooks | covered by `.opencode/plugins/agentstacks.js`, or skipped (section 5) |
 | `.opencode/plugins/agentstacks.js` | always written; with no hook it still sets `AGENTSTACKS_PROJECT_DIR` |

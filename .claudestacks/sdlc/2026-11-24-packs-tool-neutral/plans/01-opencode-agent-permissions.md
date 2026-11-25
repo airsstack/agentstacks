@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: 63f62977694c
 ---
@@ -136,3 +136,16 @@ each listed tool.`` The row stays one table line.
 
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green.
 - `cargo make book-build` with no `[ERROR]`.
+
+## Review findings
+
+- 🔵 `packs.rs:5` module doc line ran to 138 columns — fixed (rewrapped to 100); `cargo fmt --all -- --check` exit 0.
+- 🔵 `init_both` repeats `init_all`'s body with other `--tool` args — fixed on the author's word: both call one `init_tools(dir, tools)`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0; `cargo test -p agentstacks-cli --test packs` 17 passed.
+- 🔵 `five_packs_install_on_both_tools` sorts `skips`/`missing` needlessly and matches reasons with `contains` plus an exact count of 7 — fixed on the author's word: the stripped skip lines, sorted, equal the 7 expected lines; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0; `cargo test -p agentstacks-cli --test packs` 17 passed.
+- 🔵 `frontmatter.lua` `ALLOW_EXTERNAL` sits below `written()` with no comment, apart from `DENY_ALL` — fixed on the author's word: placed beside `DENY_ALL`, both commented; `cargo make lua` (in the DoD) green.
+- Verification: `cargo make lua` 651 passed; `cargo test -p agentstacks --test opencode` 20 passed; `cargo test -p agentstacks-cli --test packs` 16 passed (17 after plan 03); `cargo make opencode-check` `ok S1`…`ok S7`, exit 0; `grep -n 'allow paths outside the project' book/src/ch06-03-opencode.md` → line 33; `cargo make book-build` 0 `[ERROR]`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-25 — Run together with plans 02 and 03. No task-briefer agents: each coder read its own `### Task` section. Coders ran only their task's checks; the orchestrator ran the DoD once per batch and once at the end.
+- 2026-11-25 — The per-task commits the plan names were not made: execute does not commit unless told. The changes are in the working tree.

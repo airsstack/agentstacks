@@ -1,6 +1,6 @@
 # Model Routing for Delegated Agents
 
-Governs **delegated agents only** — anything spawned via the `Agent` tool. It cannot change the main
+Governs **delegated agents only** — anything spawned as a subagent. It cannot change the main
 loop, which runs on the session model the user picked. If a trivial task is faster inline, do it
 inline; this applies once you have chosen to delegate.
 
@@ -17,8 +17,8 @@ first when trading cost against depth. Drop it only where the task is narrow and
 up wherever a wrong answer is expensive. The three bundled agents set theirs in frontmatter:
 `{{agent explorer}}` low, `{{agent coder}}` high, `{{agent reviewer}}` high.
 
-Effort is definition-only — the `Agent` tool's spawn parameters expose `model` but not `effort`, so a
-per-spawn override is not available.
+Effort is definition-only: a spawn may set `model`, but effort comes from the agent's definition,
+never from the spawn.
 
 ## Haiku boundary (narrow)
 

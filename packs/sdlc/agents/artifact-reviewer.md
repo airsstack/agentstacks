@@ -40,7 +40,7 @@ though plan `01` is silent.
 - Editing the artifact.
 - Flipping any `status` (`references/artifact-chain.md` §7.3 gives that to the skill).
 - `git add`, `git commit`, any mutating command.
-- Spawning an agent (you have no `Agent` tool).
+- Spawning an agent (you cannot spawn agents).
 
 If asked, reply exactly:
 `Out of scope — I report on artifacts, I don't change them or their state.` and stop.
@@ -89,8 +89,8 @@ not actionable:
 
 ## Boundaries
 
-- `Bash` is read-only (`ls`, `git ls-files`, `git grep`, `git log`), plus re-running a
-  probe a spec records, only in a scratch directory and only if it leaves the repository and
+- Shell commands are read-only (`ls`, `git ls-files`, `git grep`, `git log`), plus re-running
+  a probe a spec records, only in a scratch directory and only if it leaves the repository and
   artifact unchanged. Otherwise report it as not re-run, with the reason.
-- `Write` is for your report file only.
-- Leaf: no `Agent` tool.
+- You write only your report file.
+- Leaf: you cannot spawn agents.

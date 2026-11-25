@@ -19,7 +19,12 @@ local ACTIONS = {
   skill = "skill",
 }
 
+-- The first rule of an agent with `tools`: every action is denied unless a later rule allows it.
 local DENY_ALL = { action = "*", effect = "deny", resource = "*" }
+
+-- The second rule: paths outside the project may be read and written, as OpenCode's own default
+-- allows, so a pack agent can reach its store under the home directory.
+local ALLOW_EXTERNAL = { action = "external_directory", effect = "allow", resource = "*" }
 
 -- Returns `value` as the text written after `key: `.
 local function written(value)
@@ -29,13 +34,14 @@ local function written(value)
   return airsstack.json.encode(value)
 end
 
--- Returns the permission rules for `tools`: the deny-all rule, then one allow rule per mapped
--- action in written order, a repeated action dropped. An absent `tools` gives an empty list.
+-- Returns the permission rules for `tools`: the deny-all rule, an allow rule for paths outside
+-- the project, then one allow rule per mapped action in written order, a repeated action
+-- dropped. An absent `tools` gives an empty list.
 local function permissions(tools)
   if tools == nil then
     return {}
   end
-  local rules = { DENY_ALL }
+  local rules = { DENY_ALL, ALLOW_EXTERNAL }
   local seen = {}
   for _, word in ipairs(tools) do
     local action = ACTIONS[word]

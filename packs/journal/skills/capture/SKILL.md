@@ -17,24 +17,20 @@ main-thread context.
 
 ## Steps
 
-1. Resolve the session id and stem. The session id is `{{var session_id}}`.
-   Compute `id8` = its first eight characters and `stem` = `session-<id8>`.
-   If `{{var session_id}}` is empty, fall back to `stem` =
-   `session-$(date +%Y%m%d-%H%M%S)` and note that the story cannot be keyed to
-   the session id.
+1. Resolve the session id and the project directory. The session id is
+   `{{var session_id}}` and the project directory is `{{var project_dir}}`. If
+   either still reads as a `${…}` shell variable, read its value with `echo`.
 
-2. Resolve the transcript path:
-
-   ```sh
-   HOME_ROOT="${AIRSSTACK_HOME:-$HOME/.airsstack}"
-airsl run --policy confined \
-  --allow-env CLAUDE_CONFIG_DIR --allow-env HOME --allow-env PWD \
-  --allow-read . --allow-read "$HOME/.claude" \
-  "{{var project_dir}}/{{root}}/scripts/transcript-path.lua" "{{var session_id}}"
-   ```
-
-   Capture stdout as `tpath`. An empty result (non-zero exit) means no
-   transcript was found — pass an empty `tpath` and let the agent degrade.
+2. If the session id is empty, do not read `session.md`: set `stem` =
+   `session-$(date +%Y%m%d-%H%M%S)`, pass an empty `tpath` and an empty
+   `cleanup`, and note that the story cannot be keyed to the session id.
+   Otherwise read `<project_dir>/{{skill_dir journal/capture}}/session.md` and
+   follow it with that session id. It gives `id8`, the eight-character session
+   key; `tpath`, the transcript file; and `cleanup`, a command that removes a
+   temporary transcript (often empty). Set `stem` = `session-<id8>`. If
+   `session.md` does not exist, this tool has no transcript lookup: take `id8`
+   = the first eight characters of the session id, and pass an empty `tpath`
+   and an empty `cleanup`.
 
 3. Resolve the project floor:
 
@@ -61,15 +57,16 @@ airsl run --policy confined \
   "{{var project_dir}}/{{root}}/scripts/provision.lua"
    ```
 
-5. Spawn the `{{agent capture}}` subagent (Task / Agent tool,
-   `subagent_type: {{agent capture}}`), passing `session_id`, `id8`, `stem`,
-   `tpath`, and `project`. The agent reads the transcript, overwrites
-   `sessions/<stem>.md`, links the daily note, refreshes the index, and
-   returns a one-line receipt.
+5. Spawn the `{{agent capture}}` subagent, passing `session_id`, `id8`, `stem`,
+   `tpath`, `cleanup`, and `project`. The agent reads the transcript, overwrites
+   `sessions/<stem>.md`, links the daily note, refreshes the index, runs
+   `cleanup`, and returns a one-line receipt.
 
-6. Relay the agent's receipt to the user. Do not write any note file yourself.
+6. When the agent's receipt arrives, relay it to the user. Do not write any
+   note file yourself.
 
 ## If the agent is unavailable
 
 If the `{{agent capture}}` subagent cannot be spawned (the pack's agents are
-not installed), tell the user and stop. Do nothing destructive.
+not installed), tell the user, run `cleanup` if it is set, and stop. Do nothing
+destructive.

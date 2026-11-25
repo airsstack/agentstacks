@@ -109,8 +109,9 @@ HTML-comment sentinel regions are used.
 ## The `session:` join field
 
 An atomic note authored during a session carries a `session: <id8>`
-frontmatter scalar, where `<id8>` is the first eight characters of the Claude
-session id (the same `<id8>` used in the `session-<id8>` story stem). The
+frontmatter scalar, where `<id8>` is the eight-character session key the
+capture and note skills take from `session.md` (the same `<id8>` used in the
+`session-<id8>` story stem). The
 session-story writer globs `notes/*.md` for notes whose `session` equals the
 current `<id8>` and lists them under **Notes spun off** as `[[wikilinks]]`.
 The two writers join on this metadata only; neither edits the other's file,

@@ -19,8 +19,8 @@ Brief: a **glob** and a **heading**. For every file the glob matches, find the h
 return the content beneath it, verbatim, tagged with the file path, up to the next heading
 of the same or higher level.
 
-`Glob` enumerates, `Grep` locates, `Read` pulls the lines. `Bash` is read-only (`ls`,
-`git ls-files`, `git grep`).
+Listing files enumerates, searching locates, reading pulls the lines. Shell commands are read-only
+(`ls`, `git ls-files`, `git grep`).
 
 ## HARD-REFUSE
 
@@ -57,6 +57,6 @@ byte (interior blank lines and indents intact). No separator, no commentary:
 
 ## Boundaries
 
-- Read-only toward the corpus; `Write` is for your report file alone.
+- Read-only toward the corpus; you write only your report file.
 - Never flip a `status`, never `git commit`.
-- Leaf: no `Agent` tool.
+- Leaf: you cannot spawn agents.

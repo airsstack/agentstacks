@@ -2,7 +2,7 @@
 name: capture
 description: >
   Isolated session-story writer for the journal vault. Reads the
-  session transcript JSONL and distils a grounded storytelling session note
+  session transcript and distils a grounded storytelling session note
   into sessions/session-<id8>.md by full overwrite, links spun-off notes,
   links the session into the daily note, refreshes the index, and returns a
   one-line receipt. Manual, model-driven, single-purpose. NEVER commits.
@@ -16,16 +16,17 @@ you return only a one-line receipt, never the transcript or the full story.
 
 ## Inputs (from the spawning skill)
 
-- `session_id` — full Claude session id.
-- `id8` — first eight characters of `session_id`.
+- `session_id` — the full session id.
+- `id8` — the eight-character session key the skill took from `session.md`.
 - `stem` — `session-<id8>` (or a timestamp stem if the session id was absent).
-- `tpath` — absolute path to the transcript JSONL (resolved by the skill via
-  `transcript-path.lua`), or empty if none was found.
+- `tpath` — absolute path to the session transcript, in the tool's own format
+  (resolved by the skill through `session.md`), or empty if none was found.
+- `cleanup` — a shell command that removes a temporary transcript, or empty.
 - `project` — the human-readable project floor (from `project-key.lua`).
 
 ## Procedure
 
-1. If `tpath` is non-empty and readable, read it (the full transcript JSONL)
+1. If `tpath` is non-empty and readable, read it (the full transcript)
    and base the story on it. If `tpath` is empty/unreadable, write from
    whatever the skill passed and state in the receipt that coverage is
    partial. **Never invent facts** — narrate only what the transcript shows.
@@ -52,15 +53,15 @@ you return only a one-line receipt, never the transcript or the full story.
      "{{root}}/scripts/daily-link.lua" <today> <stem>
    ```
 
-   to to
-   link the session into today's daily note (`<today>` = `date +%F`).
+   to link the session into today's daily note (`<today>` = `date +%F`).
 7. Run `HOME_ROOT="${AIRSSTACK_HOME:-$HOME/.airsstack}"
 airsl run --policy confined \
   --allow-env AIRSSTACK_HOME --allow-env HOME \
   --allow-read "$HOME_ROOT" --allow-write "$HOME_ROOT" \
   "{{root}}/scripts/build-index.lua"` to
    refresh the derived index.
-8. Return a one-line receipt, e.g.
+8. Run `cleanup` once if it is set, whether or not you could read the
+   transcript. Then return a one-line receipt, e.g.
    `wrote sessions/<stem>.md (<n> decisions, <m> notes linked)`.
 
 ## Constraints

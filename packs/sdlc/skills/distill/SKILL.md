@@ -39,8 +39,8 @@ one `chain/plan`, and that it needs a second chain.
 ## Proposals
 
 One at a time, never a batch. Each carries the finding, the `chain/plan` citations, and one concrete
-edit shown in full: a line for the target repo's `CLAUDE.md`, or a specific change to a skill file.
-Ask accept / edit / skip. Edit means the user reshapes it.
+edit shown in full: a line for the target repo's agent instructions file, or a specific change to a
+skill file. Ask accept / edit / skip. Edit means the user reshapes it.
 
 On accept, apply it exactly as agreed to the one file named; the user commits. If the file is under
 `packs/`, remind them to run `cargo make lua` first.

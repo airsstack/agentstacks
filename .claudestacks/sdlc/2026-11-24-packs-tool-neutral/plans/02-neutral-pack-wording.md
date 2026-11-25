@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: 63f62977694c
 ---
@@ -197,3 +197,15 @@ the command exits 1; `grep -nF 'subagent, passing'` finds the three spawn lines.
 - `grep -rnE "$GATE4" packs/core packs/sdlc packs/journal/skills/{recall,link,review} --exclude=README.md --exclude='*_test.lua' --exclude='statusline*.lua'`
   filtered of `^packs/[^/]+/native/` prints nothing.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green; `cargo make book-build` with no `[ERROR]`.
+
+## Review findings
+
+- 🔵 `snapshot-load/SKILL.md:13` (147 columns) and `snapshot-save/SKILL.md:11` (114 columns) were not rewrapped, against this plan's wrap rule — fixed (rewrapped to ≤100, words unchanged); `cargo make dod` exit 0.
+- 🔵 `core/agents/reviewer.md:19` says "load" twice — fixed on the author's word: "… for the rules you enforce"; GATE4 grep still exits 1; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0; `cargo test -p agentstacks-cli --test packs` 17 passed.
+- 🟡 Nothing guards the rewording yet — open: plan 04 Task 1 (gate 4) closes it.
+- Verification: the GATE4 grep over `packs/` (README, CHANGELOG, discipline docs and `native/` excluded) prints nothing; `cargo make lua` pack text gates 3 passed; `cargo make book-build` 0 `[ERROR]`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-25 — Run together with plans 01 and 03. No task-briefer agents. Coders ran only their task's checks; the orchestrator ran the DoD once per batch and once at the end.
+- 2026-11-25 — The per-task commits the plan names were not made: execute does not commit unless told.

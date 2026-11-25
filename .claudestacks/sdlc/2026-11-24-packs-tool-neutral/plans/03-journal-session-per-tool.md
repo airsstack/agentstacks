@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: 63f62977694c
@@ -180,3 +180,17 @@ line after; `cargo make book-build` prints no `[ERROR]` (`ch02-03` includes this
 
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green.
 - `cargo make book-build` with no `[ERROR]`.
+
+## Review findings
+
+- 🟡 `journal_session_lookup_is_per_tool` checked only where `session.md` lands, not that the rendered capture and note skills read it from there, so the K3 risk line ("catches it") did not hold — fixed: the test also asserts that `.<tool>/skills/journal-{capture,note}/SKILL.md` contain `.<tool>/skills/journal-capture/session.md`. Seen failing with the capture skill pointed at `{{skill_dir journal/note}}` (`… does not read .claude/skills/journal-capture/session.md`, `test result: FAILED. 0 passed; 1 failed`), then passing after the file was restored (`cargo test -p agentstacks-cli --test packs` → `17 passed`).
+- 🔵 `note-schema.md:112-114` paragraph left ragged — fixed (rewrapped, words unchanged).
+- 🔵 The OpenCode `session.md` has no branch for a failing `mktemp` — fixed on the author's word: a failed `mktemp` tells the user and passes an empty `tpath` and `cleanup`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0; `cargo test -p agentstacks-cli --test packs` 17 passed.
+- 🔵 `agents/capture.md:56` "to to" — fixed on the author's word ("to link the session …").
+- Verification: `cmp` of both session files against `probes/final` exit 0; Task 2/3 greps as the plan says (GATE4 exit 1, `transcript-path.lua` count 0, `session.md` path and `if it is set, and stop` once in each skill, `Run \`cleanup\` once if it is set` once in each agent, `Claude` exit 1); `cargo make book-build` 0 `[ERROR]`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` exit 0.
+
+## Deviations
+
+- 2026-11-25 — Run after plans 01 and 02 in the same execute. No task-briefer agents. Coders ran only their task's checks; the orchestrator ran the DoD once per batch and once at the end.
+- 2026-11-25 — The per-task commits the plan names were not made: execute does not commit unless told.
+- 2026-11-25 — On the author's word ("fix all of findings"), `packs/journal/native/opencode/skills/journal-capture/session.md` gained a branch for a failing `mktemp`. The file now differs from `probes/final/opencode-session.md` and from the spec §5.2 text, so Task 1's `cmp` for the OpenCode file no longer exits 0 (the Claude file's still does). The model run behind the probe did not cover this branch.

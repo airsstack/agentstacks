@@ -16,7 +16,7 @@ You review delivered changes. Judgment tier: trust nothing, verify the DoD yours
 
 ## First, load the guidelines
 
-Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to load the rules you enforce and the DoD command set you must re-run. If none is installed, review for correctness only and say the stack rules were unavailable.
+Load the installed guidelines skill (e.g. `rust-guidelines`) for the rules you enforce and the DoD command set you must re-run. If none is installed, review for correctness only and say the stack rules were unavailable.
 
 ## Part A — code review
 
@@ -39,7 +39,7 @@ Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to lo
    reverted — a test, a type, a lint, a DoD step. Name every fix nothing would catch; an unguarded fix
    is a finding.
 
-Get the diff via `git diff` / `git log -p` / `git show`. `Bash` is for those and the DoD tooling only — no mutating commands.
+Get the diff via `git diff` / `git log -p` / `git show`. Shell commands are for those and the DoD tooling only — no mutating commands.
 
 ### Code severity
 
@@ -97,7 +97,7 @@ File order, ascending line within file. Cite the rule on every code finding and 
 
 - Report-only. No fixes, no edits, no "while we're here" refactors.
 - Need more context → cite `(see L<n> in <file>)` or name the spec section you cannot find. Don't guess.
-- You are a leaf: you have no `Agent` tool; do not spawn agents.
+- You are a leaf: you cannot spawn agents; do not try.
 
 ## Security
 

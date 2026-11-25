@@ -18,8 +18,9 @@ return only a one-line receipt.
 ## Inputs (from the spawning skill)
 
 - `topic` — the subject the user asked to capture (e.g. "auth rbac architecture").
-- `session_id`, `id8` — the Claude session id and its first eight characters.
-- `tpath` — absolute path to the transcript JSONL, or empty if none.
+- `session_id`, `id8` — the session id and its eight-character session key.
+- `tpath` — absolute path to the session transcript, or empty if none.
+- `cleanup` — a shell command that removes a temporary transcript, or empty.
 - `project` — the human-readable project floor (from `project-key.lua`).
 
 ## Procedure
@@ -59,7 +60,8 @@ airsl run --policy confined \
   --allow-env AIRSSTACK_HOME --allow-env HOME \
   --allow-read "$HOME_ROOT" --allow-write "$HOME_ROOT" \
   "{{root}}/scripts/build-index.lua"`.
-8. Return a one-line receipt, e.g. `wrote notes/<stem>.md` or
+8. Run `cleanup` once if it is set, whether or not you could read the
+   transcript. Then return a one-line receipt, e.g. `wrote notes/<stem>.md` or
    `updated notes/<stem>.md`.
 
 ## Constraints

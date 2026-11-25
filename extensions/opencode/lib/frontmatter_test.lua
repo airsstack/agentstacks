@@ -16,6 +16,8 @@ end
 
 local DENY = '{"action":"*","effect":"deny","resource":"*"}'
 
+local EXTERNAL = '{"action":"external_directory","effect":"allow","resource":"*"}'
+
 local function allow(action)
   return '{"action":"' .. action .. '","effect":"allow","resource":"*"}'
 end
@@ -45,14 +47,14 @@ return {
 
   agent_with_empty_tools_denies_all = function()
     local out = frontmatter.agent({ description = "d", tools = {} }, "")
-    eq(line_of(out, "permissions:"), "permissions: [" .. DENY .. "]")
+    eq(line_of(out, "permissions:"), "permissions: [" .. DENY .. "," .. EXTERNAL .. "]")
   end,
 
   agent_tools_map_to_permissions = function()
     local out = frontmatter.agent({ description = "d", tools = { "read", "write", "edit", "grep" } }, "")
     eq(
       line_of(out, "permissions:"),
-      'permissions: [{"action":"*","effect":"deny","resource":"*"},{"action":"read","effect":"allow","resource":"*"},{"action":"edit","effect":"allow","resource":"*"},{"action":"grep","effect":"allow","resource":"*"}]'
+      'permissions: [{"action":"*","effect":"deny","resource":"*"},{"action":"external_directory","effect":"allow","resource":"*"},{"action":"read","effect":"allow","resource":"*"},{"action":"edit","effect":"allow","resource":"*"},{"action":"grep","effect":"allow","resource":"*"}]'
     )
   end,
 
@@ -61,7 +63,7 @@ return {
       description = "d",
       tools = { "read", "write", "edit", "grep", "glob", "shell", "skill" },
     }, "")
-    local rules = { DENY, allow("read"), allow("edit"), allow("grep"), allow("glob"), allow("shell"), allow("skill") }
+    local rules = { DENY, EXTERNAL, allow("read"), allow("edit"), allow("grep"), allow("glob"), allow("shell"), allow("skill") }
     eq(line_of(out, "permissions:"), "permissions: [" .. table.concat(rules, ",") .. "]")
   end,
 
