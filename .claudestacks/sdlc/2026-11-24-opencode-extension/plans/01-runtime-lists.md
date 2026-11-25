@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: d54f8422f1ff
 ---
@@ -89,3 +89,20 @@ back. Single events and native hooks behave exactly as before.
 
 - `cargo make dod` (fmt-check, clippy, rustdoc, tests, doctests, lua) green.
 - `cargo test -p agentstacks --test runtime` runs the list cases on the real airsl 0.1.5.
+
+## Review findings
+
+Batch review, 2026-11-25 (code: `claudestacks:reviewer`, 0🔴 for this plan; docs: `claudestacks:reviewer`, 0🔴). Workspace gate: `cargo make dod` → exit 0, 24 `test result: ok`, 0 FAILED/warning, lua 122 + 651 passed.
+
+- open 🟡 `crates/agentstacks/tests/runtime.rs:217` — no test asserts a native hook receives `args`, drops a native non-`may_block` block, or checks per-event args in a list.
+- open 🟡 `book/src/ch06-02-hooks.md:75-135` — nothing ties the §4 block to the asset; only the asset's hash is pinned (suggest `{{#include}}` or a diff test).
+- open 🔵 `crates/agentstacks/src/types/protocol/runtime.rs:15` — `RUNTIME_LUA` doc ("stays silent when the translator has none", "stops at the first block") is looser than the code; the text is the spec's, verbatim.
+- open 🔵 `crates/agentstacks/assets/runtime.lua:31` — a single event without an `event` key counts as an empty list; both official translators set `event`. Spec text, hash-pinned.
+- open 🔵 `crates/agentstacks/tests/fixtures/runtime/proj/.tool/agentstacks/translate.lua:1` — header comment omits the `{"paths":[...]}` payload.
+- open 🔵 `book/src/ch06-02-hooks.md:155,157,159` — rules table: the single-event row omits the dropped block; the block row implies `context` is always present; the dropped-block-only list case is not stated.
+- open 🔵 `book/src/ch06-02-hooks.md:222` vs `book/src/ch06-01-extensions.md:532` — ".js" vs "JavaScript or TypeScript" (each is its plan's wording); `CLAUDE.md:66` still says OpenCode plugins are TypeScript (plan 07 Task 2 owns it).
+
+## Deviations
+
+- 2026-11-25 — Task 2 ran together with plan 02 Task 2 in one coder, because both edit `crates/agentstacks/CHANGELOG.md` (one `## [Unreleased]` holding `### Added` and `### Changed`).
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.

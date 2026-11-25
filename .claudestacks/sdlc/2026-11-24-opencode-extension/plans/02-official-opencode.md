@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: d54f8422f1ff
@@ -71,3 +71,14 @@ as `claude` does. Unknown tool names are still refused with the existing wording
 ## Proof
 
 - `cargo make dod` green.
+
+## Review findings
+
+Batch review, 2026-11-25 (code and docs reviewers, 0🔴 for this plan). `cargo test -p agentstacks shorthand` → 13 passed; workspace `cargo make dod` → exit 0.
+
+- open 🟡 `book/src/ch01-02-first-project.md:15`, `book/src/ch04-00-cli.md:59` — the book names `--tool opencode` before a `packs-v*` tag holds `extensions/opencode` (already this plan's Risk; the release is outside the chain).
+
+## Deviations
+
+- 2026-11-25 — Task 1 ran in parallel with plan 01 Task 1 (disjoint files); Task 2 ran with plan 01 Task 2 in one coder (shared `crates/agentstacks/CHANGELOG.md`).
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.

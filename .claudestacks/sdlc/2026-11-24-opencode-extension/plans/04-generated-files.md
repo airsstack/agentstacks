@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: d54f8422f1ff
 ---
@@ -76,3 +76,16 @@ fixed body byte for byte, ending `};\n`. The body uses `stdio: ["pipe", "pipe", 
 ## Proof
 
 - `airsl test extensions` reports `0 failed`; `cargo make dod` green.
+
+## Review findings
+
+Batch review, 2026-11-25 (`claudestacks:reviewer`, 0🔴). `airsl test extensions` → 122 passed, 0 failed; workspace `cargo make dod` → exit 0. `translate.lua` text compared with `cmp` against the spec §4.7 block: identical, 2937 bytes.
+
+- open 🔵 `extensions/opencode/lib/plugin.lua:1` — the header comment's `<root>` means the project root, unlike `values.lua`'s root.
+- open 🔵 `extensions/opencode/lib/plugin_test.lua:3` — "spec" vocabulary in test source (same as the claude extension's precedent).
+- open 🔵 `extensions/opencode/lib/translate_test.lua:14` — the tests pin text only; behaviour is left to plans 05 and 06 (the reviewer ran it on airsl 0.1.5 and it behaved as written).
+
+## Deviations
+
+- 2026-11-25 — Task 1, `empty_table_is_an_empty_array`: the "no `{}` table" check covers the text before the fixed body only, because the fixed body itself contains `catch {}`; `body_is_exact` pins the body bytes. The reviewer judged it sound.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.

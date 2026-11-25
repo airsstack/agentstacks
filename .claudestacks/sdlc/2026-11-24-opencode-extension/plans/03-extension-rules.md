@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: d54f8422f1ff
 ---
@@ -135,3 +135,17 @@ present in `vars`, longest first.
 ## Proof
 
 - `airsl test extensions` reports `0 failed`; `cargo make dod` green.
+
+## Review findings
+
+Batch review, 2026-11-25 (`claudestacks:reviewer`, 0🔴). `airsl test extensions` → 122 passed, 0 failed (10 files); workspace `cargo make dod` → exit 0.
+
+- open 🔵 `extensions/opencode/lib/frontmatter.lua:40` — `ACTIONS[word] or word` passes an unmapped tool word through; unreachable today (the core's tool set is closed and all seven are mapped).
+- open 🔵 `extensions/opencode/lib/hooks.lua:99,106` — the `TOOLS[word] or { word }` fallback is unreachable (the core validates match values).
+- open 🔵 `extensions/opencode/lib/hooks.lua:125`, `extensions/opencode/lib/hooks_test.lua:187,206` — comments cite skip-table rule numbers; naming the reason would survive a reorder.
+- kept: extra tests `agent_every_tool_word_maps` and `skips_follow_table_order`.
+
+## Deviations
+
+- 2026-11-25 — Task 3, rule 3: the Change text reads "(neutral) session.start without `startup` in `match`", but the task's own Proof `session_start_without_match_renders` requires a no-`match` session.start to render. Built: rule 3 skips only a non-empty `match` that lacks `startup`. Tests guard both directions (`session_start_without_match_renders`, `skips_session_start_without_startup`); the reviewer judged it sound.
+- 2026-11-25 — Not committed: the execute instruction did not ask for commits.
