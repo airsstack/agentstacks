@@ -12,6 +12,8 @@ In the project directory:
 agentstacks init --tool claude --pack core --pack sdlc --pack guideline-rust
 ```
 
+`--tool opencode` sets up OpenCode the same way, and both flags may be given.
+
 `init` writes `agentstacks.toml`, prints the plan, one line per file, and asks before applying. The
 plan ends:
 
