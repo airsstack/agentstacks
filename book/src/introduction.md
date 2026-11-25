@@ -15,9 +15,9 @@ you use. Before anything is written, you see exactly what will change.
 
 ## Status
 
-agentstacks is pre-release (0.1.0). Claude Code is the one supported tool, with five official
-packs: `core`, `sdlc`, `journal`, `guideline-rust` and `guideline-python`. The extension API is
-`api = 0` and will change.
+agentstacks is pre-release (0.1.0). Claude Code is released, with five official packs: `core`,
+`sdlc`, `journal`, `guideline-rust` and `guideline-python` (`packs-v0.1.0`). The OpenCode extension
+is built and ships with the next `packs-v*` release. The extension API is `api = 0` and will change.
 
 ## claudevs
 

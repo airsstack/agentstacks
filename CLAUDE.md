@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: core, CLI commands, claude extension, packs and claudevs built; first release configured
+## Status: core, CLI, both extensions, packs and claudevs built; first release configured
 
 The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
-hook runtime, the five CLI commands, the claude extension, the five official packs and the claudevs
-crates are built and tested.
+hook runtime, the five CLI commands, the claude and opencode extensions, the five official packs and
+the claudevs crates are built and tested.
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built
@@ -14,13 +14,14 @@ crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doc
 crates/claudevs/          deterministic Claude Code setup test engine, moved from claudestacks
 crates/claudevs-cli/      the claudevs binary
 extensions/claude/        the official claude tool extension (adapter.lua under airsl)
+extensions/opencode/      the official opencode tool extension (adapter.lua under airsl; JS shim)
 packs/                    the five official packs: core, sdlc, journal, guideline-rust, guideline-python
 book/                     the agentstacks book (mdBook); book/src/ch07-00-architecture.md is the layering contract
 dist-workspace.toml       the dist release config (binaries for agentstacks and claudevs)
 install/                  the install.sh and claudevs.sh installer scripts, served from Pages
 RELEASING.md              the maintainer's release runbook
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
-.github/workflows/ci.yml  CI: `cargo make dod`, `cargo make claudevs-check`, `cargo deny check`, and the `installers` and `book` jobs
+.github/workflows/ci.yml  CI: dod, claudevs-check, cargo deny, and the installers, book and opencode-check jobs
 ```
 
 Everything below the Status section except Commands describes the agreed design: the contract to
@@ -63,9 +64,10 @@ marketplace. For Claude Code, the CLI writes native `.claude/` project config.
 - **Unsupported is visible.** An item a tool can't express becomes a skip operation with a reason,
   never a silent drop.
 - **Lua is the only scripting language**, always run under airsl. When a tool demands another
-  language (OpenCode plugins are TypeScript), generate a thin shim that only forwards events to airsl.
+  language (OpenCode hooks are JavaScript plugins), generate a thin shim that only forwards events
+  to airsl.
 - **The official extensions use the public API** that community extensions use, with no private
-  hooks. The API stays `api = 0` (unstable) until both Claude and OpenCode run on it. Freeze it as
+  hooks. Both Claude and OpenCode run on it; it stays `api = 0` (unstable) until it is frozen as
   `api = 1` in M3.
 - `airsl` comes from crates.io, never as a path dependency. Never use the `aisdk-*` crate names,
   because that family belongs to another project.
@@ -97,7 +99,7 @@ change. Links in pack READMEs are absolute URLs, because the book includes those
 
 ## Writing a tool extension
 
-To build a new tool extension (OpenCode, or any other tool), follow
+To build a new tool extension, follow
 [`book/src/ch06-00-authoring.md`](book/src/ch06-00-authoring.md) step by step. It is written for an
 agent to follow, links the API contract (`book/src/ch06-01-extensions.md`,
 `book/src/ch06-02-hooks.md`) and uses `extensions/claude/` as the worked example. Keep it in step
@@ -110,7 +112,7 @@ with the API: when `book/src/ch06-01-extensions.md` or `book/src/ch06-02-hooks.m
 crates/agentstacks/      types · port · app · fs · process · host (see book/src/ch07-00-architecture.md)
 crates/agentstacks-cli/  init · plan · apply · doctor · update
 crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (built; same crate names)
-extensions/{claude,opencode}/   official tool extensions (Lua); claude is built
+extensions/{claude,opencode}/   official tool extensions (Lua); both are built
 packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python (built)
 book/                    mdBook, published to airsstack.github.io/agentstacks/ (built)
 ```
@@ -137,14 +139,15 @@ cargo make dod-crate <crate>   # the five cargo steps scoped with -p (no lua)
 cargo make fmt                 # rewrite formatting (clippy-fix is the other task that edits sources)
 cargo make deny                # cargo-deny; deliberately not part of dod
 cargo make claudevs-check      # claudevs fixture corpus; deliberately not part of dod
+cargo make opencode-check      # real OpenCode + a mock model; deliberately not part of dod
 cargo make book                # serve the book at http://localhost:3000
 cargo make book-build          # build the book once into book/book/ (CI also fails on [ERROR] lines)
 cargo make lua                 # airsl check + airsl test over extensions/ and packs/, then the fingerprint gate (part of dod)
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
 
-CI runs `cargo make dod`, `cargo make claudevs-check`, `cargo deny check`, the `installers` job and
-the `book` job on push to `main`, on pull requests and on manual dispatch.
+CI runs `cargo make dod`, `cargo make claudevs-check`, `cargo deny check`, and the `installers`,
+`book` and `opencode-check` jobs on push to `main`, on pull requests and on manual dispatch.
 
 A run short of `cargo make dod` counts as iteration, not a green result. The source of truth for the
 gate is the `claudestacks-guideline-rust:rust-guidelines` skill. Workspace lints: `unsafe_code =

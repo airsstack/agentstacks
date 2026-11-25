@@ -5,6 +5,12 @@ together under `packs-v*` tags, which `agentstacks init` and `agentstacks update
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each pack and extension
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The `opencode` tool extension at 0.1.0, on extension API `api = 0`, for OpenCode V2.
+
 ## [packs-v0.1.0] - 2026-11-24
 
 First release.
