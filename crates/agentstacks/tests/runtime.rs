@@ -2,7 +2,7 @@
 //! `HookCommand` builds.
 //!
 //! The project under `tests/fixtures/runtime/proj` holds a small translator for a made-up tool and
-//! six hook modules. Each test copies it into a temporary directory, writes the shipped runtime
+//! a set of hook modules. Each test copies it into a temporary directory, writes the shipped runtime
 //! beside the translator and runs one command from the project directory, as a tool does.
 //! When `airsl` cannot run, each test says so and returns, unless `AGENTSTACKS_REQUIRE_AIRSL` is
 //! set (CI sets it): then each test fails, so a missing binary cannot pass the suite unseen.
@@ -247,6 +247,58 @@ fn runtime_native_result_sees_the_payload_event() -> TestResult {
 }
 
 #[test]
+fn runtime_native_gets_args() -> TestResult {
+    let case = Case {
+        kind: HookKind::Native,
+        args: &["--flag", "v"],
+        ..Case::new("native_args")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stdout),
+        "{\"context\":\"native args=--flag,v\",\"event\":\"PreToolUse\"}\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn runtime_native_drops_block_when_not_may_block() -> TestResult {
+    let case = Case {
+        kind: HookKind::Native,
+        ..Case::new("blk")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(text(&output.stdout), "");
+    assert_eq!(
+        text(&output.stderr),
+        "agentstacks: hook core.hooks.blk tried to block but is not declared may_block; reason: edits to nil are not allowed\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn runtime_native_passes_block_when_may_block() -> TestResult {
+    let case = Case {
+        kind: HookKind::Native,
+        blocking: Blocking::May,
+        ..Case::new("blk")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stdout),
+        "{\"decision\":\"block\",\"event\":\"PreToolUse\",\"reason\":\"edits to nil are not allowed\"}\n"
+    );
+    assert_eq!(text(&output.stderr), "");
+    Ok(())
+}
+
+#[test]
 fn runtime_keeps_context_and_drops_block() -> TestResult {
     let Some(output) = run(&Case::new("both"))? else {
         return Ok(());
@@ -336,6 +388,23 @@ fn runtime_list_drops_a_block_when_not_may_block() -> TestResult {
     assert_eq!(
         text(&output.stdout),
         "{\"context\":\"each a\\neach stop\\neach c\"}\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn runtime_list_gives_every_event_the_args() -> TestResult {
+    let case = Case {
+        args: &["--flag", "v"],
+        payload: r#"{"paths":["a","b"]}"#,
+        ..Case::new("each_args")
+    };
+    let Some(output) = run(&case)? else {
+        return Ok(());
+    };
+    assert_eq!(
+        text(&output.stdout),
+        "{\"context\":\"a args=--flag,v\\nb args=--flag,v\"}\n"
     );
     Ok(())
 }

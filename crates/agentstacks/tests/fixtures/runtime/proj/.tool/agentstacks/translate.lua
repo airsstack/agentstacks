@@ -1,4 +1,6 @@
--- example translator for a made-up tool whose payload is {"hook_event_name": ..., "session_id": ..., "cwd": ...}
+-- example translator for a made-up tool with two payload shapes:
+--   {"hook_event_name": ..., "session_id": ..., "cwd": ...}  one neutral event; a name not in `events` has none
+--   {"paths": [...]}  a list of neutral events, one per path; its result prints as JSON, or "nil" for no result
 local M = {}
 local events = { PreToolUse = "tool.before", SessionStart = "session.start" }
 
