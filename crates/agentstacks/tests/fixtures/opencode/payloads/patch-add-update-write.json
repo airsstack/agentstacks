@@ -1,0 +1,1 @@
+{"hook":"tool.before","session_id":"s1","parent_id":null,"cwd":"/p","match":["write"],"agent":"build","tool":"patch","input":{"patchText":"*** Begin Patch\n*** Add File: new.txt\n+hi\n*** Update File: old.txt\n@@\n-a\n+b\n*** End Patch"}}

@@ -10,162 +10,48 @@
 //! The translator tests run the `translate.lua` the full fixture expects, with the core runtime, on
 //! the real `airsl` binary and the recorded payloads under `tests/fixtures/claude/payloads`.
 
+pub mod common;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::path::PathBuf;
+use std::process::Output;
 
-use agentstacks::app::plan::plan;
-use agentstacks::fs::{StdFileTree, StdWorkspace};
-use agentstacks::host::AirslAdapter;
-use agentstacks::process::{GitCli, SystemBinary};
-use agentstacks::types::op::SkipSubject;
+use agentstacks::fs::StdFileTree;
 use agentstacks::types::plan::{Action, Plan};
-use agentstacks::types::protocol::{Blocking, HookCommand, HookKind, HookModule, RUNTIME_LUA};
-use agentstacks::types::{Extension, HookAction, PackManifest, PackName, SubPath};
+use agentstacks::types::protocol::{Blocking, HookCommand, HookKind, RUNTIME_LUA};
+use agentstacks::types::{Extension, SubPath};
+use common::{copy_tree, module, proposed, run_piped, run_plan, skip_without_airsl, skips};
 use tempfile::TempDir;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-/// The variable that turns a missing `airsl` from a skip into a failure.
-const REQUIRE_AIRSL: &str = "AGENTSTACKS_REQUIRE_AIRSL";
-
-/// The version `airsl` reports, or `None` when it cannot run.
-fn airsl_version() -> Option<String> {
-    let output = Command::new("airsl").arg("--version").output().ok()?;
-    output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
-}
-
-/// Whether the test must stop: a pack with lua hooks needs the `airsl` binary, because the plan
-/// checks it, and a translator run needs it to run the hook. When it cannot run, the test says so,
-/// unless `AGENTSTACKS_REQUIRE_AIRSL` is set: then the test fails, so a missing binary cannot pass
-/// the suite unseen.
-fn skip_without_airsl() -> Result<bool, Box<dyn Error>> {
-    if let Some(version) = airsl_version() {
-        eprintln!("ran on {version}");
-        return Ok(false);
-    }
-    if std::env::var_os(REQUIRE_AIRSL).is_some() {
-        return Err(format!("airsl cannot run on this machine and {REQUIRE_AIRSL} is set").into());
-    }
-    eprintln!("skipped: airsl cannot run on this machine");
-    Ok(true)
-}
+/// The tool these tests run.
+const TOOL: &str = "claude";
 
 /// The shipped extension directory at the repository root.
 fn extension_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../extensions/claude")
+    common::extension_dir(TOOL)
 }
 
 fn fixture(case: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/claude")
-        .join(case)
-}
-
-/// Copies `from` into `to`, leaving out a top-level entry named `skip`.
-fn copy_tree(from: &Path, to: &Path, skip: Option<&str>) -> TestResult {
-    fs::create_dir_all(to)?;
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
-        if skip.is_some_and(|name| entry.file_name() == name) {
-            continue;
-        }
-        let target = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_tree(&entry.path(), &target, None)?;
-        } else {
-            fs::copy(entry.path(), target)?;
-        }
-    }
-    Ok(())
+    common::fixture(TOOL, case)
 }
 
 /// A copy of the fixture project with the shipped extension at `extensions/claude`.
 fn project(case: &str) -> Result<TempDir, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    copy_tree(&fixture(case), dir.path(), Some("expected"))?;
-    copy_tree(
-        &extension_dir(),
-        &dir.path().join("extensions/claude"),
-        None,
-    )?;
-    Ok(dir)
-}
-
-/// Runs the real plan flow over `dir`; a refusal comes back as its lines.
-fn run_plan(dir: &Path) -> Result<Result<Plan, Vec<String>>, Box<dyn Error>> {
-    let workspace = StdWorkspace::open(dir)?;
-    Ok(plan(
-        &workspace,
-        &GitCli::from_env(),
-        &SystemBinary::from_env(),
-        &AirslAdapter::new(),
-    )
-    .map_err(|found| {
-        found
-            .into_sorted()
-            .iter()
-            .map(ToString::to_string)
-            .collect()
-    }))
+    common::project(TOOL, case)
 }
 
 /// The plan of the fixture `case`.
 fn planned(case: &str) -> Result<(TempDir, Plan), Box<dyn Error>> {
-    let dir = project(case)?;
-    let plan = run_plan(dir.path())?.map_err(|lines| lines.join("\n"))?;
-    Ok((dir, plan))
-}
-
-/// What a byte string looks like in a failed comparison.
-fn show(bytes: &[u8]) -> String {
-    std::str::from_utf8(bytes).map_or_else(|_| format!("{bytes:?}"), str::to_owned)
-}
-
-/// The bytes the plan installs at each path.
-fn proposed(plan: &Plan) -> BTreeMap<String, String> {
-    plan.steps()
-        .iter()
-        .filter_map(|step| {
-            step.new
-                .as_deref()
-                .map(|bytes| (step.path.as_str().to_owned(), show(bytes)))
-        })
-        .collect()
+    common::planned(TOOL, case)
 }
 
 /// The checked-in expected files of `case`, keyed by project-relative path. `skips.txt` is not one.
 fn expected(case: &str) -> Result<BTreeMap<String, String>, Box<dyn Error>> {
-    fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<String, String>) -> TestResult {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                walk(root, &entry.path(), out)?;
-                continue;
-            }
-            let rel = entry
-                .path()
-                .strip_prefix(root)?
-                .components()
-                .map(|part| part.as_os_str().to_string_lossy().into_owned())
-                .collect::<Vec<_>>()
-                .join("/");
-            if rel != "skips.txt" {
-                out.insert(rel, show(&fs::read(entry.path())?));
-            }
-        }
-        Ok(())
-    }
-    let root = fixture(case).join("expected");
-    let mut out = BTreeMap::new();
-    walk(&root, &root, &mut out)?;
-    Ok(out)
+    common::expected(TOOL, case)
 }
 
 /// The expected text of one file of `case`.
@@ -173,23 +59,6 @@ fn expected_file(case: &str, path: &str) -> Result<String, Box<dyn Error>> {
     expected(case)?
         .remove(path)
         .ok_or_else(|| format!("{case}/expected has no {path}").into())
-}
-
-/// The skips of the plan as `<item>: <reason>`, sorted.
-fn skips(plan: &Plan) -> Vec<String> {
-    let mut lines: Vec<String> = plan
-        .skips()
-        .iter()
-        .map(|skip| {
-            let subject = match skip.subject() {
-                SkipSubject::Item(item) => item.to_string(),
-                SkipSubject::RootFile { pack, rel } => format!("{pack}/{rel}"),
-            };
-            format!("{subject}: {}", skip.reason())
-        })
-        .collect();
-    lines.sort();
-    lines
 }
 
 #[test]
@@ -351,21 +220,6 @@ fn no_lua_hook_writes_no_translate() -> TestResult {
 /// Where the extension root sits in the project the translator tests build.
 const ROOT: &str = ".claude/agentstacks";
 
-/// The module of `hooks/<name>.lua` in the pack `core`.
-fn module(name: &str) -> Result<HookModule, Box<dyn Error>> {
-    let text = format!(
-        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
-         [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"hooks/{name}.lua\"\n"
-    );
-    let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), &text)
-        .map_err(|found| format!("{found:?}"))?;
-    let hook = manifest.hooks().first().ok_or("one hook")?;
-    let HookAction::Lua(lua) = hook.action() else {
-        return Err("a lua hook".into());
-    };
-    Ok(HookModule::new(&PackName::new("core")?, lua.run()))
-}
-
 /// One run of a hook module under the shipped runtime and the expected translator.
 struct Run<'a> {
     /// The hook module under `payloads/hooks`.
@@ -435,21 +289,8 @@ fn run_hook(case: &Run<'_>) -> Result<Option<Output>, Box<dyn Error>> {
         case.kind,
     )
     .argv();
-    let (program, rest) = argv.split_first().ok_or("a program")?;
     let payload = fs::read(fixture("payloads/input").join(format!("{}.json", case.payload)))?;
-    let mut child = Command::new(program)
-        .args(rest)
-        .current_dir(dir.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    child
-        .stdin
-        .take()
-        .ok_or("a stdin pipe")?
-        .write_all(&payload)?;
-    Ok(Some(child.wait_with_output()?))
+    Ok(Some(run_piped(&argv, dir.path(), &payload)?))
 }
 
 /// The expected stdout under `payloads/expected/<name>.out` or stderr under `<name>.err`.

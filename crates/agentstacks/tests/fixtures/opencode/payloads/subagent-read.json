@@ -1,0 +1,1 @@
+{"hook":"tool.before","session_id":"s2","parent_id":"s1","cwd":"/p","match":null,"agent":"explore","tool":"read","input":{"path":"src/a.txt"}}

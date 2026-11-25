@@ -1,0 +1,7 @@
+api = 0
+
+[tools.opencode]
+path = "extensions/opencode"
+
+[packs.core]
+path = "packs/core"

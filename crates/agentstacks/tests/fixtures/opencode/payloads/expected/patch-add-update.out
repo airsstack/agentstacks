@@ -1,0 +1,1 @@
+{"context":"tool=write path=new.txt agent=nil agent_id=nil prompt=nil\ntool=edit path=old.txt agent=nil agent_id=nil prompt=nil"}
