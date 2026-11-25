@@ -7,7 +7,8 @@
 -- generated key of the same name, and the ones that were not generated follow, sorted by name.
 local M = {}
 
--- The OpenCode permission action each tool word maps to.
+-- The OpenCode permission action each tool word maps to. Every word the pack loader accepts for
+-- an agent's `tools` is listed here, so a lookup never misses.
 local ACTIONS = {
   read = "read",
   write = "edit",
@@ -37,7 +38,7 @@ local function permissions(tools)
   local rules = { DENY_ALL }
   local seen = {}
   for _, word in ipairs(tools) do
-    local action = ACTIONS[word] or word
+    local action = ACTIONS[word]
     if not seen[action] then
       seen[action] = true
       rules[#rules + 1] = { action = action, effect = "allow", resource = "*" }

@@ -184,7 +184,7 @@ return {
 
   skips_native_prompt_with_match = function()
     eq(skipped(message_hook("session.prompt", "hi", { match = { "x" } }), true), NO_MATCHER_REASON)
-    -- Rule 4 is checked before rule 5.
+    -- The unblockable-prompt reason wins over the no-matcher reason.
     eq(skipped(lua_hook("session.prompt", { may_block = true, match = { "x" } }), true), NO_BLOCK_REASON)
   end,
 
@@ -203,7 +203,8 @@ return {
   end,
 
   skips_follow_table_order = function()
-    -- Rule 1 beats rule 7, and rule 7 beats rule 8, when a hook matches both.
+    -- The missing-event reason beats the session-id reason, and the session-id reason beats the
+    -- literal-dollar reason, when a hook fits both.
     eq(skipped(message_hook("session.end", "${OPENCODE_SESSION_ID}")), SESSION_END_REASON)
     eq(skipped(lua_hook("prompt.submit", { command = { "a$", "${OPENCODE_SESSION_ID}" } })), SESSION_ID_REASON)
   end,

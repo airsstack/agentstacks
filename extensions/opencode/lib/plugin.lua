@@ -1,4 +1,5 @@
--- Text of the hook shim the opencode extension writes to <root>/.opencode/plugins/agentstacks.js.
+-- Text of the hook shim the opencode extension writes to `.opencode/plugins/agentstacks.js` in the
+-- user's project.
 -- OpenCode loads it as a plugin: it runs the hook commands in its `HOOKS` table and forwards each
 -- event and result. `text(entries)` renders the table between a fixed header and a fixed body.
 local M = {}

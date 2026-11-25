@@ -1,8 +1,8 @@
 local plugin = require("plugin")
 
--- The spec text, pasted without change. The module under test holds its own copy; these must
--- stay equal to it byte for byte.
-local SPEC_HEADER = [==[
+-- The shim's fixed text, pasted without change. The module under test holds its own copy; these
+-- must stay equal to it byte for byte.
+local EXPECTED_HEADER = [==[
 // agentstacks hook shim for OpenCode, api 0. Written by `agentstacks apply`; edits are drift.
 // It runs the hook commands in HOOKS and forwards each event and result. All hook logic is Lua.
 import { spawn } from "node:child_process";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 ]==]
 
-local SPEC_BODY = [==[
+local EXPECTED_BODY = [==[
 const ROOT = fileURLToPath(new URL("../../", import.meta.url)).replace(/\/+$/, "");
 const TIMEOUT_MS = 60000;
 const AIRSL_MISSING =
@@ -193,17 +193,17 @@ return {
   empty_table_is_an_empty_array = function()
     local text = plugin.text({})
     assert(text:find("const HOOKS = [];\n", 1, true), "missing `const HOOKS = [];`")
-    local before_body = text:sub(1, #text - #SPEC_BODY)
+    local before_body = text:sub(1, #text - #EXPECTED_BODY)
     assert(not before_body:find("{}", 1, true), "an empty table must not render as {}")
     assert(not text:find("const HOOKS = [\n", 1, true), "an empty table must not open a multi-line array")
   end,
 
   header_is_exact = function()
     local text = plugin.text({ { on = "session.start", text = "hi" } })
-    assert(text:sub(1, #SPEC_HEADER) == SPEC_HEADER, "text does not start with the spec header")
+    assert(text:sub(1, #EXPECTED_HEADER) == EXPECTED_HEADER, "text does not start with the expected header")
     local table_open = "const HOOKS = ["
     assert(
-      text:sub(#SPEC_HEADER + 1, #SPEC_HEADER + #table_open) == table_open,
+      text:sub(#EXPECTED_HEADER + 1, #EXPECTED_HEADER + #table_open) == table_open,
       "the table does not follow the header"
     )
   end,
@@ -212,11 +212,11 @@ return {
     local text = plugin.text({ { on = "session.start", text = "hi" } })
     local _, close = text:find("\n];\n\n", 1, true)
     assert(close, "table close `];` and an empty line not found")
-    assert(text:sub(close + 1) == SPEC_BODY, "text after the table is not the spec body")
+    assert(text:sub(close + 1) == EXPECTED_BODY, "text after the table is not the expected body")
     local empty = plugin.text({})
     local _, empty_close = empty:find("const HOOKS = [];\n\n", 1, true)
     assert(empty_close, "empty table line and an empty line not found")
-    assert(empty:sub(empty_close + 1) == SPEC_BODY, "text after the empty table is not the spec body")
+    assert(empty:sub(empty_close + 1) == EXPECTED_BODY, "text after the empty table is not the expected body")
   end,
 
   two_entries_joined = function()

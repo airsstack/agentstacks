@@ -15,7 +15,8 @@ local NO_MATCHER_REASON = "opencode has no matcher for session.prompt"
 local SESSION_ID_REASON = "opencode gives hooks the session id in the event (event.session_id), "
   .. "not as {{var session_id}}"
 
--- The OpenCode tools a neutral `match` word runs for.
+-- The OpenCode tools a neutral `match` word runs for. Every word the pack loader accepts for
+-- `match` on a tool event is listed here, so a lookup never misses.
 local TOOLS = {
   read = { "read" },
   edit = { "edit", "patch" },
@@ -96,14 +97,14 @@ local function command_text(argv)
 end
 
 -- The OpenCode tools for a neutral `match`: each word's tools, duplicates dropped, first seen first.
--- A word that is not a neutral tool name stands for itself. No `match` means every file tool.
+-- No `match` means every file tool.
 local function neutral_tools(match)
   if not non_empty(match) then
     return copy(ALL_FILE_TOOLS)
   end
   local tools, seen = {}, {}
   for _, word in ipairs(match) do
-    for _, tool in ipairs(TOOLS[word] or { word }) do
+    for _, tool in ipairs(TOOLS[word]) do
       if not seen[tool] then
         seen[tool] = true
         tools[#tools + 1] = tool
@@ -122,9 +123,11 @@ local function holds(list, word)
   return false
 end
 
--- Returns the reason `hook` is skipped, or nil. The checks follow the skip table's order, each
--- one only for the hooks the table says it applies to. A `session.start` hook with no
--- `match` renders; only one whose non-empty `match` lacks `startup` is skipped.
+-- Returns the reason `hook` is skipped, or nil. The checks run in a fixed order, so a hook that
+-- fits several reasons gets the first: a missing OpenCode event, then a prompt that cannot be
+-- blocked, then a native event or matcher OpenCode lacks, then the session id, then a literal `$`.
+-- A `session.start` hook with no `match` renders; only one whose non-empty `match` lacks `startup`
+-- is skipped.
 local function skip_reason(hook, vars, native)
   local event = hook.event
   local lua = hook.kind == "lua"
