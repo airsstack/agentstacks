@@ -19,6 +19,7 @@
 - [Writing a Tool Extension](ch06-00-authoring.md)
   - [The Extension API](ch06-01-extensions.md)
   - [Hooks](ch06-02-hooks.md)
+  - [OpenCode](ch06-03-opencode.md)
 - [Under the Hood](ch07-00-architecture.md)
 
 # claudevs
