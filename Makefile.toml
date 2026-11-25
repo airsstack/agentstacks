@@ -434,6 +434,76 @@ command = "cargo"
 args = ["test", "-p", "claudevs", "--test", "corpus", "--", "--ignored", "--nocapture"]
 
 # ---------------------------------------------------------------------------
+# OpenCode
+# ---------------------------------------------------------------------------
+
+[tasks.opencode-check]
+category = "OpenCode"
+description = "Run the opencode extension inside the pinned real OpenCode (downloads it into target/)"
+# Not a dependency of `dod`, like `claudevs-check`: it needs Node and a download,
+# and CI runs it as its own job. The mock model and the scenarios are under
+# crates/agentstacks-cli/tests/opencode-check/.
+#
+# The OpenCode build is pinned by version and by the SHA256 of each platform's
+# archive, which is verified on every run. Bumping OpenCode changes the version
+# (VERSION, the download URL and the directory under target/) and both hashes
+# together.
+script_runner = "@shell"
+script = '''
+set -e
+VERSION=2.4.1
+os=$(uname -s)
+arch=$(uname -m)
+case "$os $arch" in
+  "Linux x86_64")
+    asset=opencode-linux-x64.tar.gz
+    sha=9ddd18e3faf64eaeccf6a0fcbc96a5c7a14520ae5fd5b61e5be51d894f478b47
+    ;;
+  "Darwin arm64")
+    asset=opencode-darwin-arm64.zip
+    sha=95a101eda95108478f1db43cff8fcbd4811f6c0e79af1e167301843c6a48d731
+    ;;
+  *)
+    echo "opencode-check: no pinned OpenCode build for $os $arch" >&2
+    exit 1
+    ;;
+esac
+
+dir="target/opencode-check/$VERSION"
+archive="$dir/$asset"
+mkdir -p "$dir"
+if [ ! -f "$archive" ]; then
+  curl -sSfL -o "$archive" \
+    "https://github.com/anomalyco/opencode/releases/download/v$VERSION/$asset"
+fi
+# The archive is checked on every run, so a kept file that changed is refused
+# too; the binary that runs is always extracted from the archive that passed.
+if command -v sha256sum >/dev/null 2>&1; then
+  got=$(sha256sum "$archive" | cut -d ' ' -f 1)
+else
+  got=$(shasum -a 256 "$archive" | cut -d ' ' -f 1)
+fi
+if [ "$got" != "$sha" ]; then
+  rm -f "$archive"
+  echo "opencode-check: $asset: checksum mismatch" >&2
+  exit 1
+fi
+rm -rf "$dir/bin"
+mkdir -p "$dir/bin"
+case "$asset" in
+  *.tar.gz) tar -xzf "$archive" -C "$dir/bin" ;;
+  *.zip) unzip -o -q "$archive" -d "$dir/bin" ;;
+esac
+if [ ! -x "$dir/bin/opencode" ]; then
+  echo "opencode-check: $asset: no opencode binary inside" >&2
+  exit 1
+fi
+
+cargo build -p agentstacks-cli
+node crates/agentstacks-cli/tests/opencode-check/check.mjs "$dir/bin/opencode" target/debug/agentstacks
+'''
+
+# ---------------------------------------------------------------------------
 # Supply chain
 # ---------------------------------------------------------------------------
 
