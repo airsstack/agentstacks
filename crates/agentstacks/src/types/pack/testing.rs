@@ -23,7 +23,7 @@ pub(super) const DIR: &str = "packs/core";
 
 /// The `[pack]` table every test manifest starts its tables with.
 const IDENTITY: &str =
-    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n";
+    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n";
 
 /// The walked paths `texts`, as the walker would list them.
 pub(super) fn paths(texts: &[&str]) -> Vec<TreePath> {

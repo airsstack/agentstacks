@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 built-on: c187d693fbea
 ---
@@ -141,7 +141,30 @@ the files it has touched.
 | `crates/agentstacks/src/types/api.rs`, `types/project/file.rs`, `types/lock/file.rs`, `types/manifest/pack/file.rs`, `types/extension/manifest.rs`, `types/lock/error.rs`, `types/manifest/error.rs`, `types/set/check.rs`, `app/plan/*` tests, `app/doctor.rs` tests | legacy-case tests and docs (`check(0)`, the §3.3 cases, E1b) | 01 |
 | `crates/agentstacks/tests/fixtures/extensions/invalid/api-zero/extension.toml`, `crates/agentstacks/tests/{pack,set,extension}.rs` | legacy-case fixture and tests | 01 |
 | `crates/agentstacks-cli/src/command/apply.rs` tests | `apply_refuses_a_legacy_project` | 01 |
+| `crates/agentstacks-cli/src/command/testing.rs`, `crates/agentstacks/src/types/lock/write.rs`, `types/project/error.rs`, `types/format/fields.rs` (`"api = 0.5"`), `crates/agentstacks/tests/fixtures/packs/pack-api-legacy/pack.toml` | legacy-test lines and fixtures that legitimately hit the api-0 gate | 01 |
 | `crates/agentstacks/src/types/project/upgrade.rs`, `app/update.rs`, `crates/agentstacks-cli/src/{command,show}/update.rs` tests, `crates/agentstacks-cli/tests/fixtures/legacy/**`, `crates/agentstacks-cli/tests/commands.rs` | the 0 → 1 move and its tests | 03 |
 | `crates/agentstacks/src/app/ext/add.rs` tests | `legacy_project_refused` | 05 |
 | `book/src/ch03-01-from-0x.md`, `book/src/ch04-00-cli.md` (`update`'s `api: 0 → 1` and the legacy messages), `book/src/ch05-00-plan-and-apply.md` (the lock reads api 0), `book/src/ch06-06-stability.md` (the lock reads api 0) | the 0.x move, documented | 07 |
 | `crates/agentstacks/CHANGELOG.md`, `crates/agentstacks-cli/CHANGELOG.md`, `packs/CHANGELOG.md` (the 1.0.0 entries) | release notes for the move | 08 |
+
+## Review findings
+
+- Task 1 (reviewer, handoff 20261125-174220-4854/09-reviewer-batchA.md; the `read_api` duplication was fixed later by the plan 02 cross-check pass): 0🔴, blocking none. `cargo make dod` exit 0; `cargo make claudevs-check` exit 0; `cargo make opencode-check` exit 0 (S6–S8b ok). Every 🔵 nit below is now fixed (fix pass, below).
+- Task 2 (reviewer, handoff 20261125-174220-4854/11-reviewer-batchB.md): 0🔴, blocking none. `cargo make dod` exit 0; `cargo make opencode-check` exit 0 (S7–S8b ok). Every 🔵 nit below is now fixed (fix pass, below).
+- Fix pass over the nits of Tasks 1 and 2. Final gates, each run once after the last edit: `cargo make dod` exit 0 (Rust: 2595 passed, 0 failed across 25 test binaries and doctests; lua 651 passed, fingerprint gate 8 cases, pack text gates 4 passed), `cargo make claudevs-check` exit 0, `cargo make opencode-check` exit 0 (S3 to S8b ok), `cargo deny check` exit 0 (advisories ok, bans ok, licenses ok, sources ok), `cargo make book-build` exit 0 with no `[ERROR]` line.
+  - fixed: read.rs `# Errors` doc omitted the legacy refusal; it now names `api 0 is from agentstacks 0.x (run agentstacks update)`. Proof: `cargo make dod` (rustdoc with `-D warnings`) exit 0.
+  - fixed: read.rs matched `ApiCheck::Current` and treated every other value as legacy; it now matches `ApiCheck::Legacy` explicitly. Proof: `cargo make dod`, the `plan` and `apply` legacy tests pass.
+  - fixed: the two `read_api` sentinel helpers are one `types::api::read` returning `Option<ApiCheck>` (the plan 02 cross-check pass). Proof: `cargo make dod` exit 0.
+  - fixed: the legacy `0` was a literal in phrase.rs and show/update.rs beside a private `LEGACY_API`; `types::api::LEGACY_API` is now one public constant (re-exported as `types::LEGACY_API`) used by api.rs, phrase.rs and show/update.rs. Output unchanged: the `update_text_puts_api_first` and `legacy_*_names_*` tests assert the same text. Proof: `cargo make dod` exit 0.
+  - fixed: `apply_refuses_a_legacy_project` now asserts that `workspace.calls()` holds no `WorkspaceCall::Stage`. Proof: `cargo make dod` exit 0.
+  - fixed: `legacy_lock_reports_as_today` is renamed `legacy_lock_reports_like_a_current_one`. Proof: `git grep -n reports_as_today -- crates` prints nothing.
+  - fixed: the `PackError::Reserved` doc said "support" twice; it now reads "reserves for later, which the supported API does not read".
+  - fixed: `reserved_dir_refusal_names_api_one` repeated a table row; it is now `reserved_dir_refusal_names_the_supported_api_at_the_directory` and asserts the located form `core/commands: reserved, not supported in api <API>`.
+  - fixed: the module docs of hooks/{invalid,policy,grants}.rs said "api 1" as a literal; they link [`API`].
+  - fixed: the `PureUnsupported` and `Reserved` tests (invalid.rs, policy.rs, pack/error.rs, layout.rs, load.rs) build the expected text with `format!` from `API`, so a hard-coded number fails them. The `hooks/grants.rs` and `hooks/native/hook.rs` case tables and `tests/pack.rs` keep literal text (their cases are `&str` tables).
+  - fixed: the "Kept lines" table below lists the legacy-test lines of command/testing.rs, lock/write.rs, project/error.rs, format/fields.rs and the pack-api-legacy fixture. Proof: `git grep -nE 'api *= *0|api 0|speaks 0' -- crates extensions packs` prints hits only in files the table lists: packs/CHANGELOG.md; phrase.rs, api.rs, format/fields.rs; project/{file,upgrade,error}.rs; lock/{file,write}.rs; manifest/{pack/file,error}.rs; extension/manifest.rs; app/plan/{flow,read}.rs, app/doctor.rs, app/update.rs; the cli command/{apply,testing}.rs and tests/commands.rs; the legacy, api-zero and pack-api-legacy fixtures; tests/pack.rs.
+
+## Deviations
+
+- 2026-11-25: The Task 1 rewrite covered every tracked `api = 0` file in crates/extensions/packs (292 files), not only the 49 `.rs` files named. `app/plan/load.rs:243` and the `extension_api(_, 1)` refused cases became api 2. The api-0 gate's kept lines grow by these legacy-test lines: command/testing.rs, lock/write.rs, project/error.rs, fixtures packs/pack-api-legacy and extensions/invalid/api-zero, plus the pre-existing format/fields.rs:440 `"api = 0.5"`.
+- 2026-11-25: Not committed. Task 1 is staged in the index; Task 2 is unstaged in the working tree.

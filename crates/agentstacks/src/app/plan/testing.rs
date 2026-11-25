@@ -108,7 +108,7 @@ pub(super) fn pack_files(root: &str, name: &str) -> FakeFileTree {
         .file(
             "pack.toml",
             format!(
-                "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n"
+                "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n"
             )
             .as_bytes(),
         )
@@ -130,7 +130,7 @@ pub(super) fn ext_files_reading(root: &str, tool: &str, reads: &[&str]) -> FakeF
         .file(
             "extension.toml",
             format!(
-                "[extension]\nname = \"{tool}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"adapter.lua\"\n{reads}"
+                "[extension]\nname = \"{tool}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\n{reads}"
             )
             .as_bytes(),
         )
@@ -215,7 +215,7 @@ pub(super) fn lock_text(contents: LockContents) -> Result<String, Box<dyn Error>
 }
 
 /// A project of the tool `claude` and the pack `core`, both read from the project directory.
-pub(super) const PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+pub(super) const PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
 
 /// What loading a scenario's sources gives.
 pub(super) type LoadedTrees = Loaded<Tree<FakeFileTree, FakeFileTree>>;

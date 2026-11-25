@@ -17,6 +17,7 @@
 //! Where a refusal is located belongs to the [`Diagnostic`](crate::types::Diagnostic) that carries
 //! it.
 
+use crate::types::report::LegacyProject;
 use crate::types::report::UnsupportedApi;
 
 /// A refusal of `agentstacks.toml` as a whole, of an entry's name, or of the arguments `init`
@@ -35,6 +36,9 @@ pub enum ProjectError {
     /// An `api` this agentstacks does not speak.
     #[error("api {0}")]
     UnsupportedApi(#[from] UnsupportedApi),
+    /// An `api` written for the `0.x` releases, which only `update` goes on with.
+    #[error(transparent)]
+    LegacyProject(#[from] LegacyProject),
     /// A file that lists no tool or no pack.
     #[error("nothing to install")]
     NothingToInstall,
@@ -48,6 +52,10 @@ pub enum ProjectError {
     /// A tag rewrite found no `tag` at the entry it was asked to change.
     #[error("no tag to update (run update again)")]
     NoTagToUpdate,
+    /// An `api` rewrite found no integer `api` that is the legacy one, because the `api` is
+    /// missing, not an integer or another number: the file changed after `update` read it.
+    #[error("api changed during update (run update again)")]
+    ApiChanged,
     /// `init` found an `agentstacks.toml` already there.
     #[error("already exists (edit it and run apply)")]
     AlreadyExists,
@@ -79,8 +87,12 @@ mod tests {
     #[test]
     fn project_error_messages_are_the_refusal_texts() {
         assert_eq!(
-            ProjectError::from(UnsupportedApi::new(1)).to_string(),
-            "api 1 not supported (this agentstacks speaks 0)"
+            ProjectError::from(UnsupportedApi::new(2)).to_string(),
+            "api 2 not supported (this agentstacks speaks 1)"
+        );
+        assert_eq!(
+            ProjectError::from(LegacyProject).to_string(),
+            "api 0 is from agentstacks 0.x (run agentstacks update)"
         );
         assert_eq!(
             ProjectError::NothingToInstall.to_string(),
@@ -94,6 +106,10 @@ mod tests {
         assert_eq!(
             ProjectError::NoTagToUpdate.to_string(),
             "no tag to update (run update again)"
+        );
+        assert_eq!(
+            ProjectError::ApiChanged.to_string(),
+            "api changed during update (run update again)"
         );
         assert_eq!(
             ProjectError::AlreadyExists.to_string(),

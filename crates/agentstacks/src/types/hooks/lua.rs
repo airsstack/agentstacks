@@ -14,7 +14,8 @@
 //! # Non-responsibilities
 //!
 //! The hook's kind, event and selectors belong to [`HookAction`](crate::types::HookAction) and
-//! [`Hook`](crate::types::Hook), and unknown keys are reported there, where every allowed key is known.
+//! [`Hook`](crate::types::Hook), and unknown keys are reported there, where every allowed key is
+//! known.
 
 use crate::types::format::TomlFields;
 use crate::types::hooks::grants::Grants;
@@ -39,7 +40,7 @@ use toml::Value;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]
@@ -73,7 +74,7 @@ use toml::Value;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]

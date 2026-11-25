@@ -3,7 +3,7 @@ local plugin = require("plugin")
 -- The shim's fixed text, pasted without change. The module under test holds its own copy; these
 -- must stay equal to it byte for byte.
 local EXPECTED_HEADER = [==[
-// agentstacks hook shim for OpenCode, api 0. Written by `agentstacks apply`; edits are drift.
+// agentstacks hook shim for OpenCode, api 1. Written by `agentstacks apply`; edits are drift.
 // It runs the hook commands in HOOKS and forwards each event and result. All hook logic is Lua.
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";

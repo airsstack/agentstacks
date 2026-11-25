@@ -186,7 +186,7 @@ mod tests {
     use crate::types::plan::Action;
     use crate::types::resolve::FetchError;
 
-    const CLAUDE_ONLY: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const CLAUDE_ONLY: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
     const STATUS_FILE: &str = ".claude/skills/status/SKILL.md";
     const AGENT_FILE: &str = ".claude/agents/coder.md";
     const SKILL_BYTES: &[u8] = b"---\nname: status\ndescription: d\n---\nBody\n";
@@ -197,7 +197,7 @@ mod tests {
             .file(
                 "pack.toml",
                 format!(
-                    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n{requires}"
+                    "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n{requires}"
                 )
                 .as_bytes(),
             )
@@ -315,6 +315,19 @@ mod tests {
             .find(|entry| entry.path().as_str() == STATUS_FILE)
             .ok_or("the locked file")?;
         assert_eq!(entry.by().as_str(), "core");
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_project_refused() -> TestResult {
+        let legacy = CLAUDE_ONLY.replacen("api = 1", "api = 0", 1);
+        assert_ne!(legacy, CLAUDE_ONLY);
+        let world = World::new(&legacy, core_tree(""), &[])?;
+        let found = world.plan().err().ok_or("a refusal")?;
+        assert_eq!(
+            shown(found),
+            ["agentstacks.toml: api 0 is from agentstacks 0.x (run agentstacks update)"]
+        );
         Ok(())
     }
 
@@ -606,7 +619,7 @@ mod tests {
         let requires = "[requires]\nairsl = \">=0.1.4\"\n";
         let tree = core_tree(requires);
         let project = format!(
-            "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"{URL}\"\ntag = \"packs-v0.1.0\"\n"
+            "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"{URL}\"\ntag = \"packs-v0.1.0\"\n"
         );
         let (remote, tag, at) = (url()?, git_tag("packs-v0.1.0")?, rev(REV_A)?);
         let served = tree.clone();

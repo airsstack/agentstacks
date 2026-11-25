@@ -5,7 +5,8 @@
 //!
 //! # Responsibilities
 //!
-//! - [`api`]: the one `api` number this agentstacks speaks, which every file reader checks.
+//! - [`api`]: the one `api` number and the version of this agentstacks, and the decision on the
+//!   `api` a file asks for, which every file reader takes.
 //! - [`report`]: where and what of every refusal, and the sorted collection a run reports.
 //! - [`name`]: names that parse on construction (pack, tool, item, option, binary, environment).
 //! - [`tokens`]: the token vocabulary, scanning text into located tokens, rendering values.
@@ -57,6 +58,12 @@ pub mod tree;
 #[doc(inline)]
 pub use api::API;
 #[doc(inline)]
+pub use api::ApiCheck;
+#[doc(inline)]
+pub use api::LEGACY_API;
+#[doc(inline)]
+pub use api::VERSION;
+#[doc(inline)]
 pub use extension::EntryPath;
 #[doc(inline)]
 pub use extension::Extension;
@@ -64,6 +71,8 @@ pub use extension::Extension;
 pub use extension::ExtensionError;
 #[doc(inline)]
 pub use extension::ExtensionManifest;
+#[doc(inline)]
+pub use extension::ExtensionRequires;
 #[doc(inline)]
 pub use format::YamlValue;
 #[doc(inline)]
@@ -133,17 +142,15 @@ pub use lock::check_airsl_presence;
 #[doc(inline)]
 pub use lock::write_lock;
 #[doc(inline)]
-pub use manifest::AirslReq;
-#[doc(inline)]
 pub use manifest::ExcludeGlob;
-#[doc(inline)]
-pub use manifest::InvalidAirslReq;
 #[doc(inline)]
 pub use manifest::InvalidExcludeGlob;
 #[doc(inline)]
 pub use manifest::InvalidOptionType;
 #[doc(inline)]
 pub use manifest::InvalidPackPath;
+#[doc(inline)]
+pub use manifest::InvalidRange;
 #[doc(inline)]
 pub use manifest::InvalidVersion;
 #[doc(inline)]
@@ -162,6 +169,8 @@ pub use manifest::PackPath;
 pub use manifest::PackVersion;
 #[doc(inline)]
 pub use manifest::Requires;
+#[doc(inline)]
+pub use manifest::VersionRange;
 #[doc(inline)]
 pub use name::BinaryName;
 #[doc(inline)]
@@ -234,6 +243,10 @@ pub use report::DoesNotExist;
 pub use report::FieldError;
 #[doc(inline)]
 pub use report::FormatError;
+#[doc(inline)]
+pub use report::LegacyApi;
+#[doc(inline)]
+pub use report::LegacyProject;
 #[doc(inline)]
 pub use report::ListedTwice;
 #[doc(inline)]

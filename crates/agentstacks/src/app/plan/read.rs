@@ -5,7 +5,9 @@
 //! - [`Inputs`] is the flow's carrier for the parsed project file and the lock, when there is one.
 //! - [`read_inputs`] reads both texts through the [`Workspace`] port and parses them with the
 //!   built readers. A read failure is located at the file it happened on. Parse refusals pass
-//!   through unchanged, and when both files are refused both sets are returned.
+//!   through unchanged, and when both files are refused both sets are returned. A project file
+//!   written for the `0.x` releases parses but is refused here, naming `update`, so `plan` and
+//!   `apply` never go on with one.
 //!
 //! # Non-responsibilities
 //!
@@ -16,12 +18,11 @@
 use std::path::Path;
 
 use crate::port::Workspace;
+use crate::types::ApiCheck;
 use crate::types::lock::Lockfile;
-use crate::types::project::ProjectFile;
-use crate::types::report::{Diagnostic, Diagnostics, Location};
+use crate::types::project::{PROJECT_FILE, ProjectError, ProjectFile};
+use crate::types::report::{Diagnostic, Diagnostics, LegacyProject, Location};
 
-/// The file the project is read from.
-pub(super) const PROJECT_FILE: &str = "agentstacks.toml";
 /// The file the lock is read from.
 pub(super) const LOCK_FILE: &str = "agentstacks.lock";
 
@@ -37,13 +38,24 @@ pub(super) struct Inputs {
 ///
 /// # Errors
 ///
-/// Every refusal of both files: an I/O failure of a read, or what parsing refused.
+/// Every refusal of both files: an I/O failure of a read, what parsing refused, or a project file
+/// written for the legacy `api` (`api 0 is from agentstacks 0.x (run agentstacks update)`).
 pub(super) fn read_inputs<W: Workspace>(workspace: &W) -> Result<Inputs, Diagnostics> {
     let mut refusals = Diagnostics::new();
     let project = match workspace.project_text() {
         Ok(text) => ProjectFile::parse(Path::new(PROJECT_FILE), &text)
             .map_err(|found| refusals.extend(found))
-            .ok(),
+            .ok()
+            .filter(|project| match project.api() {
+                ApiCheck::Legacy => {
+                    refusals.push(Diagnostic::new(
+                        Location::file(PROJECT_FILE),
+                        ProjectError::from(LegacyProject),
+                    ));
+                    false
+                }
+                ApiCheck::Current | ApiCheck::Unsupported(_) => true,
+            }),
         Err(error) => {
             refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
             None
@@ -74,12 +86,12 @@ mod tests {
     use crate::types::name::{PackName, ToolName};
     use crate::types::tree::ContentHash;
 
-    const PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
 
     fn lock_text() -> String {
         let hash = ContentHash::of_bytes(b"x");
         format!(
-            "api = 0\n\n[[pack]]\nname = \"core\"\nversion = \"0.1.0\"\npath = \"packs/core\"\ntree = \"{hash}\"\n"
+            "api = 1\n\n[[pack]]\nname = \"core\"\nversion = \"0.1.0\"\npath = \"packs/core\"\ntree = \"{hash}\"\n"
         )
     }
 
@@ -99,6 +111,24 @@ mod tests {
         assert_eq!(
             lock.packs().first().map(|p| p.name().as_str()),
             Some("core")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn read_inputs_refuses_a_legacy_project_and_still_reads_the_lock() -> TestResult {
+        let legacy = PROJECT.replacen("api = 1", "api = 0", 1);
+        assert_ne!(legacy, PROJECT);
+        let scenario = Scenario::new(&legacy).lock("api = 2\n");
+        let Err(found) = read_inputs(&scenario.workspace) else {
+            return Err("a refusal".into());
+        };
+        assert_eq!(
+            shown(found),
+            [
+                "agentstacks.lock: api 2 not supported (this agentstacks speaks 1)",
+                "agentstacks.toml: api 0 is from agentstacks 0.x (run agentstacks update)",
+            ]
         );
         Ok(())
     }
@@ -125,7 +155,7 @@ mod tests {
     #[test]
     fn read_inputs_returns_project_and_lock_refusals_together() -> TestResult {
         let project = format!("foo = 1\n{PROJECT}");
-        let lock = "api = 0\nmerge = 1\n";
+        let lock = "api = 1\nmerge = 1\n";
         let scenario = Scenario::new(&project).lock(lock);
         let found = read_inputs(&scenario.workspace).err().ok_or("refusals")?;
         assert_eq!(

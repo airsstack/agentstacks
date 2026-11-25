@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: c187d693fbea
@@ -60,3 +60,15 @@ extensions/{claude,opencode}/extension.toml — modify: version 1.0.0
 ## Proof
 
 - `cargo make dod`, `cargo make claudevs-check`, `cargo make opencode-check` and `cargo deny check` are green.
+
+## Review findings
+
+- Task 1 (reviewer, handoff 20261125-174220-4854/19-reviewer-batchC.md): 0🔴, blocking none. `cargo make dod` exit 0, `cargo make claudevs-check` exit 0, `cargo make opencode-check` exit 0, `cargo deny check` exit 0 (advisories ok, bans ok, licenses ok, sources ok). The version grep prints nothing; the claudevs diff is empty; Cargo.lock changes only the two workspace crates. The open 🔵 and ❓ below are now fixed (fix pass, below).
+- Fix pass. Final gates, each run once after the last edit: `cargo make dod` exit 0 (Rust: 2595 passed, 0 failed across 25 test binaries and doctests; lua 651 passed, fingerprint gate 8 cases, pack text gates 4 passed), `cargo make claudevs-check` exit 0, `cargo make opencode-check` exit 0 (S3 to S8b ok), `cargo deny check` exit 0 (advisories ok, bans ok, licenses ok, sources ok), `cargo make book-build` exit 0 with no `[ERROR]` line.
+  - fixed: nothing failed if a pack or extension version went back to 0.x. `every_official_pack_and_extension_is_at_version_one_or_later` in crates/agentstacks-cli/tests/packs.rs reads every `packs/*/pack.toml` and `extensions/*/extension.toml` and asserts major >= 1 (it does not tie them to the crate version, and counts five packs and two extensions). Proof: `cargo test -p agentstacks-cli --test packs every_official` passed (1 passed); with `packs/core/pack.toml` set to `0.9.0` for one run it failed with `.../packs/core/pack.toml is below 1.0.0`, and the file was restored. The crate adds `toml` as a dev-dependency.
+  - fixed: book/src/ch06-01-extensions.md showed the claude extension at `version = "0.1.0"`; it now reads `1.0.0`. The same example also said `api = 0`, which api 1 refuses as legacy; it now says `api = 1`. Proof: `cargo make book-build` exit 0, no `[ERROR]` line.
+  - kept by design: `VERSION` drops pre-release parts of the package version, because semver has no const way to build them (spec F10). Nothing to change.
+
+## Deviations
+
+- 2026-11-25: The pinned official version was in crates/agentstacks/tests/opencode.rs:88 (`opencode_manifest_loads`), not packs.rs; updated to "1.0.0".

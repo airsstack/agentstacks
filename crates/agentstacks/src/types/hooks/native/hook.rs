@@ -186,7 +186,7 @@ mod tests {
             ),
             (
                 "kind = \"lua\"\nevent = \"E\"\nrun = \"hooks/x.lua\"\n[grants]\npolicy = \"pure\"\n",
-                "hooks[0].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
+                "hooks[0].grants.policy: \"pure\" is not supported in api 1 (airsl has no require under pure, airsstack/airsl#12)",
             ),
             (
                 "kind = \"lua\"\nevent = \"E\"\nrun = \"hooks/my.hook.lua\"\n",

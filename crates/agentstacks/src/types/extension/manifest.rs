@@ -11,12 +11,14 @@
 //! - A syntax error stops only this file and is its only diagnostic; empty text is an empty table,
 //!   so each missing field is refused by name.
 //! - It reads `[extension]` (`name`, `version`, `api`, `description`, `entry`, and the optional
-//!   `reads`) and refuses any other key at either level.
+//!   `reads`) and the optional `[requires]` table, which holds only `agentstacks`, a version
+//!   range; it refuses any other key at any of these levels.
 //! - `reads` lists the project files the extension may read. Each entry is a project-relative path
 //!   with no `..` segment and no `\`, kept as written; a path that repeats an earlier entry after
 //!   normalising is refused. agentstacks' own files are allowed there.
-//! - An `api` other than [`API`] is refused here and nowhere else: a refused manifest yields no
-//!   extension, so no later check sees it.
+//! - An `api` other than [`API`](crate::types::API) is refused here and nowhere else, as legacy
+//!   when it is the `0` of the `0.x` releases and as unsupported otherwise: a refused manifest
+//!   yields no extension, so no later check sees it.
 //!
 //! # Non-responsibilities
 //!
@@ -24,18 +26,20 @@
 
 use std::path::Path;
 
-use crate::types::api::API;
+use crate::types::api::{ApiCheck, check};
 use crate::types::extension::EntryPath;
 use crate::types::extension::error::ExtensionError;
 use crate::types::format::TomlFields;
 use crate::types::format::parse_toml_document;
 use crate::types::manifest::PackVersion;
+use crate::types::manifest::VersionRange;
 use crate::types::name::ToolName;
 use crate::types::project::InvalidSubPath;
 use crate::types::project::SubPath;
 use crate::types::report::Diagnostics;
 use crate::types::report::FieldError;
 use crate::types::report::FormatError;
+use crate::types::report::LegacyApi;
 use crate::types::report::ListedTwice;
 use crate::types::report::MustBeRelative;
 use crate::types::report::OutsideProject;
@@ -53,7 +57,7 @@ use crate::types::report::UnsupportedApi;
 /// let text = "[extension]\n\
 ///     name = \"claude\"\n\
 ///     version = \"0.1.0\"\n\
-///     api = 0\n\
+///     api = 1\n\
 ///     description = \"Renders packs into Claude Code project config\"\n\
 ///     entry = \"adapter.lua\"\n";
 /// let manifest = ExtensionManifest::parse(Path::new("extension.toml"), text)
@@ -71,6 +75,45 @@ pub struct ExtensionManifest {
     description: String,
     entry: EntryPath,
     reads: Vec<SubPath>,
+    requires: ExtensionRequires,
+}
+
+/// The `[requires]` table of an extension manifest, which holds only the agentstacks range.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use agentstacks::types::ExtensionManifest;
+///
+/// let text = "[extension]\n\
+///     name = \"claude\"\n\
+///     version = \"1.0.0\"\n\
+///     api = 1\n\
+///     description = \"Renders packs into Claude Code project config\"\n\
+///     entry = \"adapter.lua\"\n\
+///     [requires]\n\
+///     agentstacks = \">=1.0\"\n";
+/// let manifest = ExtensionManifest::parse(Path::new("extension.toml"), text)
+///     .map_err(|refusals| format!("{refusals:?}"))?;
+/// assert_eq!(
+///     manifest.requires().agentstacks().map(|range| range.written()),
+///     Some(">=1.0")
+/// );
+/// # Ok::<(), String>(())
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ExtensionRequires {
+    agentstacks: Option<VersionRange>,
+}
+
+impl ExtensionRequires {
+    /// The agentstacks range the extension needs, when it declares one; absent means any version.
+    #[must_use]
+    pub const fn agentstacks(&self) -> Option<&VersionRange> {
+        self.agentstacks.as_ref()
+    }
 }
 
 impl ExtensionManifest {
@@ -115,11 +158,17 @@ impl ExtensionManifest {
             }
         };
         let mut root = TomlFields::new(file, "", table);
-        root.refuse_unknown_keys(&["extension"]);
+        root.refuse_unknown_keys(&["extension", "requires"]);
         let read = root.table_or_empty("extension").map(|mut section| {
             let read = read_section(&mut section);
             root.absorb(section);
             read
+        });
+        let agentstacks = root.optional_table("requires").and_then(|mut table| {
+            let range = VersionRange::read::<ExtensionError>(&mut table, "agentstacks");
+            table.refuse_unknown_keys(&["agentstacks"]);
+            root.absorb(table);
+            range
         });
         let diagnostics = root.into_diagnostics();
         let Some(read) = read else {
@@ -142,6 +191,7 @@ impl ExtensionManifest {
                 description,
                 entry,
                 reads,
+                requires: ExtensionRequires { agentstacks },
             }),
             _ => Err(diagnostics),
         };
@@ -170,6 +220,13 @@ impl ExtensionManifest {
     #[must_use]
     pub const fn entry(&self) -> &EntryPath {
         &self.entry
+    }
+
+    /// What the extension requires; the same shape as a pack's
+    /// [`Requires`](crate::types::Requires), holding only the agentstacks range.
+    #[must_use]
+    pub const fn requires(&self) -> &ExtensionRequires {
+        &self.requires
     }
 
     /// The project files the extension may read, as written; empty when `reads` is absent.
@@ -202,8 +259,12 @@ fn read_section(section: &mut TomlFields) -> Section {
             .map_err(|error| section.refuse("version", ExtensionError::from(error)))
             .ok()
     });
-    if let Some(api) = section.required_integer("api").filter(|api| *api != API) {
-        section.refuse("api", ExtensionError::from(UnsupportedApi::new(api)));
+    match section.required_integer("api").map(check) {
+        Some(ApiCheck::Legacy) => section.refuse("api", ExtensionError::from(LegacyApi)),
+        Some(ApiCheck::Unsupported(found)) => {
+            section.refuse("api", ExtensionError::from(UnsupportedApi::new(found)));
+        }
+        Some(ApiCheck::Current) | None => {}
     }
     let description = section.required_text("description");
     let entry = section.required_text("entry").and_then(|text| {
@@ -267,6 +328,7 @@ fn check_read(text: &str) -> Result<SubPath, FormatError> {
 mod tests {
     use super::*;
     use crate::types::project::SubPath;
+    use crate::types::report::Diagnostic;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -275,7 +337,7 @@ mod tests {
     const EXAMPLE: &str = "[extension]\n\
         name        = \"claude\"\n\
         version     = \"0.1.0\"\n\
-        api         = 0\n\
+        api         = 1\n\
         description = \"Renders packs into Claude Code project config\"\n\
         entry       = \"adapter.lua\"\n";
 
@@ -552,16 +614,26 @@ mod tests {
     }
 
     #[test]
-    fn extension_manifest_refuses_api_other_than_zero() {
-        for api in [1, -1] {
+    fn extension_manifest_refuses_api_other_than_one() {
+        for api in [2, -1] {
             assert_eq!(
                 parse(&with_line("api", &format!("api = {api}"))),
                 [format!(
-                    "extension.toml: extension.api: {api} not supported (this agentstacks speaks 0)"
+                    "extension.toml: extension.api: {api} not supported (this agentstacks speaks 1)"
                 )],
                 "{api}"
             );
         }
+    }
+
+    #[test]
+    fn extension_manifest_refuses_api_zero_as_legacy() {
+        assert_eq!(
+            parse(&with_line("api", "api = 0")),
+            [
+                "extension.toml: extension.api: 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)"
+            ]
+        );
     }
 
     #[test]
@@ -608,7 +680,7 @@ mod tests {
             [extension]\n\
             name = \"Claude\"\n\
             version = \"1.2\"\n\
-            api = 1\n\
+            api = 2\n\
             description = \"d\"\n\
             entry = \"adapter.js\"\n";
         let mut shown = parse(text);
@@ -617,7 +689,7 @@ mod tests {
             "extension.toml: foo: unknown key".to_owned(),
             "extension.toml: extension.name: \"Claude\" is not a valid name".to_owned(),
             "extension.toml: extension.version: \"1.2\" is not semver".to_owned(),
-            "extension.toml: extension.api: 1 not supported (this agentstacks speaks 0)".to_owned(),
+            "extension.toml: extension.api: 2 not supported (this agentstacks speaks 1)".to_owned(),
             "extension.toml: extension.entry: \"adapter.js\" is not a .lua file".to_owned(),
         ];
         expected.sort();
@@ -647,5 +719,105 @@ mod tests {
         assert_eq!(shown(result).len(), 1);
         assert!(entry.is_none());
         Ok(())
+    }
+
+    const REQUIRES_FILE: &str = "ext/mytool/extension.toml";
+
+    fn parse_requires(text: &str) -> Vec<String> {
+        shown(ExtensionManifest::parse(Path::new(REQUIRES_FILE), text))
+    }
+
+    #[test]
+    fn documented_examples_parse() -> TestResult {
+        let text = "[extension]\n\
+            name        = \"mytool\"\n\
+            version     = \"1.0.0\"\n\
+            api         = 1\n\
+            description = \"Renders packs into mytool project config\"\n\
+            entry       = \"adapter.lua\"\n\
+            \n\
+            [requires]\n\
+            agentstacks = \">=1.0\"\n";
+        let manifest = ExtensionManifest::parse(Path::new(REQUIRES_FILE), text)
+            .map_err(|d| format!("{d:?}"))?;
+        assert_eq!(
+            manifest.requires().agentstacks().map(ToString::to_string),
+            Some(">=1.0".to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extension_requires_absent_accepts_any() -> TestResult {
+        let manifest =
+            ExtensionManifest::parse(Path::new(FILE), EXAMPLE).map_err(|d| format!("{d:?}"))?;
+        assert!(manifest.requires().agentstacks().is_none());
+        let with_empty = format!("{EXAMPLE}[requires]\n");
+        let manifest =
+            ExtensionManifest::parse(Path::new(FILE), &with_empty).map_err(|d| format!("{d:?}"))?;
+        assert!(manifest.requires().agentstacks().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn extension_requires_unknown_key() {
+        assert_eq!(
+            parse_requires(&format!("{EXAMPLE}[requires]\nfoo = 1\n")),
+            ["ext/mytool/extension.toml: requires.foo: unknown key"]
+        );
+    }
+
+    #[test]
+    fn extension_requires_not_a_table() {
+        assert_eq!(
+            parse_requires(&format!("requires = \"x\"\n{EXAMPLE}")),
+            ["ext/mytool/extension.toml: requires: expected table, got string"]
+        );
+    }
+
+    #[test]
+    fn extension_requires_refuses_a_bad_agentstacks_range() {
+        for text in ["", "   ", "nope"] {
+            assert_eq!(
+                parse_requires(&format!("{EXAMPLE}[requires]\nagentstacks = \"{text}\"\n")),
+                [format!(
+                    "ext/mytool/extension.toml: requires.agentstacks: \"{text}\" is not a version range"
+                )],
+                "{text:?}"
+            );
+        }
+        assert_eq!(
+            parse_requires(&format!("{EXAMPLE}[requires]\nagentstacks = 1\n")),
+            ["ext/mytool/extension.toml: requires.agentstacks: expected string, got integer"]
+        );
+    }
+
+    #[test]
+    fn extension_requires_bad_range_is_an_extension_error() -> TestResult {
+        let text = format!("{EXAMPLE}[requires]\nagentstacks = \"nope\"\n");
+        let refused = ExtensionManifest::parse(Path::new(FILE), &text)
+            .err()
+            .ok_or("a bad range is refused")?
+            .into_sorted();
+        assert!(matches!(
+            refused.first().map(Diagnostic::error),
+            Some(FormatError::Extension(ExtensionError::Range(_)))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn extension_requires_range_is_one_refusal_among_others() {
+        let text = format!(
+            "{}\n[requires]\nagentstacks = \"nope\"\n",
+            with_line("name", "name = \"Claude\"")
+        );
+        assert_eq!(
+            parse_requires(&text),
+            [
+                "ext/mytool/extension.toml: extension.name: \"Claude\" is not a valid name",
+                "ext/mytool/extension.toml: requires.agentstacks: \"nope\" is not a version range",
+            ]
+        );
     }
 }

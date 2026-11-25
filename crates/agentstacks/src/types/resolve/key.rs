@@ -7,8 +7,8 @@
 //! # Responsibilities
 //!
 //! - [`SourceKey`] is a pack name or a tool name, displayed as the key path of its entry.
-//! - [`SourceKey::location`] and [`SourceKey::subdir_location`] are where a refusal about the entry,
-//!   or about its `subdir`, is reported.
+//! - [`SourceKey::location`] and [`SourceKey::subdir_location`] are where a refusal about the
+//!   entry, or about its `subdir`, is reported.
 //! - It orders packs before tools, and by name within each, so a map keyed by it lists `packs.*`
 //!   first and then `tools.*`.
 //!
@@ -20,10 +20,8 @@ use std::fmt;
 
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
+use crate::types::project::PROJECT_FILE;
 use crate::types::report::Location;
-
-/// The file every location here points into.
-const PROJECT_FILE: &str = "agentstacks.toml";
 
 /// The key of a pack or tool entry.
 ///

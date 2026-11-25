@@ -11,8 +11,8 @@
 //!
 //! - [`ExtensionError`] has a variant per extension refusal, each displaying exactly the message
 //!   the author reads after the location.
-//! - It wraps the name and version errors transparently, so a bad extension name or version reads
-//!   the same as a bad one anywhere else.
+//! - It wraps the name, version and version-range errors transparently, so a bad extension name,
+//!   version or `requires.agentstacks` reads the same as a bad one anywhere else.
 //! - It words the symlink refusal for an extension, which the directory walker words for a pack.
 //! - It words the refusals of a `reads` entry: absolute, outside the project, repeated, or written
 //!   with a backslash; the shared phrases are wrapped transparently.
@@ -24,9 +24,11 @@
 //! failure and the walker's other refusals are not variants here:
 //! [`FormatError`](crate::types::FormatError) carries them.
 
+use crate::types::manifest::InvalidRange;
 use crate::types::manifest::InvalidVersion;
 use crate::types::name::InvalidName;
 use crate::types::report::DoesNotExist;
+use crate::types::report::LegacyApi;
 use crate::types::report::ListedTwice;
 use crate::types::report::MustBeRelative;
 use crate::types::report::NotLuaFile;
@@ -65,9 +67,15 @@ pub enum ExtensionError {
     /// A `version` that is not semver.
     #[error(transparent)]
     Version(#[from] InvalidVersion),
+    /// A `requires.agentstacks` that is not a version range, or whose operator is not supported.
+    #[error(transparent)]
+    Range(#[from] InvalidRange),
     /// An `api` this agentstacks does not speak.
     #[error(transparent)]
     UnsupportedApi(#[from] UnsupportedApi),
+    /// An `api` written for the `0.x` releases.
+    #[error(transparent)]
+    LegacyApi(#[from] LegacyApi),
     /// An `entry` that is absolute or climbs out of the extension.
     #[error("\"{text}\" must stay inside the extension")]
     EntryOutside {
@@ -121,8 +129,16 @@ mod tests {
                 "\"1.2\" is not semver",
             ),
             (
-                ExtensionError::from(UnsupportedApi::new(1)),
-                "1 not supported (this agentstacks speaks 0)",
+                ExtensionError::from(InvalidRange::NotVersionRange { text: text() }),
+                "\"adapter.lua\" is not a version range",
+            ),
+            (
+                ExtensionError::from(UnsupportedApi::new(2)),
+                "2 not supported (this agentstacks speaks 1)",
+            ),
+            (
+                ExtensionError::from(LegacyApi),
+                "0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)",
             ),
             (
                 ExtensionError::EntryOutside { text: text() },

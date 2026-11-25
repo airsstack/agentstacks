@@ -4,7 +4,8 @@
 //!
 //! - [`diff_lines`] is the unified diff of an updated shared file.
 //! - [`doctor_text`] is the doctor report.
-//! - [`update_text`] is the update list, and [`has_newer`] says whether it names a newer tag.
+//! - [`update_text`] is the update list, and [`has_newer`] says whether it moves the `api` or names
+//!   a newer tag.
 //! - [`plan_text`] is the plan, [`nothing_to_change`] says when it has nothing to apply, and
 //!   [`written_and_deleted`] counts what applying it writes and deletes.
 //!

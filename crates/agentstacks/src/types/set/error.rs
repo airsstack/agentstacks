@@ -23,8 +23,8 @@
 
 use std::fmt::{self, Display};
 
-use crate::types::manifest::AirslReq;
 use crate::types::manifest::PackVersion;
+use crate::types::manifest::VersionRange;
 use crate::types::name::OptionName;
 use crate::types::name::PackName;
 use crate::types::name::ToolName;
@@ -36,7 +36,7 @@ use crate::types::tokens::Token;
 /// # Examples
 ///
 /// ```
-/// use agentstacks::types::{AirslReq, PackName, SetError};
+/// use agentstacks::types::{PackName, SetError, VersionRange};
 ///
 /// let unlisted = SetError::RequiresUnlisted {
 ///     pack: PackName::new("sdlc")?,
@@ -49,8 +49,8 @@ use crate::types::tokens::Token;
 ///
 /// let disjoint = SetError::AirslDisjoint {
 ///     needs: vec![
-///         (PackName::new("core")?, AirslReq::new(">=0.2")?),
-///         (PackName::new("sdlc")?, AirslReq::new("<0.2")?),
+///         (PackName::new("core")?, VersionRange::new(">=0.2")?),
+///         (PackName::new("sdlc")?, VersionRange::new("<0.2")?),
 ///     ],
 /// };
 /// assert_eq!(disjoint.to_string(), "airsl: core needs >=0.2, sdlc needs <0.2");
@@ -140,7 +140,7 @@ pub enum SetError {
     #[error("airsl: {}", Needs(needs))]
     AirslDisjoint {
         /// Each pack that declares a range, in name order, with the range.
-        needs: Vec<(PackName, AirslReq)>,
+        needs: Vec<(PackName, VersionRange)>,
     },
     /// An installed airsl outside the ranges the packs need.
     #[error("airsl {installed} installed, packs need {}", Joined { items: ranges, separator: ", " })]
@@ -148,7 +148,7 @@ pub enum SetError {
         /// The installed version.
         installed: PackVersion,
         /// Each declared range, in pack name order, as written.
-        ranges: Vec<AirslReq>,
+        ranges: Vec<VersionRange>,
     },
 }
 
@@ -171,7 +171,7 @@ impl<T: Display> Display for Joined<'_, T> {
 }
 
 /// `<pack> needs <range>` for each pack, joined by `, `.
-struct Needs<'a>(&'a [(PackName, AirslReq)]);
+struct Needs<'a>(&'a [(PackName, VersionRange)]);
 
 impl Display for Needs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -204,8 +204,8 @@ mod tests {
         names.iter().map(|name| pack(name)).collect()
     }
 
-    fn range(text: &str) -> Result<AirslReq, Box<dyn Error>> {
-        Ok(AirslReq::new(text)?)
+    fn range(text: &str) -> Result<VersionRange, Box<dyn Error>> {
+        Ok(VersionRange::new(text)?)
     }
 
     fn token(text: &str) -> Result<Token, Box<dyn Error>> {

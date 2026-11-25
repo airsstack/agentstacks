@@ -147,7 +147,7 @@ fn against_lock<N>(source: &Source, locked: &LockedEntry<N>) -> Reconciled {
 /// use agentstacks::types::ProjectFile;
 /// use agentstacks::types::resolve::{Reconciled, reconcile};
 ///
-/// let text = "api = 0\n\
+/// let text = "api = 1\n\
 ///     [tools.claude]\n\
 ///     path = \"extensions/claude\"\n\
 ///     [packs.core]\n\
@@ -326,7 +326,7 @@ mod tests {
     }
 
     fn project(tools: &str, packs: &str) -> Result<ProjectFile, Box<dyn std::error::Error>> {
-        let text = format!("api = 0\n{tools}{packs}");
+        let text = format!("api = 1\n{tools}{packs}");
         ProjectFile::parse(Path::new("agentstacks.toml"), &text)
             .map_err(|refusals| format!("{refusals:?}").into())
     }

@@ -26,13 +26,12 @@ use crate::types::extension::Extension;
 use crate::types::name::{PackName, ToolName};
 use crate::types::pack::Pack;
 use crate::types::plan::StepError;
-use crate::types::project::{GitUrl, Pin, ProjectError, Source, SubPath, render_project};
+use crate::types::project::{
+    GitUrl, PROJECT_FILE, Pin, ProjectError, Source, SubPath, render_project,
+};
 use crate::types::report::{Diagnostic, Diagnostics, FormatError, Location};
 use crate::types::resolve::{FetchError, latest_tag};
 use crate::types::shorthand::{Argument, Flag, TAG_PREFIX, classify};
-
-/// The project file, the file the refusals of the file itself are located in.
-const PROJECT_FILE: &str = "agentstacks.toml";
 
 /// The location of refusals that belong to no argument and no file: `init` itself.
 const INIT: &str = "init";
@@ -297,7 +296,7 @@ mod tests {
 
     fn pack_tree(root: &str, name: &str) -> FakeFileTree {
         let identity = format!(
-            "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n"
+            "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n"
         );
         FakeFileTree::new(root)
             .file("pack.toml", identity.as_bytes())
@@ -309,7 +308,7 @@ mod tests {
 
     fn extension_tree(root: &str, name: &str) -> FakeFileTree {
         let manifest = format!(
-            "[extension]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"adapter.lua\"\n"
+            "[extension]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\n"
         );
         FakeFileTree::new(root)
             .file("extension.toml", manifest.as_bytes())
@@ -346,7 +345,7 @@ mod tests {
 
     #[test]
     fn init_refuses_an_existing_project_file() -> TestResult {
-        let workspace = FakeWorkspace::new().project("api = 0\n");
+        let workspace = FakeWorkspace::new().project("api = 1\n");
         let result = init(
             &workspace,
             &git()?,

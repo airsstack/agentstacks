@@ -1,11 +1,12 @@
 //! The sandbox policy a pack hook runs under.
 //!
-//! It is its own enum so that `trusted` is unrepresentable for a pack hook: a closed type makes that
-//! a fact of the type instead of a check every reader repeats.
+//! It is its own enum so that `trusted` is unrepresentable for a pack hook: a closed type makes
+//! that a fact of the type instead of a check every reader repeats.
 //!
 //! # Responsibilities
 //!
-//! - [`Policy`] is `confined`, the only policy api 0 allows, and the default. The airsl policy
+//! - [`Policy`] is `confined`, the only policy the supported [`API`](crate::types::API) allows,
+//!   and the default. The airsl policy
 //!   `trusted` is deliberately not representable, because a pack hook may not run with it, and
 //!   `pure` is refused because airsl has no `require` under it.
 //!
@@ -90,7 +91,7 @@ impl TryFrom<&str> for Policy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Diagnostic, Location, ManifestError};
+    use crate::types::{API, Diagnostic, Location, ManifestError};
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -103,12 +104,14 @@ mod tests {
     }
 
     #[test]
-    fn policy_refuses_pure_in_api_0() -> TestResult {
+    fn pure_policy_refusal_names_api_one() -> TestResult {
         let error = Policy::new("pure").err().ok_or("expected a refusal")?;
         let location = Location::at_key("packs/core/pack.toml", "hooks[1].grants.policy");
         assert_eq!(
             Diagnostic::new(location, ManifestError::from(error)).to_string(),
-            "packs/core/pack.toml: hooks[1].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)"
+            format!(
+                "packs/core/pack.toml: hooks[1].grants.policy: \"pure\" is not supported in api {API} (airsl has no require under pure, airsstack/airsl#12)"
+            )
         );
         Ok(())
     }

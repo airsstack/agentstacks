@@ -18,6 +18,10 @@
 //! - [`DoesNotExist`]: `"<text>" does not exist`.
 //! - [`UnsupportedApi`]: `<found> not supported (this agentstacks speaks <API>)`. A format whose
 //!   message starts with `api` puts the word in front in its own variant.
+//! - [`LegacyApi`]: `0 is from agentstacks 0.x (this agentstacks speaks <API>; set api = <API>, or
+//!   use a newer release of it)`, for a pack or extension file written for the `0.x` releases.
+//! - [`LegacyProject`]: `api 0 is from agentstacks 0.x (run agentstacks update)`, for a project
+//!   file written for the `0.x` releases.
 //!
 //! # Non-responsibilities
 //!
@@ -26,7 +30,7 @@
 
 use std::fmt::{self, Display};
 
-use crate::types::api::API;
+use crate::types::api::{API, LEGACY_API};
 
 /// The bare phrase of a path that climbs out of the project, for a refusal that names no value.
 pub(in crate::types) const OUTSIDE_PROJECT: &str = "must stay inside the project";
@@ -154,6 +158,29 @@ impl UnsupportedApi {
     }
 }
 
+/// The legacy `api` of a pack or extension file: `0 is from agentstacks 0.x (this agentstacks
+/// speaks <API>; set api = <API>, or use a newer release of it)`.
+///
+/// A format whose message starts with `api` puts the word in front in its own variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LegacyApi;
+
+impl Display for LegacyApi {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{LEGACY_API} is from agentstacks 0.x (this agentstacks speaks {API}; set api = {API}, or use a newer release of it)"
+        )
+    }
+}
+
+impl std::error::Error for LegacyApi {}
+
+/// The legacy `api` of a project file: `api 0 is from agentstacks 0.x (run agentstacks update)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("api {} is from agentstacks 0.x (run agentstacks update)", LEGACY_API)]
+pub struct LegacyProject;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,11 +246,27 @@ mod tests {
 
     #[test]
     fn unsupported_api_names_the_found_and_the_spoken_api() {
-        let refusal = UnsupportedApi::new(1);
+        let refusal = UnsupportedApi::new(2);
         assert_eq!(
             refusal.to_string(),
-            "1 not supported (this agentstacks speaks 0)"
+            "2 not supported (this agentstacks speaks 1)"
         );
-        assert_eq!(refusal.found(), 1);
+        assert_eq!(refusal.found(), 2);
+    }
+
+    #[test]
+    fn legacy_phrase_names_api_one() {
+        assert_eq!(
+            LegacyApi.to_string(),
+            "0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)"
+        );
+    }
+
+    #[test]
+    fn legacy_project_names_update() {
+        assert_eq!(
+            LegacyProject.to_string(),
+            "api 0 is from agentstacks 0.x (run agentstacks update)"
+        );
     }
 }

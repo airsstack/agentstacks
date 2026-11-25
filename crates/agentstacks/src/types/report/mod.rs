@@ -45,6 +45,10 @@ pub use parser::ParserMessage;
 #[doc(inline)]
 pub use phrase::DoesNotExist;
 #[doc(inline)]
+pub use phrase::LegacyApi;
+#[doc(inline)]
+pub use phrase::LegacyProject;
+#[doc(inline)]
 pub use phrase::ListedTwice;
 #[doc(inline)]
 pub use phrase::MustBeRelative;

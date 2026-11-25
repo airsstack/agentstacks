@@ -109,7 +109,7 @@ mod tests {
                 ContentHash::of_bytes(bytes)
             )
         });
-        std::iter::once("api = 0\n".to_owned())
+        std::iter::once("api = 1\n".to_owned())
             .chain(airsl_table)
             .chain([pack])
             .chain(file_tables)
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn doctor_reports_the_lock_refusals() {
-        let workspace = FakeWorkspace::new().lock("api = 0\n[[merge]]\nx = 1\n");
+        let workspace = FakeWorkspace::new().lock("api = 1\n[[merge]]\nx = 1\n");
         let found = run(&workspace, &FakeBinary::new());
         assert!(
             found.contains(&"agentstacks.lock: merge: unknown key".to_owned()),
@@ -166,6 +166,19 @@ mod tests {
             found,
             ["agentstacks.lock: file[0].path: \"a\\b\" must use / as the separator"]
         );
+    }
+
+    #[test]
+    fn legacy_lock_reports_like_a_current_one() -> TestResult {
+        let legacy = lock_text(None, &[(X, LOCKED)]).replacen("api = 1", "api = 0", 1);
+        assert!(legacy.starts_with("api = 0\n"));
+        let workspace = FakeWorkspace::new().lock(&legacy).file(&path(X)?, LOCKED);
+        assert!(run(&workspace, &FakeBinary::new()).is_empty());
+        let edited = FakeWorkspace::new()
+            .lock(&legacy)
+            .file(&path(X)?, b"edited");
+        assert_eq!(run(&edited, &FakeBinary::new()), ["changed: .claude/x"]);
+        Ok(())
     }
 
     #[test]

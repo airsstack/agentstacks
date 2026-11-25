@@ -1,11 +1,11 @@
 //! The five official packs installed together through the real `agentstacks` binary.
 //!
-//! Each install test copies the repository's `packs/`, `extensions/claude` and `extensions/opencode`
-//! into a temporary git project, runs `init` for all five packs on one tool or on both and checks
-//! the result; the unit tests at the end only cover the version parse. Nothing here proves a rule
-//! on its own: the rules are proven in the library and the Lua tests, and these runs show that the
-//! packs install side by side, that every rendered hook runs under its prefixed module name, and
-//! that no rendered file keeps unconverted pack syntax.
+//! Each install test copies the repository's `packs/`, `extensions/claude` and
+//! `extensions/opencode` into a temporary git project, runs `init` for all five packs on one tool
+//! or on both and checks the result; the unit tests at the end only cover the version parse.
+//! Nothing here proves a rule on its own: the rules are proven in the library and the Lua tests,
+//! and these runs show that the packs install side by side, that every rendered hook runs under its
+//! prefixed module name, and that no rendered file keeps unconverted pack syntax.
 
 use std::error::Error;
 use std::fs;
@@ -221,9 +221,9 @@ fn hook_command(
 /// Pipes `event` into a rendered hook `command` the way Claude Code runs it: from a shell, with
 /// `CLAUDE_PROJECT_DIR` set and the event on stdin. `home` is the `AIRSSTACK_HOME` the hook sees.
 ///
-/// Returns the parsed reply, or `None` when the hook printed nothing. The runtime is fail-open, so a
-/// hook that cannot load its modules also exits 0 and prints nothing: a caller that expects output
-/// is what notices.
+/// Returns the parsed reply, or `None` when the hook printed nothing. The runtime is fail-open, so
+/// a hook that cannot load its modules also exits 0 and prints nothing: a caller that expects
+/// output is what notices.
 fn run_hook(
     root: &Path,
     home: &Path,
@@ -545,7 +545,8 @@ fn compaction_rearms_the_read_hook() -> TestResult {
 }
 
 /// Writes one handoff report that breaks the protocol, one that conforms and one that is a
-/// communication report breaking its protocol; returns the directory they sit in, relative to `root`.
+/// communication report breaking its protocol; returns the directory they sit in, relative to
+/// `root`.
 fn write_reports(root: &Path) -> Result<&'static str, Box<dyn Error>> {
     let rel = ".airsstack/cc/plugins/claudestacks/handoff/s";
     fs::create_dir_all(root.join(rel))?;
@@ -978,6 +979,57 @@ fn the_lua_gate_tests_the_packs_and_is_part_of_dod() -> TestResult {
         .find(|line| line.trim_start().starts_with("dependencies"))
         .ok_or("[tasks.dod] has no dependencies")?;
     assert!(dependencies.contains("\"lua\""), "{dependencies}");
+    Ok(())
+}
+
+/// The major version of the `version` the `table` table of the manifest at `path` declares.
+fn declared_major(path: &Path, table: &str) -> Result<u64, Box<dyn Error>> {
+    let manifest: toml::Table = fs::read_to_string(path)?.parse()?;
+    let version = manifest
+        .get(table)
+        .and_then(toml::Value::as_table)
+        .and_then(|found| found.get("version"))
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| format!("{}: no [{table}] version", path.display()))?;
+    let major = version.split('.').next().unwrap_or_default();
+    major.parse().map_err(|_| {
+        format!(
+            "{}: version \"{version}\" has no major number",
+            path.display()
+        )
+        .into()
+    })
+}
+
+/// The directories directly under `dir` of the repository root, sorted.
+fn repo_dirs(dir: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(dir);
+    let mut found = fs::read_dir(root)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    found.retain(|path| path.is_dir());
+    found.sort();
+    Ok(found)
+}
+
+#[test]
+fn every_official_pack_and_extension_is_at_version_one_or_later() -> TestResult {
+    let manifests = [
+        ("packs", "pack.toml", "pack"),
+        ("extensions", "extension.toml", "extension"),
+    ];
+    let mut checked = 0;
+    for (dir, file, table) in manifests {
+        for path in repo_dirs(dir)? {
+            let manifest = path.join(file);
+            let major = declared_major(&manifest, table)?;
+            assert!(major >= 1, "{} is below 1.0.0", manifest.display());
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 7, "five packs and two extensions");
     Ok(())
 }
 

@@ -65,7 +65,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::types::manifest::AirslReq;
+    use crate::types::manifest::VersionRange;
     use crate::types::name::PackName;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -75,7 +75,7 @@ mod tests {
     fn range(needs: &[(&str, &str)]) -> Result<AirslRange, Box<dyn std::error::Error>> {
         let mut listed = Vec::new();
         for (pack, req) in needs {
-            listed.push((PackName::new(pack)?, AirslReq::new(req)?));
+            listed.push((PackName::new(pack)?, VersionRange::new(req)?));
         }
         Ok(AirslRange::new(listed).ok_or("a pack declares a range")?)
     }

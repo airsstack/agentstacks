@@ -6,7 +6,8 @@
 //! # Responsibilities
 //!
 //! - [`Grants`] holds a hook's policy and the paths, environment variables and binaries it may
-//!   use. The policy is `confined`, the only one api 0 allows; nothing is granted by default.
+//!   use. The policy is `confined`, the only one the supported [`API`](crate::types::API) allows;
+//!   nothing is granted by default.
 //! - `Grants::read` reads a `grants` table. A read or write path must be absolute or start with
 //!   a `{{root}}`, `{{skill_dir}}` or `{{var}}` token; an environment variable must be a valid
 //!   name; an exec grant must be `airsl` or a binary the pack requires. An environment variable or
@@ -43,7 +44,7 @@ use crate::types::tokens::TokenKind;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]
@@ -79,7 +80,7 @@ use crate::types::tokens::TokenKind;
 /// [pack]
 /// name = "core"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Shared skills"
 ///
 /// [[hooks]]
@@ -356,7 +357,7 @@ mod tests {
             ),
             (
                 "policy = \"pure\"",
-                "hooks[1].grants.policy: \"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
+                "hooks[1].grants.policy: \"pure\" is not supported in api 1 (airsl has no require under pure, airsstack/airsl#12)",
             ),
         ];
         for (text, message) in cases {

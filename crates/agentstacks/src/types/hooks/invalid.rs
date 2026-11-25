@@ -8,14 +8,16 @@
 //!
 //! - [`InvalidHookEvent`]: a hook `event` outside the neutral vocabulary.
 //! - [`InvalidMatchValue`]: a `match` value outside the seven selector values.
-//! - [`InvalidPolicy`]: a `grants.policy` that is `pure`, which api 0 does not support, `trusted`,
-//!   which no pack hook may use, or that is no policy at all.
+//! - [`InvalidPolicy`]: a `grants.policy` that is `pure`, which the supported [`API`] does not
+//!   allow, `trusted`, which no pack hook may use, or that is no policy at all.
 //!
 //! # Non-responsibilities
 //!
 //! Tool-specific events belong to `native/<tool>/hooks.toml`, where the event is an opaque string,
 //! and turning a policy into airsl flags belongs to the extension host. The tests assert the exact
 //! `Display` text of every variant.
+
+use crate::types::api::API;
 
 /// An `event` that is none of the six neutral events.
 ///
@@ -101,9 +103,10 @@ pub enum InvalidPolicy {
         /// The refused text.
         text: String,
     },
-    /// The grant policy `pure`, which api 0 does not support.
+    /// The grant policy `pure`, which the supported [`API`] does not allow.
     #[error(
-        "\"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)"
+        "\"pure\" is not supported in api {} (airsl has no require under pure, airsstack/airsl#12)",
+        API
     )]
     PureUnsupported,
     /// A grant policy other than the one a pack hook may use.
@@ -139,17 +142,19 @@ mod tests {
                 InvalidPolicy::NotAllowed {
                     text: "trusted".to_owned(),
                 },
-                "\"trusted\" is not allowed for pack hooks",
+                "\"trusted\" is not allowed for pack hooks".to_owned(),
             ),
             (
                 InvalidPolicy::PureUnsupported,
-                "\"pure\" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)",
+                format!(
+                    "\"pure\" is not supported in api {API} (airsl has no require under pure, airsstack/airsl#12)"
+                ),
             ),
             (
                 InvalidPolicy::Unknown {
                     text: "foo".to_owned(),
                 },
-                "\"foo\" (expected confined)",
+                "\"foo\" (expected confined)".to_owned(),
             ),
         ];
         for (error, message) in cases {

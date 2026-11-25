@@ -6,8 +6,11 @@
 //!
 //! # Responsibilities
 //!
-//! - [`Requires`] holds the packs a pack depends on, the airsl range it needs, and the binaries it
-//!   needs on the machine, each already valid.
+//! - [`Requires`] holds the packs a pack depends on, the agentstacks and airsl ranges it needs, and
+//!   the binaries it needs on the machine, each already valid.
+//! - `agentstacks_too_new` reads only `requires.agentstacks` out of a manifest's text and
+//!   answers the refusal of a range that excludes a given agentstacks version, so a loader can
+//!   report it alone before anything else in the file is checked.
 //! - `Requires::read` reads the `[requires]` table. A pack name is refused when invalid, when
 //!   listed twice, and when it is the pack's own name; a binary is refused when invalid or listed
 //!   twice. Every refusal about one entry is located at its indexed key path
@@ -19,12 +22,19 @@
 //! airsl range, and whether the ranges of the set intersect belong to the checks over a loaded
 //! pack and over a whole set of packs.
 
+use std::path::Path;
+
+use semver::Version;
+
 use crate::types::format::TomlFields;
-use crate::types::manifest::AirslReq;
+use crate::types::format::parse_toml_document;
+use crate::types::manifest::VersionRange;
 use crate::types::manifest::error::ManifestError;
 use crate::types::name::BinaryName;
 use crate::types::name::PackName;
+use crate::types::report::Diagnostic;
 use crate::types::report::ListedTwice;
+use crate::types::report::Location;
 
 /// The `[requires]` table of a pack manifest.
 ///
@@ -39,12 +49,13 @@ use crate::types::report::ListedTwice;
 /// [pack]
 /// name = "sdlc"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Delivery skills"
 ///
 /// [requires]
 /// packs = ["core"]
 /// airsl = ">= 0.1.4"
+/// agentstacks = ">=1.0"
 /// binaries = ["git"]
 /// "#;
 /// let manifest = PackManifest::parse(Path::new("packs/sdlc/pack.toml"), text)
@@ -52,6 +63,7 @@ use crate::types::report::ListedTwice;
 /// let requires = manifest.requires();
 /// assert_eq!(requires.packs().len(), 1);
 /// assert_eq!(requires.airsl().map(|range| range.written()), Some(">= 0.1.4"));
+/// assert_eq!(requires.agentstacks().map(|range| range.written()), Some(">=1.0"));
 /// assert_eq!(requires.binaries().len(), 1);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -67,7 +79,7 @@ use crate::types::report::ListedTwice;
 /// [pack]
 /// name = "sdlc"
 /// version = "1.0.0"
-/// api = 0
+/// api = 1
 /// description = "Delivery skills"
 ///
 /// [requires]
@@ -86,8 +98,32 @@ use crate::types::report::ListedTwice;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Requires {
     packs: Vec<PackName>,
-    airsl: Option<AirslReq>,
+    agentstacks: Option<VersionRange>,
+    airsl: Option<VersionRange>,
     binaries: Vec<BinaryName>,
+}
+
+/// The refusal of a `requires.agentstacks` in `text` that excludes the `running` agentstacks, or
+/// `None` when `text` is not valid TOML, has no such key, holds a value that is not a range, or
+/// holds a range that matches `running`. Those other cases are refused by the manifest parser.
+pub(in crate::types) fn agentstacks_too_new(
+    file: &Path,
+    text: &str,
+    running: &Version,
+) -> Option<Diagnostic> {
+    let table = parse_toml_document(file, text).ok()?;
+    let written = table.get("requires")?.get("agentstacks")?.as_str()?;
+    let range = VersionRange::new(written).ok()?;
+    if range.as_version_req().matches(running) {
+        return None;
+    }
+    Some(Diagnostic::new(
+        Location::at_key(file, "requires.agentstacks"),
+        ManifestError::TooNew {
+            range: Box::new(range),
+            version: running.clone(),
+        },
+    ))
 }
 
 impl Requires {
@@ -111,15 +147,8 @@ impl Requires {
                 }
             }
         }
-        let airsl = fields
-            .optional_string("airsl")
-            .and_then(|text| match AirslReq::new(&text) {
-                Ok(req) => Some(req),
-                Err(error) => {
-                    fields.refuse("airsl", ManifestError::from(error));
-                    None
-                }
-            });
+        let airsl = VersionRange::read::<ManifestError>(fields, "airsl");
+        let agentstacks = VersionRange::read::<ManifestError>(fields, "agentstacks");
         let mut binaries: Vec<BinaryName> = Vec::new();
         for (index, text) in fields.optional_string_list("binaries").unwrap_or_default() {
             let item_path = fields.item_path("binaries", index);
@@ -131,9 +160,10 @@ impl Requires {
                 Ok(name) => binaries.push(name),
             }
         }
-        fields.refuse_unknown_keys(&["packs", "airsl", "binaries"]);
+        fields.refuse_unknown_keys(&["packs", "agentstacks", "airsl", "binaries"]);
         Self {
             packs,
+            agentstacks,
             airsl,
             binaries,
         }
@@ -145,9 +175,15 @@ impl Requires {
         &self.packs
     }
 
+    /// The agentstacks range this pack needs, when it declares one; absent means any version.
+    #[must_use]
+    pub const fn agentstacks(&self) -> Option<&VersionRange> {
+        self.agentstacks.as_ref()
+    }
+
     /// The airsl range this pack needs, when it declares one.
     #[must_use]
-    pub const fn airsl(&self) -> Option<&AirslReq> {
+    pub const fn airsl(&self) -> Option<&VersionRange> {
         self.airsl.as_ref()
     }
 
@@ -184,6 +220,39 @@ mod tests {
             .map(ToString::to_string)
             .collect();
         Ok((requires, shown))
+    }
+
+    fn excluded(text: &str, running: &Version) -> Option<String> {
+        agentstacks_too_new(Path::new(FILE), text, running).map(|found| found.to_string())
+    }
+
+    #[test]
+    fn agentstacks_too_new_words_the_refusal() {
+        assert_eq!(
+            excluded("[requires]\nagentstacks = \">=1.3\"\n", &Version::new(1, 0, 0)),
+            Some(
+                "packs/sdlc/pack.toml: requires.agentstacks: \">=1.3\" does not match agentstacks 1.0.0 (install a newer agentstacks)"
+                    .to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn agentstacks_too_new_is_silent_unless_a_valid_range_excludes() {
+        let running = Version::new(1, 0, 0);
+        for text in [
+            "[requires]\nagentstacks = \">=1.0\"\n",
+            "[requires]\nagentstacks = \"*\"\n",
+            "[requires]\nairsl = \">=99\"\n",
+            "[requires]\nagentstacks = \"nope\"\n",
+            "[requires]\nagentstacks = 3\n",
+            "requires = \"x\"\n",
+            "[pack]\nname = \"a\"\n",
+            "agentstacks = \">=99\"\na = [1,",
+            "",
+        ] {
+            assert_eq!(excluded(text, &running), None, "{text:?}");
+        }
     }
 
     #[test]
@@ -252,6 +321,41 @@ mod tests {
             let (_, shown) = read(text, Some(&own))?;
             assert_eq!(shown, [message], "{text}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn requires_agentstacks_absent_accepts() -> TestResult {
+        let (requires, shown) = read("airsl = \">=0.1.4\"\n", None)?;
+        assert!(shown.is_empty(), "{shown:?}");
+        assert!(requires.agentstacks().is_none());
+
+        let (requires, shown) = read("agentstacks = \">=1.0\"\n", None)?;
+        assert!(shown.is_empty(), "{shown:?}");
+        assert_eq!(
+            requires.agentstacks().map(ToString::to_string),
+            Some(">=1.0".to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn agentstacks_range_messages_match_airsl() -> TestResult {
+        for text in ["", "   ", "nope"] {
+            let (_, shown) = read(&format!("agentstacks = \"{text}\""), None)?;
+            assert_eq!(
+                shown,
+                [format!(
+                    "packs/sdlc/pack.toml: requires.agentstacks: \"{text}\" is not a version range"
+                )],
+                "{text:?}"
+            );
+        }
+        let (_, shown) = read("agentstacks = 1", None)?;
+        assert_eq!(
+            shown,
+            ["packs/sdlc/pack.toml: requires.agentstacks: expected string, got integer"]
+        );
         Ok(())
     }
 }

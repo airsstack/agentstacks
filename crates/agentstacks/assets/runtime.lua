@@ -1,4 +1,4 @@
--- agentstacks hook runtime, api 0.
+-- agentstacks hook runtime, api 1.
 -- usage: airsl run ... runtime.lua <hook-module> <may_block: 0|1> <kind: neutral|native> [args...]
 local translate = require("translate")
 local name, may_block, kind = arg[1], arg[2] == "1", arg[3]

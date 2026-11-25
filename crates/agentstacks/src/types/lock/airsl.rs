@@ -39,7 +39,7 @@ use crate::types::report::Location;
 ///
 /// let manifest = PackManifest::parse(
 ///     Path::new("packs/core/pack.toml"),
-///     "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\
+///     "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\
 ///      [requires]\nairsl = \">=0.1.4\"\n",
 /// )
 /// .map_err(|refusals| format!("{refusals:?}"))?;
@@ -82,7 +82,7 @@ mod tests {
 
     fn manifest(requires: &str) -> Result<PackManifest, Box<dyn std::error::Error>> {
         let text = format!(
-            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n{requires}"
+            "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n{requires}"
         );
         PackManifest::parse(Path::new("packs/core/pack.toml"), &text).map_err(|diagnostics| {
             let shown: Vec<String> = diagnostics

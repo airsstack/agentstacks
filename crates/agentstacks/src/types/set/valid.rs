@@ -37,7 +37,7 @@ use crate::types::set::airsl::AirslRange;
 /// use agentstacks::types::{Extension, OptionName, Pack, PackName, ProjectFile, check_pack_set};
 ///
 /// let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
-/// let text = "api = 0\n\
+/// let text = "api = 1\n\
 ///     [tools.claude]\n\
 ///     path = \"extensions/claude\"\n\
 ///     [packs.core]\n\

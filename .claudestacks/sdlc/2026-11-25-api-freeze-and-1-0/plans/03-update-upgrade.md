@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: c187d693fbea
@@ -87,3 +87,22 @@ crates/agentstacks-cli/tests/commands.rs         — modify: update of a 0.x pro
 
 - `cargo make dod` is green.
 - The api-0 gate of plan 01 ("Kept lines") prints only kept lines.
+
+## Review findings
+
+- Task 1 (reviewer, handoff 20261125-174220-4854/19-reviewer-batchC.md): 0🔴, blocking none; batch gate `cargo make dod` exit 0. The open 🔵 below are now fixed (fix pass, below).
+- Task 2 (reviewer, handoff 20261125-174220-4854/22-reviewer-batchD.md): 0🔴, blocking none; batch gate `cargo make dod` exit 0 (1717 lib tests). One re-read, one write, refusal writes nothing, api line first: each holds and has a test. The open 🟡 and 🔵 below are now fixed (fix pass, below).
+- Fix pass. Final gates, each run once after the last edit: `cargo make dod` exit 0 (Rust: 2595 passed, 0 failed across 25 test binaries and doctests; lua 651 passed, fingerprint gate 8 cases, pack text gates 4 passed), `cargo make claudevs-check` exit 0, `cargo make opencode-check` exit 0 (S3 to S8b ok), `cargo deny check` exit 0 (advisories ok, bans ok, licenses ok, sources ok), `cargo make book-build` exit 0 with no `[ERROR]` line.
+  - fixed: the `ProjectError::ApiChanged` doc said "other than the legacy `0`"; it now says the `api` is missing, not an integer, or another number.
+  - fixed: doc lines over 100 columns in upgrade.rs, project/mod.rs and every other `.rs` file this change touched are wrapped. Proof: a scan of `//!` and `///` lines over 100 characters in the files `git diff 41799a9 --name-only` lists finds only the three doctest code lines of hooks/grants.rs:100 and hooks/native/file.rs:74 and :82.
+  - fixed: `PROJECT_FILE` was copied in about ten modules; `types::project::PROJECT_FILE` is now the one constant, used by app/{init,update,plan/*}.rs, fs/workspace/project.rs, project/{retag,upgrade}.rs, resolve/key.rs, plan/airsl.rs, and the own-files lists of op/path.rs and lock/entry/written.rs. Proof: `git grep -nE 'const PROJECT_FILE' -- crates` prints only project/file.rs; the test helper in set/testing.rs re-exports it. The test-local `const PROJECT` in the op/airsl.rs tests keeps its own literal.
+  - fixed: the TOML-parse closure copied between retag.rs and upgrade.rs is one `parse_document` in the new types/project/document.rs, with its own tests.
+  - fixed: `Update::api_moves: bool` is `Update::api: ApiCheck` (the project's `api`, never `Unsupported` because `update` refuses it); `rewrite`, show/update.rs and command/update.rs match `ApiCheck::Legacy`. The text and exit codes are unchanged (the `update_text_puts_api_first` and `update_legacy_with_no_tag_does_not_say_nothing` tests assert the same output).
+  - fixed: the test-only `retag` shim is dropped; the tests call `rewrite` and are named `rewrite_*`.
+  - fixed: the legacy `0` in show/update.rs is `LEGACY_API` (plan 01).
+  - fixed: book/src/ch04-00-cli.md section 7 said "With no new tag, print `nothing to update`"; it now says that applies only when the `api` is already current, and that a 0.x project is moved to `api = 1` (and prints `  api: 0 → 1` first). Proof: `cargo make book-build` exit 0, no `[ERROR]` line.
+
+## Deviations
+
+- 2026-11-25: `upgrade_project` returns `Result<String, Diagnostic>` (as `retag_project` does), not `Result<String, ProjectError>`: the refusal text needs the `agentstacks.toml:` location, and a TOML parse failure needs a Diagnostic. `ApiChanged` is the ProjectError inside it. An extra test, `text_that_is_not_toml_is_refused_at_the_file`, covers the parse refusal.
+- 2026-11-25: The flow's rewrite function `app::update::retag` is renamed `rewrite`; it takes the `Update` result and applies retag then upgrade on one re-read text. Its only caller is the CLI's command/update.rs.

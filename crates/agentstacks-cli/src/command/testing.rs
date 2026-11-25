@@ -111,17 +111,17 @@ pub(super) const URL: &str = "https://example.com/org/packs";
 const REV: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 /// The project of the tool `claude` and the pack `core`, both read from the project directory.
-pub(super) const PATH_PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+pub(super) const PATH_PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
 
 /// The project of [`PATH_PROJECT`] with the pack `core` taken from [`URL`] at `packs-v0.1.0`.
-pub(super) const GIT_PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"https://example.com/org/packs\"\ntag = \"packs-v0.1.0\"  # pinned\n";
+pub(super) const GIT_PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"https://example.com/org/packs\"\ntag = \"packs-v0.1.0\"  # pinned\n";
 
 /// The tree of a pack `core` at 0.1.0 holding the agent `coder`.
 pub(super) fn core_tree() -> FakeFileTree {
     FakeFileTree::new("packs/core")
         .file(
             "pack.toml",
-            b"[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n",
+            b"[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n",
         )
         .file(
             "agents/coder.md",
@@ -134,7 +134,7 @@ fn claude_tree() -> FakeFileTree {
     FakeFileTree::new("extensions/claude")
         .file(
             "extension.toml",
-            b"[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"adapter.lua\"\n",
+            b"[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\n",
         )
         .file("adapter.lua", b"")
 }
@@ -234,6 +234,14 @@ impl World {
     /// The project of [`PATH_PROJECT`].
     pub(super) fn paths() -> Result<Self, Box<dyn Error>> {
         Self::build(Some(PATH_PROJECT), FakeGit::new())
+    }
+
+    /// The project of [`PATH_PROJECT`] written for the `0.x` releases, with `api = 0`.
+    pub(super) fn legacy() -> Result<Self, Box<dyn Error>> {
+        Self::build(
+            Some(&PATH_PROJECT.replacen("api = 1", "api = 0", 1)),
+            FakeGit::new(),
+        )
     }
 
     /// The project of [`GIT_PROJECT`], whose remote serves both tags.

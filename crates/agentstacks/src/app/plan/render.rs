@@ -26,7 +26,6 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 
 use crate::app::plan::load::Loaded;
-use crate::app::plan::read::PROJECT_FILE;
 use crate::port::FileTree;
 use crate::types::hooks::HookAction;
 use crate::types::name::{ItemName, PackName, ToolName};
@@ -36,7 +35,7 @@ use crate::types::op::{
     skip_for_missing_value, skip_root_file_for_missing_value, skip_skill_without_location,
 };
 use crate::types::pack::{Pack, PackSkill};
-use crate::types::project::{SourceError, SubPath};
+use crate::types::project::{PROJECT_FILE, SourceError, SubPath};
 use crate::types::protocol::{Blocking, HookCommand, HookKind, HookModule};
 use crate::types::report::{Diagnostic, Diagnostics, Location};
 use crate::types::resolve::SourceKey;
@@ -508,11 +507,11 @@ mod tests {
 
     const VALUES: &str = r#"{"root":".claude/agentstacks","skills":{"core/status":{"invoke":"/status","dir":".claude/skills/status"}},"agents":{"core/coder":"coder"},"vars":{"tmpdir":"$TMPDIR"}}"#;
     const ONLY_STATUS: &str = r#"{"root":".claude/agentstacks","skills":{"core/status":{"invoke":"/status","dir":".claude/skills/status"}}}"#;
-    const OPTIONS_PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n\n[packs.core.options]\narchive_keep = 50\n";
+    const OPTIONS_PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n\n[packs.core.options]\narchive_keep = 50\n";
 
     fn manifest(extra: &str) -> String {
         format!(
-            "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n{extra}"
+            "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n{extra}"
         )
     }
 

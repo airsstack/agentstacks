@@ -6,7 +6,7 @@
 //!
 //! # Responsibilities
 //!
-//! - [`InvalidAirslReq`]: a `requires.airsl` text that is no range or uses an unsupported operator.
+//! - [`InvalidRange`]: a `requires` text that is no range or uses an unsupported operator.
 //! - [`InvalidExcludeGlob`]: an `exclude` pattern that is absolute or not a glob.
 //! - [`InvalidOptionType`]: an option `type` outside `boolean`, `integer` and `string`.
 //! - [`InvalidPackPath`]: a pack-relative path with a variant per path rule it breaks.
@@ -20,19 +20,19 @@
 
 use crate::types::report::MustBeRelative;
 
-/// A text that cannot be an [`AirslReq`](crate::types::AirslReq).
+/// A text that cannot be a [`VersionRange`](crate::types::VersionRange).
 ///
 /// # Examples
 ///
 /// ```
-/// use agentstacks::types::AirslReq;
+/// use agentstacks::types::VersionRange;
 ///
-/// let refused = AirslReq::new("nope").err().ok_or("expected a refusal")?;
+/// let refused = VersionRange::new("nope").err().ok_or("expected a refusal")?;
 /// assert_eq!(refused.to_string(), "\"nope\" is not a version range");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum InvalidAirslReq {
+pub enum InvalidRange {
     /// A value that is not a version range.
     #[error("\"{text}\" is not a version range")]
     NotVersionRange {
@@ -198,16 +198,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn invalid_airsl_req_displays_each_message() {
+    fn invalid_range_displays_each_message() {
         let cases = [
             (
-                InvalidAirslReq::NotVersionRange {
+                InvalidRange::NotVersionRange {
                     text: "nope".to_owned(),
                 },
                 "\"nope\" is not a version range",
             ),
             (
-                InvalidAirslReq::UnsupportedOperator {
+                InvalidRange::UnsupportedOperator {
                     text: ">=0.1".to_owned(),
                 },
                 "\">=0.1\" uses an operator this agentstacks does not support",

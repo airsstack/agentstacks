@@ -117,8 +117,8 @@ mod tests {
             .ok_or("expected a refused hash")?;
         let cases = [
             (
-                LockError::from(UnsupportedApi::new(1)),
-                "api 1 not supported (this agentstacks speaks 0)",
+                LockError::from(UnsupportedApi::new(2)),
+                "api 2 not supported (this agentstacks speaks 1)",
             ),
             (
                 LockError::NotAVersion {

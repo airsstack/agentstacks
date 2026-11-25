@@ -1,16 +1,22 @@
-//! The project file `agentstacks.toml`, checked field by field into one value, and the source values it is built from.
+//! The project file `agentstacks.toml`, checked field by field into one value, and the source
+//! values it is built from.
 //!
 //! Both the project file and the lock say where a pack or tool comes from, so the source rules
 //! live in one place that both read.
 //!
 //! # Responsibilities
 //!
-//! - [`ProjectFile`]: parses the whole file and returns the tools and packs it lists, or every refusal at once.
+//! - [`ProjectFile`]: parses the whole file and returns the tools and packs it lists, or every
+//!   refusal at once.
+//! - [`PROJECT_FILE`]: the name of the project file, written once.
 //! - [`PackEntry`]: one `[packs.<name>]` entry, its source plus the `options` table kept raw.
-//! - [`Source`]: where a pack or tool comes from, a git repository with a pin or a directory in the project.
-//! - `SourceFields` (crate-internal): the checked source keys (`git`, `path`, `tag`, `rev`, `subdir`) of one entry, read under a pin rule.
+//! - [`Source`]: where a pack or tool comes from, a git repository with a pin or a directory in the
+//!   project.
+//! - `SourceFields` (crate-internal): the checked source keys (`git`, `path`, `tag`, `rev`,
+//!   `subdir`) of one entry, read under a pin rule.
 //! - [`Pin`]: what a git source is fixed to, a tag or a commit.
-//! - `PinRule` (crate-internal): which pin keys a git source must carry, so one reader serves the project file and the lock.
+//! - `PinRule` (crate-internal): which pin keys a git source must carry, so one reader serves the
+//!   project file and the lock.
 //! - [`GitUrl`]: a repository URL that cannot be taken for a command-line option.
 //! - [`GitTag`]: a non-empty git tag name.
 //! - [`CommitId`]: a full-length lowercase hex commit id.
@@ -22,6 +28,8 @@
 //! - [`ProjectError`]: the refusals of the project file with a wording of their own.
 //! - [`render_project`]: the text of a new project file from its tool and pack entries.
 //! - [`retag_project`]: an existing project file with new tags, its comments kept.
+//! - [`upgrade_project`]: an existing project file with its `api` moved from `0` to the current
+//!   one, its comments kept.
 //!
 //! # Non-responsibilities
 //!
@@ -31,6 +39,7 @@
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
+mod document;
 pub mod entry;
 pub mod error;
 pub mod file;
@@ -41,6 +50,7 @@ pub mod pin;
 pub mod render;
 pub mod retag;
 pub mod source;
+pub mod upgrade;
 
 #[cfg(test)]
 mod testing;
@@ -49,6 +59,8 @@ mod testing;
 pub use entry::PackEntry;
 #[doc(inline)]
 pub use error::ProjectError;
+#[doc(inline)]
+pub use file::PROJECT_FILE;
 #[doc(inline)]
 pub use file::ProjectFile;
 #[doc(inline)]
@@ -83,3 +95,5 @@ pub use source::Source;
 #[doc(inline)]
 pub use source::SourceError;
 pub(in crate::types) use source::SourceFields;
+#[doc(inline)]
+pub use upgrade::upgrade_project;

@@ -186,10 +186,12 @@ nothing applied (run apply)`).
 
 1. List the newer tags. A refusal is printed and exits 1.
 2. Print each entry on stdout: `  <key>: <current> → <new>` for a new tag, `  note     <UpdateNote Display>`
-   for a note. `<key>` is `packs.core` or `tools.claude`.
-3. With no new tag, print `nothing to update`, exit 0 and write nothing.
-4. Rewrite `agentstacks.toml` with each new tag, comments kept, and print `agentstacks.toml updated`.
-   A refusal exits 1 with the file unchanged and no plan.
+   for a note. `<key>` is `packs.core` or `tools.claude`. A project written for the 0.x releases
+   (`api = 0`) first prints `  api: 0 → 1`.
+3. With no new tag and the `api` already current, print `nothing to update`, exit 0 and write
+   nothing. A 0.x project is not in this case: it is moved to `api = 1` even when no tag is newer.
+4. Rewrite `agentstacks.toml` with each new tag and, for a 0.x project, with `api = 1`, comments
+   kept, and print `agentstacks.toml updated`. A refusal exits 1 with the file unchanged and no plan.
 5. Plan, show, confirm and apply exactly as `apply` does (sections 4 to 6), then add the follow-up
    on stderr.
 

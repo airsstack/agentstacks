@@ -20,13 +20,14 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::app::plan::read::{Inputs, PROJECT_FILE};
+use crate::app::plan::read::Inputs;
 use crate::app::plan::sources::{Entry, Fetched};
 use crate::port::FileTree;
 use crate::types::extension::Extension;
 use crate::types::name::ToolName;
 use crate::types::pack::Pack;
 use crate::types::plan::Note;
+use crate::types::project::PROJECT_FILE;
 use crate::types::report::Diagnostics;
 use crate::types::resolve::SourceKey;
 use crate::types::set::{ValidSet, check};
@@ -204,7 +205,7 @@ mod tests {
 
     type TestLoaded = Loaded<Tree<FakeFileTree, FakeFileTree>>;
 
-    const PROJECT: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const PROJECT: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
 
     fn load(scenario: &Scenario) -> Result<TestLoaded, Diagnostics> {
         let inputs = read_inputs(&scenario.workspace)?;
@@ -236,11 +237,11 @@ mod tests {
     #[test]
     fn load_set_reports_fetch_and_load_refusals_together() -> TestResult {
         let text = format!(
-            "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.a]\ngit = \"{URL}\"\nrev = \"{REV_A}\"\n\n[packs.b]\npath = \"packs/b\"\n"
+            "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.a]\ngit = \"{URL}\"\nrev = \"{REV_A}\"\n\n[packs.b]\npath = \"packs/b\"\n"
         );
         let broken = pack_files("packs/b", "b").file(
             "pack.toml",
-            b"[pack]\nname = \"b\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n",
+            b"[pack]\nname = \"b\"\nversion = \"0.1.0\"\napi = 2\ndescription = \"d\"\n",
         );
         let scenario = Scenario::new(&text)
             .path_source("packs/b", broken)?
@@ -313,7 +314,7 @@ mod tests {
     fn load_set_labels_a_git_dot_entry_by_its_subdir() -> TestResult {
         let text = |subdir: &str| {
             format!(
-                "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"{URL}\"\nrev = \"{REV_A}\"\n{subdir}\n"
+                "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\ngit = \"{URL}\"\nrev = \"{REV_A}\"\n{subdir}\n"
             )
         };
         let (url, at, subdir) = (url()?, rev(REV_A)?, sub("packs/core")?);

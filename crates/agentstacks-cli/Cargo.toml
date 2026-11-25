@@ -1,6 +1,6 @@
 [package]
 name                   = "agentstacks-cli"
-version                = "0.2.0"
+version                = "1.0.0"
 description            = "Sets up agentic coding tools from one tool-neutral copy of skills, agents, commands, hooks and rules."
 edition.workspace      = true
 rust-version.workspace = true
@@ -29,3 +29,4 @@ similar = { workspace = true }
 agentstacks = { workspace = true, features = ["testing"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+toml = { workspace = true }

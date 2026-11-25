@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(
             values_payload(&values_input()?),
             json!({
-                "api": 0,
+                "api": 1,
                 "tool": "claude",
                 "packs": [
                     {"name": "core", "version": "0.3.0", "skills": ["status"], "agents": ["coder"]}
@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(
             plan_payload(&plan_input()?),
             json!({
-                "api": 0,
+                "api": 1,
                 "tool": "claude",
                 "root": ".claude/agentstacks",
                 "packs": [{
@@ -330,7 +330,7 @@ mod tests {
         input.packs.clear();
         assert_eq!(
             plan_payload(&input),
-            json!({"api": 0, "tool": "claude", "root": ".claude/agentstacks", "packs": []})
+            json!({"api": 1, "tool": "claude", "root": ".claude/agentstacks", "packs": []})
         );
         Ok(())
     }

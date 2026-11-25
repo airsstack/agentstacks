@@ -210,7 +210,7 @@ mod tests {
             Some("adapter")
         );
 
-        let manifest = "[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"src/main.lua\"\n";
+        let manifest = "[extension]\nname = \"claude\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"src/main.lua\"\n";
         let nested = FakeFileTree::new("ext")
             .file("extension.toml", manifest.as_bytes())
             .file("src/main.lua", b"");

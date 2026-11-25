@@ -51,7 +51,7 @@ pub(super) fn load(
     files: &[(&str, &str)],
 ) -> Result<Pack, Box<dyn Error>> {
     let manifest = format!(
-        "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n{tables}"
+        "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n{tables}"
     );
     let mut tree =
         FakeFileTree::new(format!("packs/{name}")).file("pack.toml", manifest.as_bytes());

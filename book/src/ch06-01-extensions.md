@@ -33,8 +33,8 @@ Its `reads` key is optional: a list of project paths the extension may read with
 # example: claude extension
 [extension]
 name = "claude"
-version = "0.1.0"
-api = 0
+version = "1.0.0"
+api = 1
 description = "Renders packs into Claude Code project config"
 entry = "adapter.lua"
 reads = [".claude/settings.json"]

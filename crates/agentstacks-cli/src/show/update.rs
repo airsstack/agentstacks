@@ -2,8 +2,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`update_text`] prints a row for each newer tag and for each note.
-//! - [`has_newer`] says whether any entry names a newer tag.
+//! - [`update_text`] prints the `api` move first when there is one, then a row for each newer tag
+//!   and for each note.
+//! - [`has_newer`] says whether the `api` moves or any entry names a newer tag.
 //!
 //! # Non-responsibilities
 //!
@@ -15,12 +16,18 @@
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
 )]
 
-use agentstacks::types::resolve::{UpdateEntry, UpdateOutcome};
+use agentstacks::app::update::Update;
+use agentstacks::types::resolve::UpdateOutcome;
+use agentstacks::types::{API, ApiCheck, LEGACY_API};
 
-/// One row per entry, lines joined by `\n` with no trailing newline: `  <key>: <current> →
-/// <new>` for a newer tag, `  note     <note>` for a note. Empty for no entries.
-pub(crate) fn update_text(entries: &[UpdateEntry]) -> String {
-    entries
+/// `  api: <LEGACY_API> → <API>` when the `api` moves, then one row per entry, lines joined by `\n`
+/// with no trailing newline: `  <key>: <current> → <new>` for a newer tag, `  note     <note>` for
+/// a note. Empty when the `api` stays and there are no entries.
+pub(crate) fn update_text(found: &Update) -> String {
+    let api =
+        (found.api == ApiCheck::Legacy).then(|| format!("  api: {LEGACY_API} \u{2192} {API}"));
+    let rows = found
+        .entries
         .iter()
         .map(|entry| match (&entry.outcome, &entry.current) {
             (UpdateOutcome::NewTag(new), Some(current)) => {
@@ -28,23 +35,24 @@ pub(crate) fn update_text(entries: &[UpdateEntry]) -> String {
             }
             (UpdateOutcome::NewTag(new), None) => format!("  {}: {new}", entry.key),
             (UpdateOutcome::Note(note), _) => format!("  note     {note}"),
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+        });
+    api.into_iter().chain(rows).collect::<Vec<_>>().join("\n")
 }
 
-/// Whether any entry names a newer tag.
-pub(crate) fn has_newer(entries: &[UpdateEntry]) -> bool {
-    entries
-        .iter()
-        .any(|entry| matches!(entry.outcome, UpdateOutcome::NewTag(_)))
+/// Whether the `api` moves or any entry names a newer tag: whether there is anything to write.
+pub(crate) fn has_newer(found: &Update) -> bool {
+    found.api == ApiCheck::Legacy
+        || found
+            .entries
+            .iter()
+            .any(|entry| matches!(entry.outcome, UpdateOutcome::NewTag(_)))
 }
 
 #[cfg(test)]
 mod tests {
     use agentstacks::types::name::PackName;
     use agentstacks::types::project::GitTag;
-    use agentstacks::types::resolve::{SourceKey, UpdateNote};
+    use agentstacks::types::resolve::{SourceKey, UpdateEntry, UpdateNote};
 
     use super::*;
 
@@ -73,10 +81,17 @@ mod tests {
         })
     }
 
+    fn tags(entries: Vec<UpdateEntry>) -> Update {
+        Update {
+            api: ApiCheck::Current,
+            entries,
+        }
+    }
+
     #[test]
     fn newer_tag_row_has_an_arrow() -> TestResult {
         assert_eq!(
-            update_text(&[newer()?]),
+            update_text(&tags(vec![newer()?])),
             "  packs.core: packs-v0.1.0 \u{2192} packs-v0.2.0"
         );
         Ok(())
@@ -85,7 +100,7 @@ mod tests {
     #[test]
     fn note_row_is_prefixed() -> TestResult {
         assert_eq!(
-            update_text(&[note()?]),
+            update_text(&tags(vec![note()?])),
             "  note     agentstacks.toml: packs.core: no newer tag than packs-v0.1.0"
         );
         Ok(())
@@ -93,7 +108,7 @@ mod tests {
 
     #[test]
     fn rows_keep_the_entry_order() -> TestResult {
-        let text = update_text(&[note()?, newer()?]);
+        let text = update_text(&tags(vec![note()?, newer()?]));
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 2);
         assert!(lines[0].starts_with("  note     "));
@@ -103,9 +118,32 @@ mod tests {
 
     #[test]
     fn has_newer_is_false_for_notes_only() -> TestResult {
-        assert!(!has_newer(&[note()?]));
-        assert!(!has_newer(&[]));
-        assert!(has_newer(&[note()?, newer()?]));
+        assert!(!has_newer(&tags(vec![note()?])));
+        assert!(!has_newer(&tags(Vec::new())));
+        assert!(has_newer(&tags(vec![note()?, newer()?])));
         Ok(())
+    }
+
+    #[test]
+    fn update_text_puts_api_first() -> TestResult {
+        let found = Update {
+            api: ApiCheck::Legacy,
+            entries: vec![newer()?],
+        };
+        assert_eq!(
+            update_text(&found),
+            "  api: 0 \u{2192} 1\n  packs.core: packs-v0.1.0 \u{2192} packs-v0.2.0"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn api_move_alone_is_something_to_write() {
+        let found = Update {
+            api: ApiCheck::Legacy,
+            entries: Vec::new(),
+        };
+        assert_eq!(update_text(&found), "  api: 0 \u{2192} 1");
+        assert!(has_newer(&found));
     }
 }

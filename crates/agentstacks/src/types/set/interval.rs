@@ -1,7 +1,8 @@
 //! The release versions one version range admits, as an interval.
 //!
-//! It is separate from [`AirslRange`](crate::types::AirslRange) because `semver` can test one version
-//! against a range but cannot say whether several ranges overlap, which needs the intervals.
+//! It is separate from [`AirslRange`](crate::types::AirslRange) because `semver` can test one
+//! version against a range but cannot say whether several ranges overlap, which needs the
+//! intervals.
 //!
 //! # Responsibilities
 //!
@@ -19,8 +20,9 @@
 //!
 //! # Non-responsibilities
 //!
-//! Which ranges a pack may declare is guaranteed by [`AirslReq`](crate::types::AirslReq), and
-//! which packs' ranges are intersected belongs to [`AirslRange`](crate::types::AirslRange).
+//! Which ranges a pack may declare is guaranteed by
+//! [`VersionRange`](crate::types::VersionRange), and which packs' ranges are intersected belongs to
+//! [`AirslRange`](crate::types::AirslRange).
 
 use semver::{Comparator, Op, VersionReq};
 
@@ -57,8 +59,8 @@ impl VersionInterval {
 
     /// The release versions one comparator admits.
     ///
-    /// `Op` is `#[non_exhaustive]`, so a match over it needs a last arm. A range held by an
-    /// [`AirslReq`](crate::types::AirslReq) never reaches it, because that type refuses any
+    /// `Op` is `#[non_exhaustive]`, so a match over it needs a last arm. A range held by a
+    /// [`VersionRange`](crate::types::VersionRange) never reaches it, because that type refuses any
     /// operator but the eight handled here when it is built. Should one arrive anyway, the arm
     /// admits nothing, so an operator this code does not understand is refused instead of
     /// accepted.

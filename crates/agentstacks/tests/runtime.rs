@@ -2,8 +2,8 @@
 //! `HookCommand` builds.
 //!
 //! The project under `tests/fixtures/runtime/proj` holds a small translator for a made-up tool and
-//! a set of hook modules. Each test copies it into a temporary directory, writes the shipped runtime
-//! beside the translator and runs one command from the project directory, as a tool does.
+//! a set of hook modules. Each test copies it into a temporary directory, writes the shipped
+//! runtime beside the translator and runs one command from the project directory, as a tool does.
 //! When `airsl` cannot run, each test says so and returns, unless `AGENTSTACKS_REQUIRE_AIRSL` is
 //! set (CI sets it): then each test fails, so a missing binary cannot pass the suite unseen.
 
@@ -62,7 +62,7 @@ fn project() -> Result<TempDir, Box<dyn Error>> {
 /// The module of `hooks/<name>.lua` in the pack `core`.
 fn module(name: &str) -> Result<HookModule, Box<dyn Error>> {
     let text = format!(
-        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 0\ndescription = \"d\"\n\n\
+        "[pack]\nname = \"core\"\nversion = \"1.0.0\"\napi = 1\ndescription = \"d\"\n\n\
          [[hooks]]\nkind = \"lua\"\nevent = \"session.start\"\nrun = \"hooks/{name}.lua\"\n"
     );
     let manifest = PackManifest::parse(Path::new("packs/core/pack.toml"), &text)
@@ -74,7 +74,8 @@ fn module(name: &str) -> Result<HookModule, Box<dyn Error>> {
     Ok(HookModule::new(&PackName::new("core")?, lua.run()))
 }
 
-/// What one hook run needs: the hook's file name (`hooks/<hook>.lua` in the pack `core`) and the rest.
+/// What one hook run needs: the hook's file name (`hooks/<hook>.lua` in the pack `core`) and the
+/// rest.
 struct Case<'a> {
     hook: &'a str,
     blocking: Blocking,

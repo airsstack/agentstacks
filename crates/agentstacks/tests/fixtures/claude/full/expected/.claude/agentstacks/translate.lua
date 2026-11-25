@@ -1,4 +1,4 @@
--- agentstacks translator for claude, api 0.
+-- agentstacks translator for claude, api 1.
 local M = {}
 
 local EVENTS = {

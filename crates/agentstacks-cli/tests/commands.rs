@@ -1,7 +1,8 @@
 //! End-to-end runs of the `agentstacks` binary on a temporary project.
 //!
 //! Each test copies `tests/fixtures/project` and the shipped `extensions/claude` into a temporary
-//! directory and runs the real binary there with `-C`, stdin null. Nothing here proves a rule on
+//! directory (the legacy tests lay the `0.x` project files of `tests/fixtures/legacy` over it) and
+//! runs the real binary there with `-C`, stdin null. Nothing here proves a rule on
 //! its own: the rules are proven in the library, and these runs show that the commands, the claude
 //! extension and the airsl adapter hold together.
 
@@ -74,6 +75,15 @@ impl Project {
             &dir.path().join("ext/claude"),
         )?;
         Ok(Self { dir })
+    }
+
+    /// [`Project::new`] with the `agentstacks.toml` and `agentstacks.lock` of a project written for
+    /// the `0.x` releases, both at `api = 0`, laid over it.
+    fn legacy() -> Result<Self, Box<dyn Error>> {
+        let project = Self::new()?;
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        copy_tree(&manifest.join("tests/fixtures/legacy"), project.dir.path())?;
+        Ok(project)
     }
 
     /// A temporary directory with no fixture: nothing but what a test adds.
@@ -293,6 +303,47 @@ fn usage_error_exits_two() -> TestResult {
     let run = project.run(&["init", "--tool", "claude"])?;
 
     assert_eq!(run.code, 2, "stderr: {}", run.stderr);
+    Ok(())
+}
+
+#[test]
+fn update_moves_a_legacy_project() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::legacy()?;
+    let run = project.run(&["update", "--yes"])?;
+
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    assert_eq!(
+        run.stdout.lines().next(),
+        Some("  api: 0 \u{2192} 1"),
+        "{}",
+        run.stdout
+    );
+    let toml = fs::read_to_string(project.path("agentstacks.toml"))?;
+    assert!(toml.starts_with("api = 1\n"), "{toml}");
+    let lock = fs::read_to_string(project.path("agentstacks.lock"))?;
+    assert!(lock.starts_with("api = 1\n"), "{lock}");
+    assert!(project.path(SKILL).is_file());
+    Ok(())
+}
+
+#[test]
+fn plan_refuses_the_legacy_fixture_before_update() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::legacy()?;
+    let run = project.run(&["plan"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert!(
+        run.stderr
+            .contains("agentstacks.toml: api 0 is from agentstacks 0.x (run agentstacks update)"),
+        "{}",
+        run.stderr
+    );
     Ok(())
 }
 

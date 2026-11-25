@@ -1,6 +1,6 @@
 [extension]
 name = "claud"
 version = "0.1.0"
-api = 0
+api = 1
 description = "d"
 entry = "adapter.lua"

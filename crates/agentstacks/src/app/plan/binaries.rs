@@ -19,7 +19,7 @@
 use std::path::Path;
 
 use crate::app::plan::load::Loaded;
-use crate::app::plan::read::{Inputs, PROJECT_FILE};
+use crate::app::plan::read::Inputs;
 use crate::app::plan::tools::Ran;
 use crate::port::Binary;
 use crate::types::manifest::PackVersion;
@@ -30,6 +30,7 @@ use crate::types::op::{
 };
 use crate::types::pack::Pack;
 use crate::types::plan::{AirslAnswer, AirslPin, BinaryCheck};
+use crate::types::project::PROJECT_FILE;
 use crate::types::report::Diagnostics;
 
 /// What looking up the binaries found.
@@ -112,15 +113,15 @@ mod tests {
     use crate::types::name::BinaryName;
     use crate::types::op::{Operation, Proposal, Proposals};
 
-    const ONE_PACK: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
-    const TWO_PACKS: &str = "api = 0\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n\n[packs.sdlc]\npath = \"packs/sdlc\"\n";
+    const ONE_PACK: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n";
+    const TWO_PACKS: &str = "api = 1\n\n[tools.claude]\npath = \"extensions/claude\"\n\n[packs.core]\npath = \"packs/core\"\n\n[packs.sdlc]\npath = \"packs/sdlc\"\n";
 
     fn pack_with(name: &str, requires: &str) -> FakeFileTree {
         FakeFileTree::new(format!("packs/{name}"))
             .file(
                 "pack.toml",
                 format!(
-                    "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n[requires]\n{requires}"
+                    "[pack]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n[requires]\n{requires}"
                 )
                 .as_bytes(),
             )

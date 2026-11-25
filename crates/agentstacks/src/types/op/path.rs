@@ -22,10 +22,11 @@
 use std::fmt;
 
 use crate::types::op::{ApiFunction, OpError, PathShape};
+use crate::types::project::PROJECT_FILE;
 use crate::types::report::{MustBeRelative, OutsideProject, Quoted};
 
 /// The files agentstacks writes itself, which an extension may not propose.
-const OWN_FILES: [&str; 2] = ["agentstacks.lock", "agentstacks.toml"];
+const OWN_FILES: [&str; 2] = ["agentstacks.lock", PROJECT_FILE];
 
 /// A project-relative path, in its normalised form.
 ///

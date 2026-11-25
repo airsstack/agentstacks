@@ -16,6 +16,7 @@
 use std::io;
 
 use crate::types::op::OpError;
+use crate::types::project::PROJECT_FILE;
 use crate::types::report::{Diagnostic, Location};
 
 /// The exit of `airsl --version`.
@@ -69,7 +70,7 @@ impl AirslAnswer {
         // `io::Error` is not `Clone`; the copy keeps the kind and the text.
         let copy = io::Error::new(error.kind(), error.to_string());
         Some(Diagnostic::new(
-            Location::file("agentstacks.toml"),
+            Location::file(PROJECT_FILE),
             OpError::AirslSpawn(copy),
         ))
     }

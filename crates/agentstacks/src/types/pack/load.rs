@@ -1,21 +1,26 @@
 //! Reading a pack directory into a checked [`Pack`].
 //!
-//! It is the one place that reads a pack's files and runs the rules in order, so every other file in
-//! this group stays a rule over data already in hand.
+//! It is the one place that reads a pack's files and runs the rules in order, so every other file
+//! in this group stays a rule over data already in hand.
 //!
 //! # Responsibilities
 //!
-//! - [`Pack::load`] walks the directory through the [`FileTree`] port, classifies the files, reads
-//!   `pack.toml`, every `SKILL.md` and agent file, each `native/<tool>/hooks.toml`, and every
-//!   rendered file, and runs each rule over them. It returns the [`Pack`] when the run found no
-//!   refusal, else every refusal of the run: sorted by file, then the refusals without a line in
-//!   the order found, then by line.
-//! - No refusal stops the run early except that a directory without a readable `pack.toml` is not
-//!   a pack. A refusal of the walk (a symlink, a special file, a path that is not UTF-8, an I/O
-//!   failure) is reported together with every other refusal, and the files the walk could list are
-//!   still read and checked. A directory without `pack.toml` ends the run with the one refusal
-//!   that it is not a pack, besides the walk's own refusals; a `pack.toml` the walk refused is not
-//!   reported as absent.
+//! - [`Pack::load`] walks the directory through the [`FileTree`] port, then reads `pack.toml` and
+//!   checks first whether it has a `requires.agentstacks` that excludes this agentstacks. If it
+//!   does, that is the one refusal returned and nothing after it runs, because a pack written for
+//!   a later agentstacks may use things this one does not know. Otherwise (the walk did not list
+//!   `pack.toml`, it is not UTF-8 or not TOML, or its range is absent or does not parse) the load
+//!   goes on: it classifies the files, parses the text of `pack.toml` it already read, reads every
+//!   `SKILL.md` and agent file, each `native/<tool>/hooks.toml`, and every rendered file, and runs
+//!   each rule over them. It returns the [`Pack`] when the run found no refusal, else every
+//!   refusal of the run: sorted by file, then the refusals without a line in the order found, then
+//!   by line. A range that does not parse is one of those refusals.
+//! - Past that first check, no refusal stops the run early except that a directory without a
+//!   readable `pack.toml` is not a pack. A refusal of the walk (a symlink, a special file, a path
+//!   that is not UTF-8, an I/O failure) is reported together with every other refusal, and the
+//!   files the walk could list are still read and checked. A directory without `pack.toml` ends the
+//!   run with the one refusal that it is not a pack, besides the walk's own refusals; a `pack.toml`
+//!   the walk refused is not reported as absent.
 //! - A refusal never causes a second one about the same thing. A skill, agent or tool directory
 //!   the walk or a name rule refused, and a `native/<tool>/hooks.toml` that failed to read, may
 //!   have been the pack's only item, so "nothing to install" is not reported then. A file the walk
@@ -46,15 +51,18 @@
 //! [`FileTree`] port that the caller passes in.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::io;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use crate::port::FileTree;
+use crate::types::VERSION;
 use crate::types::frontmatter::AgentMeta;
 use crate::types::frontmatter::BodyStart;
 use crate::types::frontmatter::SkillMeta;
 use crate::types::hooks::NativeHooks;
 use crate::types::manifest::PackManifest;
+use crate::types::manifest::requires::agentstacks_too_new;
 use crate::types::name::ItemName;
 use crate::types::name::ToolName;
 use crate::types::pack::install::{
@@ -71,6 +79,7 @@ use crate::types::report::Diagnostics;
 use crate::types::report::Location;
 use crate::types::tokens::LocatedToken;
 use crate::types::tree::TreePath;
+use crate::types::tree::Walked;
 use crate::types::tree::walk;
 
 /// A pack directory that passed every check.
@@ -110,7 +119,8 @@ impl Pack {
     /// # Errors
     ///
     /// Every refusal the directory contains; the [`Diagnostics`] hand them back sorted: by file
-    /// path, then the refusals without a line in the order found, then by line.
+    /// path, then the refusals without a line in the order found, then by line. A
+    /// `requires.agentstacks` range that excludes this agentstacks is the only refusal returned.
     ///
     /// # Examples
     ///
@@ -134,17 +144,7 @@ impl Pack {
     /// # }
     /// ```
     pub fn load<T: FileTree>(tree: &T) -> Result<Self, Diagnostics> {
-        let (walked, walk_refusals) = walk(tree);
-        let mut run = Run::new(tree);
-        run.diagnostics.extend(walk_refusals);
-        let (layout, refusals) = match PackLayout::classify(&run.dir, &walked) {
-            Ok(classified) => classified,
-            Err(not_a_pack) => {
-                run.diagnostics.push(not_a_pack);
-                return Err(run.diagnostics);
-            }
-        };
-        run.diagnostics.extend(refusals);
+        let (mut run, walked, layout) = Run::begin(tree)?;
         let skills = run.read_skills(&layout);
         let agents = run.read_agents(&layout);
         let Some(manifest) = run.read_manifest(&layout) else {
@@ -304,6 +304,17 @@ impl Pack {
     }
 }
 
+/// The read of `pack.toml`, or `None` when the walk did not list it as a regular file. The load
+/// reads it here once, before any other file, so the range check and the manifest parse see the
+/// same text.
+fn read_manifest_text<T: FileTree>(tree: &T, walked: &Walked) -> Option<io::Result<String>> {
+    walked
+        .files()
+        .iter()
+        .any(|path| path.as_str() == MANIFEST_FILE)
+        .then(|| tree.read_text(Path::new(MANIFEST_FILE)))
+}
+
 /// One load: the tree being read and what the run has found so far.
 struct Run<'a, T: FileTree> {
     tree: &'a T,
@@ -312,16 +323,47 @@ struct Run<'a, T: FileTree> {
     tokens: Vec<LocatedToken>,
     /// The walked files a read was attempted on, whether it succeeded or not.
     read: BTreeSet<TreePath>,
+    /// The read of `pack.toml` made before the run started, held until the manifest is parsed.
+    manifest_text: Option<io::Result<String>>,
 }
 
 impl<'a, T: FileTree> Run<'a, T> {
-    fn new(tree: &'a T) -> Self {
+    fn new(tree: &'a T, manifest_text: Option<io::Result<String>>) -> Self {
         Self {
             tree,
             dir: tree.root().to_path_buf(),
             diagnostics: Diagnostics::new(),
             tokens: Vec::new(),
             read: BTreeSet::new(),
+            manifest_text,
+        }
+    }
+
+    /// Walks the tree and starts a run holding the walk's refusals and the classified layout, or
+    /// ends the load before anything else is read: with the one refusal of a `requires.agentstacks`
+    /// that excludes this agentstacks, or with the walk's refusals and the one that the directory
+    /// is not a pack.
+    fn begin(tree: &'a T) -> Result<(Self, Walked, PackLayout), Diagnostics> {
+        let (walked, walk_refusals) = walk(tree);
+        let manifest_text = read_manifest_text(tree, &walked);
+        let too_new = manifest_text
+            .as_ref()
+            .and_then(|read| read.as_deref().ok())
+            .and_then(|text| agentstacks_too_new(&tree.root().join(MANIFEST_FILE), text, &VERSION));
+        if let Some(only) = too_new {
+            return Err(Diagnostics::from(only));
+        }
+        let mut run = Self::new(tree, manifest_text);
+        run.diagnostics.extend(walk_refusals);
+        match PackLayout::classify(&run.dir, &walked) {
+            Ok((layout, refusals)) => {
+                run.diagnostics.extend(refusals);
+                Ok((run, walked, layout))
+            }
+            Err(not_a_pack) => {
+                run.diagnostics.push(not_a_pack);
+                Err(run.diagnostics)
+            }
         }
     }
 
@@ -426,13 +468,23 @@ impl<'a, T: FileTree> Run<'a, T> {
         agents
     }
 
-    /// Reads `pack.toml`. `None` when it is refused, or when the walk already refused it.
+    /// Parses `pack.toml` from the text read when the run began; a failed read is recorded here.
+    /// `None` when it is refused, or when the walk already refused it.
     fn read_manifest(&mut self, layout: &PackLayout) -> Option<PackManifest> {
         let path = TreePath::from_parts(&[MANIFEST_FILE]);
         if !layout.files().contains(&path) {
             return None;
         }
-        let (file, text) = self.read_text(&path)?;
+        self.read.insert(path);
+        let file = self.dir.join(MANIFEST_FILE);
+        let text = match self.manifest_text.take()? {
+            Ok(text) => text,
+            Err(error) => {
+                self.diagnostics
+                    .push(Diagnostic::new(Location::file(&file), error));
+                return None;
+            }
+        };
         match PackManifest::parse(&file, &text) {
             Ok(manifest) => Some(manifest),
             Err(refusals) => {
@@ -500,13 +552,14 @@ impl<'a, T: FileTree> Run<'a, T> {
 mod tests {
     use super::*;
     use crate::port::FakeFileTree;
+    use crate::types::API;
     use std::error::Error;
 
     type TestResult = Result<(), Box<dyn Error>>;
 
     const ROOT: &str = "packs/core";
     const IDENTITY: &str =
-        "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\n";
+        "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n";
     const DENIED: &str = "permission denied";
     const SYMLINK: &str = "symlinks are not allowed in a pack";
     const NOT_UTF8: &str = "not valid UTF-8";
@@ -827,6 +880,77 @@ mod tests {
         Ok(())
     }
 
+    fn requiring(range: &str, identity_api: u32, top: &str) -> String {
+        format!(
+            "{top}\n[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = {identity_api}\ndescription = \"d\"\n\n[requires]\nagentstacks = \"{range}\"\n"
+        )
+    }
+
+    #[test]
+    fn excluding_range_is_the_only_refusal() -> TestResult {
+        let tree = FakeFileTree::new(ROOT)
+            .file("pack.toml", requiring(">=99", 2, "zzz = 1").as_bytes())
+            .file("skills/a/SKILL.md", doc("a", "{{bogus x}}").as_bytes())
+            .symlink("link");
+        assert_eq!(
+            refusals(&tree)?,
+            [format!(
+                "{ROOT}/pack.toml: requires.agentstacks: \">=99\" does not match agentstacks {VERSION} (install a newer agentstacks)"
+            )]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_range_is_one_refusal_among_others() -> TestResult {
+        let tree = base().file("pack.toml", requiring("nope", 1, "zzz = 1").as_bytes());
+        assert_eq!(
+            refusals(&tree)?,
+            [
+                format!("{ROOT}/pack.toml: zzz: unknown key"),
+                format!("{ROOT}/pack.toml: requires.agentstacks: \"nope\" is not a version range"),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn absent_range_loads() -> TestResult {
+        loaded(&base())?;
+        Ok(())
+    }
+
+    #[test]
+    fn matching_range_loads() -> TestResult {
+        let tree = base().file("pack.toml", requiring(">=1.0", 1, "").as_bytes());
+        let pack = loaded(&tree)?;
+        assert_eq!(
+            pack.manifest()
+                .requires()
+                .agentstacks()
+                .map(ToString::to_string),
+            Some(">=1.0".to_owned())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unreadable_or_invalid_toml_is_refused_by_the_parse_not_the_range_check() -> TestResult {
+        let tree = base().file("pack.toml", b"agentstacks = \">=99\"\na = [1,");
+        assert_eq!(
+            refusals(&tree)?,
+            [format!("{ROOT}/pack.toml:2: unclosed array, expected `]`")]
+        );
+        let tree = base().file("pack.toml", b"\xff\xfe");
+        assert_eq!(refusals(&tree)?, [format!("{ROOT}/pack.toml: {NOT_UTF8}")]);
+        let tree = base().unreadable("pack.toml");
+        assert_eq!(
+            refusals(&tree)?,
+            [format!("{ROOT}/pack.toml: {}", FakeFileTree::denied())]
+        );
+        Ok(())
+    }
+
     #[test]
     fn load_does_not_call_a_pack_toml_the_walk_refused_absent() -> TestResult {
         let tree = FakeFileTree::new(ROOT)
@@ -918,7 +1042,7 @@ mod tests {
             refusals(&tree)?,
             [
                 format!("{ROOT}: pack declares nothing to install"),
-                format!("{ROOT}/commands: reserved, not supported in api 0"),
+                format!("{ROOT}/commands: reserved, not supported in api {API}"),
             ]
         );
         Ok(())

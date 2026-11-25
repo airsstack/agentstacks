@@ -60,7 +60,7 @@ use crate::types::set::valid::ValidSet;
 /// use agentstacks::types::{Extension, Pack, ProjectFile, check_pack_set};
 ///
 /// let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
-/// let text = "api = 0\n\
+/// let text = "api = 1\n\
 ///     [tools.claude]\n\
 ///     path = \"extensions/claude\"\n\
 ///     [packs.core]\n\
@@ -173,14 +173,14 @@ mod tests {
 
     type TestResult = Result<(), Box<dyn Error>>;
 
-    const API_ONE: &str =
-        "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\n";
+    const API_TWO: &str =
+        "[pack]\nname = \"core\"\nversion = \"0.1.0\"\napi = 2\ndescription = \"d\"\n";
     const CORE_API: &str =
-        "packs/core/pack.toml: core: api 1 not supported (this agentstacks speaks 0)";
+        "packs/core/pack.toml: core: api 2 not supported (this agentstacks speaks 1)";
 
-    /// A `core` whose `pack.toml` asks for api 1, so it fails to load.
+    /// A `core` whose `pack.toml` asks for api 2, so it fails to load.
     fn failing_core() -> PackSpec {
-        PackSpec::new("core").file("pack.toml", API_ONE)
+        PackSpec::new("core").file("pack.toml", API_TWO)
     }
 
     fn refusals(packs: &[(PackSpec, &str)]) -> Result<Vec<String>, Box<dyn Error>> {
@@ -260,16 +260,16 @@ mod tests {
     fn failed_loads_are_not_name_checked() -> TestResult {
         let kore = PackSpec::new("kore")
             .listed_as("core")
-            .file("pack.toml", &API_ONE.replace("\"core\"", "\"kore\""));
-        let tools = vec![("claude", extension_api("claud", 1))];
+            .file("pack.toml", &API_TWO.replace("\"core\"", "\"kore\""));
+        let tools = vec![("claude", extension_api("claud", 2))];
         let found = run_check_with(&[(kore, "")], tools)?
             .err()
             .ok_or("the check passed")?;
         assert_eq!(
             found,
             [
-                "extensions/claud/extension.toml: extension.api: 1 not supported (this agentstacks speaks 0)",
-                "packs/kore/pack.toml: kore: api 1 not supported (this agentstacks speaks 0)",
+                "extensions/claud/extension.toml: extension.api: 2 not supported (this agentstacks speaks 1)",
+                "packs/kore/pack.toml: kore: api 2 not supported (this agentstacks speaks 1)",
             ]
         );
         Ok(())
@@ -277,14 +277,14 @@ mod tests {
 
     #[test]
     fn check_never_returns_a_valid_set_after_a_failed_load() -> TestResult {
-        let tools = vec![("claude", extension_api("claude", 1))];
+        let tools = vec![("claude", extension_api("claude", 2))];
         let found = run_check_with(&[(PackSpec::new("core"), "")], tools)?
             .err()
             .ok_or("the check passed")?;
         assert_eq!(
             found,
             [
-                "extensions/claude/extension.toml: extension.api: 1 not supported (this agentstacks speaks 0)"
+                "extensions/claude/extension.toml: extension.api: 2 not supported (this agentstacks speaks 1)"
             ]
         );
         Ok(())
@@ -304,7 +304,7 @@ mod tests {
             },
             |key, source| {
                 tools_seen.push((key.to_string(), source.clone()));
-                extension_api(key.as_str(), 0)
+                extension_api(key.as_str(), 1)
             },
         );
         assert!(result.is_ok());
@@ -343,7 +343,7 @@ mod tests {
                     PackSpec::new("sdlc").load_raw()
                 }
             },
-            |key, _source| extension_api(key.as_str(), 0),
+            |key, _source| extension_api(key.as_str(), 1),
         )
         .err()
         .ok_or("a failed load returns no ValidSet")?;

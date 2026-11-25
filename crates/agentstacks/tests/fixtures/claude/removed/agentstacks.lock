@@ -1,4 +1,4 @@
-api = 0
+api = 1
 
 [[tool]]
 name = "claude"

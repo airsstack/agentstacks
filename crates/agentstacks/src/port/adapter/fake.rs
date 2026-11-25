@@ -231,7 +231,7 @@ mod tests {
 
     fn extension(name: &str) -> Result<(Extension, FakeFileTree), Box<dyn Error>> {
         let manifest = format!(
-            "[extension]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 0\ndescription = \"d\"\nentry = \"adapter.lua\"\n"
+            "[extension]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\n"
         );
         let tree = FakeFileTree::new(format!("extensions/{name}"))
             .file("extension.toml", manifest.as_bytes())
