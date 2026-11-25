@@ -82,21 +82,51 @@ for i = 4, #arg do
   args[#args + 1] = arg[i]
 end
 local payload = airsstack.hook.payload()
-local event
+local hook
+
+-- Runs the hook on one event; a block from a hook that is not may_block is dropped with a line.
+local function run(event)
+  hook = hook or require(name)
+  event.args = args
+  local result = hook(event)
+  if type(result) == "table" and result.block ~= nil and not may_block then
+    airsstack.stdio.error("agentstacks: hook " .. name .. " tried to block but is not declared may_block; reason: "
+      .. tostring(result.block) .. "\n")
+    result.block = nil
+  end
+  return result
+end
+
+local result
 if kind == "native" then
-  event = { payload = payload, args = args }
+  result = run({ payload = payload })
 else
-  event = translate.event(payload)
+  local event = translate.event(payload)
   if event == nil then
     return
   end
-  event.args = args
-end
-local result = require(name)(event)
-if type(result) == "table" and result.block ~= nil and not may_block then
-  airsstack.stdio.error("agentstacks: hook " .. name .. " tried to block but is not declared may_block; reason: "
-    .. tostring(result.block) .. "\n")
-  result.block = nil
+  if event.event ~= nil then
+    result = run(event)
+  else
+    -- A list of events: the hook runs once per event, in order, until one blocks.
+    local contexts = {}
+    for _, each in ipairs(event) do
+      local one = run(each)
+      if type(one) == "table" then
+        if one.context ~= nil then
+          contexts[#contexts + 1] = tostring(one.context)
+        end
+        if one.block ~= nil then
+          result = { block = one.block }
+          break
+        end
+      end
+    end
+    if #contexts > 0 then
+      result = result or {}
+      result.context = table.concat(contexts, "\n")
+    end
+  end
 end
 local out = translate.result(result, payload)
 if out ~= nil then
@@ -117,6 +147,20 @@ What it does for each run:
 
 The table above is an example: claude extension (its `translate.lua`, with `tool_name=Edit` as the
 tool's own payload field). A real tool's translator decides the actual output text.
+
+`M.event` may return a list of events instead of one. The rules:
+
+| Case | Result |
+|---|---|
+| `M.event` returns a table with `event` set | one event; the result is exactly what the hook returned |
+| `M.event` returns a list (a table with no `event` key) | the hook runs once per element, in order; each gets `args` |
+| a list, `may_block` 1, an element blocks | the loop stops; the result is `{ block = <that block>, context = <contexts so far, joined with "\n"> }` (the blocking element's context included) |
+| a list, `may_block` 0, an element blocks | the stderr line as above, the block dropped, the loop goes on |
+| a list where no hook returns context or block, or an empty list | `M.result` gets `nil` |
+| native kind | one event `{ payload = <raw>, args = … }` |
+| a context that is not a string | in a list it is joined after `tostring`; a single event passes it through unchanged |
+
+The hook module is required only when a hook runs, so a translator returning `nil` never loads it.
 
 `airsstack.stdio` (`error`, `write`) and `airsstack.hook.payload` exist under `confined`.
 
@@ -149,8 +193,9 @@ hook).
 `<root>/translate.lua` is one file per tool, written by the extension. It returns a module with two
 functions:
 
-- `M.event(payload)` returns the neutral event, or `nil` for an event that is not for this runtime
-  (the hook is then not run).
+- `M.event(payload)` returns the neutral event, a list of neutral events, or `nil` for an event that
+  is not for this runtime (the hook is then not run). A list makes the runtime run the hook once per
+  event ([section 4](#4-runtimelua)).
 - `M.result(result or nil, payload)` returns the string to print, or `nil`. `payload` is the raw
   payload for neutral and native hooks alike. The runtime passes it because the payload can be read
   only once.
@@ -175,9 +220,9 @@ Message hooks (`kind = "message"`) never reach the runtime. The extension render
 ## 9. Shims for other hook languages
 
 When a tool demands another hook language, the extension writes a thin shim. Example: OpenCode
-plugins are TypeScript. The shim only runs the command line of [section 3](#3-command-line) and
-forwards the payload and the result. It is an ordinary `write`, shown in the plan like any other
-file: the core gives it nothing new.
+hooks are JavaScript plugins (`.js`), so its shim is JavaScript. The shim only runs the command line
+of [section 3](#3-command-line) and forwards the payload and the result. It is an ordinary `write`,
+shown in the plan like any other file: the core gives it nothing new.
 
 ## 10. airsl on the machine
 
