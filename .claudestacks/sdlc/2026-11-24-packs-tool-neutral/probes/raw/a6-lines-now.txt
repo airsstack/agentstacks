@@ -1,0 +1,146 @@
+$ sh harness/lines.sh   # prints each changed line of today's packs/
+## core/agents/reviewer.md:19
+Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to load the rules you enforce and the DoD command set you must re-run. If none is installed, review for correctness only and say the stack rules were unavailable.
+## core/agents/reviewer.md:42
+Get the diff via `git diff` / `git log -p` / `git show`. `Bash` is for those and the DoD tooling only — no mutating commands.
+## core/agents/reviewer.md:100
+- You are a leaf: you have no `Agent` tool; do not spawn agents.
+## core/agents/explorer.md:26
+Use `Grep` / `Glob` to find, `Read` to confirm the exact line, `Bash` for read-only inspection (`git ls-files`, `git grep`, `ls`) only — never a mutating command.
+## core/agents/explorer.md:61,62
+- Read-only: you have no `Edit`/`Write`. You change nothing.
+- You are a leaf: you have no `Agent` tool; do not attempt to spawn agents.
+## core/agents/coder.md:18
+The stack's rules and Definition of Done are not in your context by default. At task start, invoke the installed guidelines skill via `Skill` to load them — e.g. `rust-guidelines` for Rust, or whichever `*-guidelines` skill matches the project's language. It gives you the rules to follow and the exact DoD command set to pass.
+## core/agents/coder.md:71
+- You are a leaf: you have no `Agent` tool; do not attempt to spawn other agents.
+## core/scripts/install-airsl.sh:7
+# than the problem it solves. The SessionStart preflight names this script instead of running it.
+## core/skills/process-guidelines/references/agent-orchestration.md:22,24
+
+- A spawned agent does NOT spawn another agent — none of them carry the `Agent` tool.
+- All chaining lives in the orchestrator: the main thread, or a one-level workflow script.
+## core/skills/process-guidelines/references/agent-orchestration.md:72,75
+
+- An agent spawning another agent (recursion hides steps, bypasses the gate). Forbidden — agents have no
+  `Agent` tool.
+- A coder diff going straight to commit without a review pass.
+## core/skills/process-guidelines/references/model-routing.md:3,4
+Governs **delegated agents only** — anything spawned via the `Agent` tool. It cannot change the main
+loop, which runs on the session model the user picked. If a trivial task is faster inline, do it
+## core/skills/process-guidelines/references/model-routing.md:20,22
+Effort is definition-only — the `Agent` tool's spawn parameters expose `model` but not `effort`, so a
+per-spawn override is not available.
+
+## core/skills/orchestrate/SKILL.md:8
+The driver for the `coder → reviewer` pipeline. The pack agents are **leaves** — they have no `Agent` tool and cannot chain themselves. So the chaining lives HERE, on the main thread that runs this skill. You are the orchestrator: you spawn each agent, route every finding, and hold the commit gate.
+## core/skills/orchestrate/SKILL.md:18
+Named {{agent coder}}, {{agent reviewer}}, and so on. Spawn each via the `Agent` tool's `subagent_type`. Both dials are set in each agent's frontmatter — the spawn can override `model:`, but effort comes from the definition only.
+## core/skills/orchestrate/SKILL.md:67
+Run each verification once, at the point it is meaningful, and then trust it. The stack's Definition of Done runs **once for the batch**, not once per task — a green gate is not re-run to confirm it is still green. A file you just wrote through `Edit` or `Write` is not read back; the tool would have failed. The reviewer's own DoD run is the one deliberate duplication in this flow, and it replaces any auditing pass of yours over the coder's receipt — there is no third run. A verification that cannot change what you do next is not a verification.
+## core/skills/orchestrate/SKILL.md:136
+- An agent spawning another agent (recursion hides steps, bypasses the gate). Agents have no `Agent` tool — keep it that way.
+## core/skills/context-handoff/references/protocol.md:103,106
+Every spawn writes exactly one handoff file — its own, never another agent's, never
+source. `{{agent coder}}` writes with its `Write` tool. The read-only agents (`{{agent explorer}}`,
+`{{agent reviewer}}`) carry `Write` **scoped by instruction** to the handoff directory only —
+writing the report is a first-class duty, distinct from mutating source, which they still
+## core/skills/context-handoff/SKILL.md:24,26
+By the time you read this file the placeholder is already an absolute path — copy it. An agent
+cannot compute it: the project directory is not a variable in the environment of a `Bash` tool
+call.
+## core/skills/snapshot-save/SKILL.md:11,12
+project snapshot memory; it is **deliberately separate from Claude's native memory tool**, whose store has
+size limits we are working around.
+## core/skills/snapshot-save/SKILL.md:37
+├── index.md                          # custom index — one line per snapshot (NOT Claude's MEMORY.md)
+## core/skills/snapshot-save/SKILL.md:48,50
+The index file is named `index.md` **on purpose** — never name it `MEMORY.md`. `MEMORY.md` is the
+filename Claude's native memory tool drives; reusing it would collide with native memory and defeat
+the point of this store.
+## core/skills/snapshot-save/SKILL.md:155,156
+- Write to Claude's native memory store (`~/.claude/projects/.../memory/` or any `MEMORY.md`). This
+  skill owns the snapshot store only.
+## core/skills/snapshot-load/SKILL.md:13,15
+This reads the project **snapshot** store only — **not** Claude's native memory tool. The native
+store has size limits we are working around; the snapshot store lives outside the repo at the path
+below.
+## core/skills/snapshot-load/SKILL.md:21
+snapshot — NOT Claude's `MEMORY.md`); the timestamped snapshot files live alongside it. See
+## core/skills/snapshot-load/SKILL.md:69
+- Read Claude's native memory store. Only this snapshot store.
+## sdlc/agents/chain-reader.md:22,23
+`Glob` enumerates, `Grep` locates, `Read` pulls the lines. `Bash` is read-only (`ls`,
+`git ls-files`, `git grep`).
+## sdlc/agents/chain-reader.md:60,62
+- Read-only toward the corpus; `Write` is for your report file alone.
+- Never flip a `status`, never `git commit`.
+- Leaf: no `Agent` tool.
+## sdlc/agents/artifact-reviewer.md:43
+- Spawning an agent (you have no `Agent` tool).
+## sdlc/agents/artifact-reviewer.md:92,96
+- `Bash` is read-only (`ls`, `git ls-files`, `git grep`, `git log`), plus re-running a
+  probe a spec records, only in a scratch directory and only if it leaves the repository and
+  artifact unchanged. Otherwise report it as not re-run, with the reason.
+- `Write` is for your report file only.
+- Leaf: no `Agent` tool.
+## sdlc/agents/task-briefer.md:66,68
+- a negative ("there is no such flag");
+- any statement about the `claude` binary, Claude Code's documented behaviour, or another
+  system this repository does not own.
+## sdlc/agents/task-briefer.md:89
+`Bash` is read-only (`ls`, `cat`, `sed -n`, `git ls-files`).
+## sdlc/skills/execute/SKILL.md:39,41
+   `handoff: <session-dir>/01-task-briefer-ledger.md`, `handoff-protocol: <path>`. Put one
+   TodoWrite item per task. Never read the plan end to end. If the agent is missing, use
+   `grep -n '^### Task' <plan>`.
+## sdlc/skills/distill/SKILL.md:41,43
+One at a time, never a batch. Each carries the finding, the `chain/plan` citations, and one concrete
+edit shown in full: a line for the target repo's `CLAUDE.md`, or a specific change to a skill file.
+Ask accept / edit / skip. Edit means the user reshapes it.
+## sdlc/scripts/status.sh:7,9
+# derives the board instead, and deliberately no `exec` — that would hand
+# airsl's status back to Claude Code.
+
+## sdlc/scripts/lib/status.lua:768,771
+
+-- The session-start text is held under this many bytes: Claude Code caps a
+-- hook's stdout at 10,000 characters, and a byte count never undercounts.
+M.ATTENTION_LIMIT = 9000
+## journal/skills/review/SKILL.md:69,70
+5. Spawn the `{{agent curator}}` subagent (`subagent_type: {{agent curator}}`), passing `scope`, the
+   `vault` root, the `health_report` temp path, the literal
+## journal/skills/review/SKILL.md:84,86
+
+   If this exits non-zero, report that the next SessionStart staleness check
+   will rebuild — do not fail the review (the curator's edits persist).
+## journal/skills/recall/SKILL.md:40,42
+3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
+   `subagent_type: {{agent recall}}`), passing `query`, `project`, and
+   `mode=recall`. The subagent reads only the derived index and returns a
+## journal/skills/link/SKILL.md:46,48
+3. Spawn the `{{agent recall}}` subagent (Task / Agent tool,
+   `subagent_type: {{agent recall}}`), passing `query`, `project`, `mode=link`,
+   and `subject_stem`. The subagent excludes the subject and ranks plausible
+## journal/references/note-schema.md:109,116
+## The `session:` join field
+
+An atomic note authored during a session carries a `session: <id8>`
+frontmatter scalar, where `<id8>` is the first eight characters of the Claude
+session id (the same `<id8>` used in the `session-<id8>` story stem). The
+session-story writer globs `notes/*.md` for notes whose `session` equals the
+current `<id8>` and lists them under **Notes spun off** as `[[wikilinks]]`.
+The two writers join on this metadata only; neither edits the other's file,
+## journal/agents/note.md:19,24
+
+- `topic` — the subject the user asked to capture (e.g. "auth rbac architecture").
+- `session_id`, `id8` — the Claude session id and its first eight characters.
+- `tpath` — absolute path to the transcript JSONL, or empty if none.
+- `project` — the human-readable project floor (from `project-key.lua`).
+
+## guideline-rust/README.md:14,15
+Add the `core` pack as well: its dispatcher is what points Claude at this skill, and its agents are
+what run the Definition of Done. On its own the skill still loads on request.
+## guideline-python/README.md:15,16
+Add the `core` pack as well: its dispatcher is what points Claude at this skill, and its agents are
+what run the Definition of Done. On its own the skill still loads on request.

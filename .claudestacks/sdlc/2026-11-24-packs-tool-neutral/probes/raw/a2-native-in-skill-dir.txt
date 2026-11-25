@@ -1,0 +1,41 @@
+$ cat packs/journal/native/{claude,opencode}/skills/journal-capture/transcript.md
+id={{var session_id}} root={{root}} dir={{skill_dir journal/capture}}
+id={{var session_id}} root={{root}} dir={{skill_dir journal/capture}}
+$ agentstacks plan
+agentstacks plan
+
+  create   .claude/skills/journal-capture/transcript.md    journal
+  create   .opencode/skills/journal-capture/transcript.md  journal
+  skip     core/hook/3: claude shows no hook output to the model at session end
+  skip     core/hook/1: opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match
+  skip     core/hook/3: opencode has no hook when a session ends
+  skip     core/hook/8: opencode has no hook when a subagent stops
+  skip     core/hook/9: opencode has no hook when a subagent stops
+  skip     journal/hook/1: opencode has no hook when a subagent stops
+  skip     sdlc/hook/1: opencode has no hook when a subagent stops
+
+  airsl    0.1.5 (pinned)
+
+2 to write, 0 to delete, 266 unchanged, 7 skipped
+exit=0
+$ agentstacks apply --yes
+agentstacks plan
+
+  create   .claude/skills/journal-capture/transcript.md    journal
+  create   .opencode/skills/journal-capture/transcript.md  journal
+  skip     core/hook/3: claude shows no hook output to the model at session end
+  skip     core/hook/1: opencode runs session.start hooks only for a new session (source "startup"), which this hook does not match
+  skip     core/hook/3: opencode has no hook when a session ends
+  skip     core/hook/8: opencode has no hook when a subagent stops
+  skip     core/hook/9: opencode has no hook when a subagent stops
+  skip     journal/hook/1: opencode has no hook when a subagent stops
+  skip     sdlc/hook/1: opencode has no hook when a subagent stops
+
+  airsl    0.1.5 (pinned)
+
+2 to write, 0 to delete, 266 unchanged, 7 skipped
+applied: 2 written, 0 deleted
+exit=0
+$ cat .claude/skills/journal-capture/transcript.md .opencode/skills/journal-capture/transcript.md
+id=${CLAUDE_SESSION_ID} root=.claude/agentstacks/journal dir=.claude/skills/journal-capture
+id=${OPENCODE_SESSION_ID} root=.opencode/agentstacks/journal dir=.opencode/skills/journal-capture

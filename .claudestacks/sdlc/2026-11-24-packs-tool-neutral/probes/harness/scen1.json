@@ -1,0 +1,4 @@
+[ { "tool": "shell", "args": { "command": "env | grep -E '^(OPENCODE|AGENTSTACKS)' | sort > env.txt; command -v opencode > which.txt; opencode session export \"$OPENCODE_SESSION_ID\" > live.json 2> live.err; echo $? > live.rc; opencode session export --standalone \"$OPENCODE_SESSION_ID\" > live-sa.json 2> live-sa.err; echo $? > live-sa.rc; echo ok" } },
+  { "tool": "subagent", "args": { "agent": "journal-capture", "description": "probe", "prompt": "Say hi." } },
+  { "text": "child done" },
+  { "text": "done" } ]

@@ -42,6 +42,10 @@ fail.
   `agents/task-briefer.md`.
 - The pack format, if neutral text needs a new token to name a tool-specific thing.
 - `extensions/claude/`, which must keep rendering the reworked packs into the same behaviour.
+- `extensions/opencode/lib/frontmatter.lua`: an agent's `permissions` deny `external_directory`, so
+  on OpenCode every pack agent with `tools` is refused reads and writes outside the project (the
+  journal vault, handoff reports in `$TMPDIR`). Added 2026-11-25, on the author's word, after the
+  design probes found it.
 - The claudevs corpus and the pack chapters of the book (`ch02-*`).
 - `packs/CHANGELOG.md` and the next `packs-v*` release.
 
@@ -65,7 +69,8 @@ fail.
 
 ## Non-goals
 
-- The OpenCode extension itself. That is the sibling chain `2026-11-24-opencode-extension`.
+- The OpenCode extension itself, except the agent permission fix above. That is the sibling chain
+  `2026-11-24-opencode-extension`.
 - Rewriting pack content for OpenCode beyond what tool neutrality and the journal rework need
   (`foundation/02` non-goal).
 - New skills, agents or packs.

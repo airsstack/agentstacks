@@ -1,0 +1,19 @@
+$ grep -rnE <pattern> packs/ <excludes> | grep -c /native/   # before the filter
+13
+packs/core/native/claude/hooks.toml:3:event     = "PreToolUse"
+packs/core/native/claude/hooks.toml:13:event     = "PreToolUse"
+packs/core/native/claude/skills/core-statusline/SKILL.md:6:  Installs machine-wide into ~/.claude, or for one project on
+packs/core/native/claude/skills/core-statusline/SKILL.md:27:| Writes to | `~/.claude/settings.json` | `<project>/.claude
+packs/core/native/claude/skills/core-statusline/SKILL.md:28:| Copies files | yes, into `~/.claude/statusline/` | **no** 
+packs/core/native/claude/skills/core-statusline/SKILL.md:32:**Ask the user which one, with `AskUserQuestion`.** Do not g
+packs/core/native/claude/skills/core-statusline/SKILL.md:41:grep -l statusLine "$HOME/.claude/settings.json" 2>/dev/null
+packs/core/native/claude/skills/core-statusline/SKILL.md:42:grep -l statusLine .claude/settings.local.json 2>/dev/null &
+packs/core/native/claude/skills/core-statusline/SKILL.md:136:   test -f .claude/settings.json && grep -l statusLine .cla
+packs/core/native/claude/skills/core-statusline/SKILL.md:137:   test -f .claude/settings.local.json && grep -l statusLin
+packs/core/native/claude/skills/core-statusline/SKILL.md:146:   Global — removes the `statusLine` key and deletes `~/.cl
+packs/core/native/claude/skills/core-statusline/SKILL.md:178:- Precedence, highest first: `.claude/settings.local.json`,
+packs/core/native/claude/skills/core-statusline/SKILL.md:179:  `~/.claude/settings.json`. So a project install always wi
+$ ... | grep -v /native/ | grep -c .   # after the filter
+46
+$ ... | grep -v /native/ | cut -d: -f1 | sort -u | wc -l   # files
+      21

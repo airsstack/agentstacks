@@ -1,0 +1,20 @@
+$ sh harness/t2.sh   # scenario harness/scen2.json, harness/run-abs.sh
+exit=0
+--- env.txt
+OPENCODE_DISABLE_AUTOCOMPACT=true
+OPENCODE_DISABLE_AUTOUPDATE=1
+OPENCODE_DISABLE_MODELS_FETCH=1
+OPENCODE_DISABLE_PRUNE=true
+OPENCODE_SESSION_ID=ses_deef9a0cdffeqNo5pSsAOTNYXb
+OPENCODE_TERMINAL=1
+OPENCODE=1
+--- path.txt
+/usr/bin:/bin:/usr/sbin:/sbin:/Users/hiraq/.nvm/versions/node/v25.1.0/bin:/Users/hiraq/.local/bin
+--- which.txt
+--- which.rc
+1
+--- live.rc
+127
+--- live.err
+zsh:1: command not found: opencode
+       0 live.json

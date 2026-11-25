@@ -1,0 +1,8 @@
+$ sh harness/run3.sh <t9> <port> ses_zzzzprobe0000000000000009 turn1.json "first prompt"; then turn2.json "second prompt"   # --standalone
+exit=0
+exit=0
+inside the session: status = stopped, rc = 0, status again = stopped
+after-run export exit=0
+messages 7, server-restarted messages 0
+$ pgrep -fl scratchpad/tn/t9
+exit=1

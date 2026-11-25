@@ -1,0 +1,58 @@
+$ sh harness/t1.sh service <port>   # scenario harness/scen1.json
+exit=0
+--- env.txt
+AGENTSTACKS_PROJECT_DIR=/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/2c5e6598-abe6-4df1-bfda-1cd3d720d32e/scratchpad/tn/t1-service/proj
+OPENCODE_DISABLE_AUTOCOMPACT=true
+OPENCODE_DISABLE_AUTOUPDATE=1
+OPENCODE_DISABLE_MODELS_FETCH=1
+OPENCODE_DISABLE_PRUNE=true
+OPENCODE_SESSION_ID=ses_deef9dab2ffeDlTZXy2jSdFdH5
+OPENCODE_TERMINAL=1
+OPENCODE=1
+--- which.txt
+/private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/2c5e6598-abe6-4df1-bfda-1cd3d720d32e/scratchpad/tn/t1-service/bin/opencode
+--- live.rc
+0
+--- live-sa.rc
+0
+--- live.err
+
+--- live-sa.err
+
+    1791 live.json
+    2169 live-sa.json
+    3960 total
+$ node <tools> requests.jsonl
+request 1 tools: edit generate_image generate_video glob grep question read shell skill subagent webfetch websearch write execute
+  subagent properties ["agent","description","prompt","model","sessionID"] required ["agent","description","prompt"]
+request 2 tools: edit generate_image generate_video glob grep question read shell skill subagent webfetch websearch write execute
+  subagent properties ["agent","description","prompt","model","sessionID"] required ["agent","description","prompt"]
+request 3 tools: edit glob grep opencode_worktree_remove read shell skill write
+request 4 tools: edit generate_image generate_video glob grep question read shell skill subagent webfetch websearch write execute
+  subagent properties ["agent","description","prompt","model","sessionID"] required ["agent","description","prompt"]
+request 5 tools: edit generate_image generate_video glob grep question read shell skill subagent webfetch websearch write execute
+  subagent properties ["agent","description","prompt","model","sessionID"] required ["agent","description","prompt"]
+request 6 tools: edit generate_image generate_video glob grep question read shell skill subagent webfetch websearch write execute
+  subagent properties ["agent","description","prompt","model","sessionID"] required ["agent","description","prompt"]
+$ node <msgs> proj/live.json
+keys ["info","messages"] info.id ses_deef9dab2ffeDlTZXy2jSdFdH5 messages 1
+  user  probe  Reminder: run /core-snapshot-load for the current git
+$ node <msgs> proj/live-sa.json
+keys ["info","messages"] info.id ses_deef9dab2ffeDlTZXy2jSdFdH5 messages 2
+  user  probe  Reminder: run /core-snapshot-load for the current git
+  synthetic  The server restarted while you were working. Continue from w
+$ sh harness/oc.sh <dir> service stop
+exit=0
+$ sh harness/oc.sh <dir> session export --standalone ses_deef9dab2ffeDlTZXy2jSdFdH5   # after the run
+exit=0
+keys ["info","messages"] info.id ses_deef9dab2ffeDlTZXy2jSdFdH5 messages 10
+  user  probe  Reminder: run /core-snapshot-load for the current git
+  assistant tool:shell 
+  synthetic  The server restarted while you were working. Continue from w
+  assistant tool:subagent 
+  assistant text 
+  synthetic  <background-result kind="subagent" sessionID="ses_deef9d37ef
+  assistant text 
+  idle  
+  assistant text 
+  idle  

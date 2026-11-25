@@ -1,0 +1,40 @@
+$ RUNMODE=" " sh harness/run3.sh <t4> <port> ses_zzzzprobe0000000000000004 turn1.json "first prompt"; then turn2.json "second prompt"
+exit=0
+exit=0
+export.rc: 0
+left in TMPDIR: none
+$ node <msgs> proj/export-copy.json   # the in-session export of turn 2
+info.id ses_zzzzprobe0000000000000004 messages 4
+  user  first prompt  Reminder: run /core-snapshot-load for the curr
+  assistant text 
+  idle  
+  user  second prompt  Reminder: run /core-snapshot-load for the cur
+$ opencode session export --standalone ses_zzzzprobe0000000000000004   # after both runs, service stopped
+exit=0
+info.id ses_zzzzprobe0000000000000004 messages 10
+  user  first prompt  Reminder: run /core-snapshot-load for the curr
+  assistant text 
+  idle  
+  user  second prompt  Reminder: run /core-snapshot-load for the cur
+  assistant tool:shell 
+  synthetic  The server restarted while you were working. Continue from w
+  assistant text 
+  idle  
+  assistant text 
+  idle  
+
+$ grep ^permissions .opencode/agents/journal-capture.md   # patched
+permissions: [{"action":"*","effect":"deny","resource":"*"},{"action":"external_directory","effect":"allow","resource":"*"},{"action":"read","effect":"allow","resource":"*"},{"action":"edit","effect":"allow","resource":"*"},{"action":"shell","effect":"allow","resource":"*"},{"action":"glob","effect":"allow","resource":"*"},{"action":"grep","effect":"allow","resource":"*"}]
+$ sh harness/run3.sh <t5> <port> ses_zzzzprobe0000000000000005 turn.json "probe"
+exit=0
+$ node results.mjs requests.jsonl   # child requests
+request 2 (child) tool results: 0
+request 4 (child) tool results: 1
+  read: Read file /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/2c5e6598-abe6-4df1-bfda-1cd3d720d32e/scratchpad/tn/t5/tmp/fixed.txt, lines 1-1 1: outside
+request 5 (child) tool results: 2
+  read: Read file /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/2c5e6598-abe6-4df1-bfda-1cd3d720d32e/scratchpad/tn/t5/tmp/fixed.txt, lines 1-1 1: outside
+  write: Created file successfully: /private/tmp/claude-501/-Users-hiraq-Projects-airsstack-agentstacks/2c5e6598-abe6-4df1-bfda-1cd3d720d32e/scratchpad/tn/t5/tmp/child-write.txt
+child-write.txt: child
+$ pgrep -fl scratchpad/tn
+6816 tee <scratch>/tn/t45.out   (the tee that captured this file; no OpenCode or mock process)
+exit=0

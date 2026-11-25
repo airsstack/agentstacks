@@ -1,0 +1,5 @@
+$ mktemp "${TMPDIR:-/tmp}/journal-XXXXXX"   # twice, macOS /usr/bin/mktemp
+/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T//journal-kPYJrP exit=0
+/var/folders/8w/4ccj7cw90nx4d32s72tqf5nw0000gn/T//journal-VWgojQ exit=0
+-rw-------@
+removed: 2 listing lines of errors
