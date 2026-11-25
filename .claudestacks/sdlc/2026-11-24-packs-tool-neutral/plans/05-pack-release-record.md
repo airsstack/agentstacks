@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 02, 03]
 built-on: 63f62977694c
@@ -67,3 +67,16 @@ book-build` prints no `[ERROR]`, and `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod
 ## Proof
 
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green.
+
+## Review findings
+
+One reviewer pass over the diff of plans 04-06 found nothing in this plan. It checked:
+
+- the versions: core 0.1.1, sdlc 0.1.1 and journal 0.2.0, with the guideline packs and the opencode extension still at 0.1.0;
+- that `### Changed` comes after `### Added` under `[Unreleased]`;
+- the section's claims, against `packs/journal/native/opencode/skills/journal-capture/session.md:6` and `extensions/opencode/lib/frontmatter.lua:27`.
+
+## Deviations
+
+- 2026-11-25 — The orchestrator built this plan inline, with no task-briefer or coder. It was reviewed together with plans 04 and 06, and no per-task commit was made.
+- 2026-11-25 — The changelog bullets copy spec §9 word for word. They do not name the `mktemp` failure branch that plan 03 added to the OpenCode `session.md`. The journal README covers that case: "otherwise they write without the transcript and say why".

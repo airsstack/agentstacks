@@ -2,12 +2,13 @@
 // usage: node check.mjs <opencode> <agentstacks>
 //
 // Builds a scratch project (the extension and the check pack copied in, `agentstacks init`
-// applied), then runs scenarios S1-S7. Every OpenCode run is isolated: HOME and the XDG
+// applied), then runs scenarios S1-S8b. Every OpenCode run is isolated: HOME and the XDG
 // directories live in the scratch directory, the model is the mock from mock.mjs, and the child
 // environment is built explicitly rather than inherited. Prints `ok <S>` or `FAIL <S>: <reason>`
 // per scenario and exits 1 when any failed. Every child it starts (mock, server, OpenCode run)
 // runs in its own process group; a run's group is killed when the run ends, and every mock and
-// server group at the end.
+// server group at the end. A background service a scenario starts is not in a group the check
+// kills: the scenario stops it, and so does the cleanup at exit or on a signal.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
@@ -35,6 +36,8 @@ const AGENTSTACKS = path.resolve(agentstacksArg);
 
 const SCRATCH = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "opencode-check-")));
 const live = new Set();
+// The environment of a background service a scenario may have started and not yet stopped.
+let serviceEnv = null;
 
 // Children are spawned detached, so each is the leader of its own process group; killing the
 // group (negative pid) takes any grandchild with it.
@@ -50,6 +53,10 @@ function killAll() {
 
 function cleanup() {
   killAll();
+  if (serviceEnv) {
+    spawnSync(OPENCODE, ["service", "stop"], { env: serviceEnv, timeout: 60000 });
+    serviceEnv = null;
+  }
   fs.rmSync(SCRATCH, { recursive: true, force: true });
 }
 
@@ -300,6 +307,81 @@ function pathWithoutAirsl(binDir) {
   return out.join(path.delimiter);
 }
 
+// PATH with a directory in front that holds a link named `opencode` to the pinned binary. The check
+// runs OpenCode by absolute path, and a session's shell finds `opencode` only on PATH, so scenarios
+// whose shell steps run `opencode` pass this to OpenCode.
+function pathWithOpencode(binDir) {
+  fs.mkdirSync(binDir, { recursive: true });
+  const link = path.join(binDir, "opencode");
+  if (!fs.existsSync(link)) fs.symlinkSync(OPENCODE, link);
+  return [binDir, process.env.PATH ?? ""].join(path.delimiter);
+}
+
+function parseJson(raw, what) {
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Failure(`${what} is not JSON (${err.message}): ${clip(raw)}`);
+  }
+}
+
+// The messages of a finished session, read the way a user reads it after the run, once the
+// background service is stopped: exported in-process with --standalone.
+async function sessionMessages(oc, session) {
+  const exported = await oc(["session", "export", "--standalone", session]);
+  assert(exported.code === 0, `opencode session export exited ${exported.code}: ${clip(exported.stderr)}`);
+  const { messages } = parseJson(exported.stdout, "the session export");
+  assert(
+    Array.isArray(messages) && messages.length > 0,
+    `the session export has no messages: ${clip(exported.stdout)}`,
+  );
+  return messages;
+}
+
+// What `opencode service status` prints: `stopped`, or the running service's URL.
+async function serviceStatus(oc) {
+  const status = await oc(["service", "status"]);
+  assert(
+    status.code === 0,
+    `opencode service status exited ${status.code}: ${clip(status.stdout + status.stderr)}`,
+  );
+  return status.stdout.trim();
+}
+
+// Refuses to go on when a background service already answers, which may be a developer's own:
+// the scenario would see it and stop it. From here on the cleanup stops a service in `env`.
+async function requireNoService(oc, env) {
+  const status = await serviceStatus(oc);
+  assert(
+    status === "stopped",
+    `an OpenCode background service already runs at ${status}; stop it and run the check again`,
+  );
+  serviceEnv = env;
+}
+
+// Stops the background service; once the stop succeeds the cleanup has none left to stop.
+async function stopService(oc) {
+  const stopped = await oc(["service", "stop"]);
+  if (stopped.code === 0) serviceEnv = null;
+}
+
+// Fails when a background service still runs after a scenario stopped it.
+async function requireStopped(oc) {
+  const status = await serviceStatus(oc);
+  assert(status === "stopped", `a background service is left running at ${status}`);
+}
+
+// The messages OpenCode adds to a session when its server restarted underneath it.
+const restartMessages = (messages) =>
+  messages.filter((m) => typeof m?.text === "string" && m.text.startsWith("The server restarted"));
+
+// A file a session's shell step wrote into the project, trimmed.
+function projectFile(project, file) {
+  const full = path.join(project, file);
+  assert(fs.existsSync(full), `${file} was not written`);
+  return fs.readFileSync(full, "utf8").trim();
+}
+
 // ---- scenarios ------------------------------------------------------------------------------
 
 async function s1(proj) {
@@ -529,6 +611,100 @@ async function s7(proj) {
   }
 }
 
+// A session with no background service: the shell sees `stopped`, and nothing restarts under it.
+async function s8a(proj) {
+  const project = copyProject(proj, "S8a");
+  const steps = [
+    { text: "first answer" },
+    { tool: "shell", args: { command: "opencode service status > status.txt; echo $? > rc.txt" } },
+    { text: "done" },
+  ];
+  await withOpencode(
+    "S8a",
+    steps,
+    project,
+    async ({ oc, env }) => {
+      await requireNoService(oc, env);
+      let session;
+      try {
+        const first = await oc(runArgs("hi"));
+        assert(first.code === 0, `opencode run exited ${first.code}: ${clip(first.stderr)}`);
+        session = sessionId(first.stdout);
+        const second = await oc(runArgs("status", "--session", session));
+        assert(second.code === 0, `opencode run --session exited ${second.code}: ${clip(second.stderr)}`);
+
+        const rc = projectFile(project, "rc.txt");
+        const status = projectFile(project, "status.txt");
+        assert(rc === "0", `opencode service status in the session exited ${rc}: ${clip(status)}`);
+        assert(status === "stopped", `opencode service status in the session printed ${JSON.stringify(status)}, not "stopped"`);
+      } finally {
+        await stopService(oc);
+      }
+      await requireStopped(oc);
+      const restarted = restartMessages(await sessionMessages(oc, session));
+      assert(restarted.length === 0, `the session has a restart message: ${clip(restarted)}`);
+    },
+    { homeExtra: { PATH: pathWithOpencode(path.join(SCRATCH, "bin-S8a")) } },
+  );
+}
+
+// A session on a running background service: the shell exports its own session through it, and
+// nothing restarts under the session.
+async function s8b(proj) {
+  const project = copyProject(proj, "S8b");
+  const steps = [
+    { text: "first answer" },
+    {
+      tool: "shell",
+      args: { command: 'opencode session export "$OPENCODE_SESSION_ID" > export.json; echo $? > rc.txt' },
+    },
+    { text: "done" },
+  ];
+  await withOpencode(
+    "S8b",
+    steps,
+    project,
+    async ({ oc, env }) => {
+      await requireNoService(oc, env);
+      let session;
+      try {
+        // Not through run(): it kills the child's process group when the child closes, which could
+        // take the background service with it.
+        const start = spawnSync(OPENCODE, ["service", "start"], {
+          cwd: project,
+          env,
+          encoding: "utf8",
+          timeout: 60000,
+        });
+        assert(
+          start.status === 0,
+          `opencode service start exited ${start.status}: ${clip(String(start.stdout) + String(start.stderr))}`,
+        );
+        const url = await serviceStatus(oc);
+        assert(url.startsWith("http://"), `opencode service status printed ${JSON.stringify(url)}, not a URL`);
+
+        const first = await oc(runArgs("hi"));
+        assert(first.code === 0, `opencode run exited ${first.code}: ${clip(first.stderr)}`);
+        session = sessionId(first.stdout);
+        const second = await oc(runArgs("export", "--session", session));
+        assert(second.code === 0, `opencode run --session exited ${second.code}: ${clip(second.stderr)}`);
+
+        const rc = projectFile(project, "rc.txt");
+        assert(rc === "0", `opencode session export in the session exited ${rc}`);
+        const exported = parseJson(projectFile(project, "export.json"), "export.json");
+        assert(exported.info && exported.messages, `export.json lacks info or messages: ${clip(Object.keys(exported))}`);
+        assert(exported.info.id === session, `export.json info.id is ${exported.info.id}, not ${session}`);
+      } finally {
+        await stopService(oc);
+      }
+      await requireStopped(oc);
+      const restarted = restartMessages(await sessionMessages(oc, session));
+      assert(restarted.length === 0, `the session has a restart message: ${clip(restarted)}`);
+    },
+    { homeExtra: { PATH: pathWithOpencode(path.join(SCRATCH, "bin-S8b")) } },
+  );
+}
+
 // ---- main -----------------------------------------------------------------------------------
 
 async function main() {
@@ -537,7 +713,7 @@ async function main() {
 
   const proj = buildProject();
   let failed = 0;
-  const scenarios = [["S1", s1], ["S2", s2], ["S3", s3], ["S4", s4], ["S5", s5], ["S6", s6], ["S7", s7]];
+  const scenarios = [["S1", s1], ["S2", s2], ["S3", s3], ["S4", s4], ["S5", s5], ["S6", s6], ["S7", s7], ["S8a", s8a], ["S8b", s8b]];
   for (const [name, fn] of scenarios) {
     try {
       await fn(proj);

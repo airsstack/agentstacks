@@ -806,6 +806,100 @@ fn journal_session_lookup_is_per_tool() -> TestResult {
     Ok(())
 }
 
+/// The names pack text gate 4 keeps out of neutral pack text, read from its pattern in the
+/// `[tasks.lua]` table of `Makefile.toml`, so the rendered output is checked against the same list.
+fn gate4_names() -> Result<Vec<String>, Box<dyn Error>> {
+    let makefile =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Makefile.toml"))?;
+    let lua = make_task(&makefile, "lua")?;
+    let gate = &lua[lua
+        .find("# Gate 4")
+        .ok_or("[tasks.lua] has no `# Gate 4` block")?..];
+    let pattern = gate
+        .split_once("grep -rnE '")
+        .and_then(|(_, rest)| rest.split_once('\''))
+        .map(|(pattern, _)| pattern)
+        .ok_or("gate 4 has no `grep -rnE '<pattern>'`")?;
+    Ok(literal_alternatives(pattern))
+}
+
+/// Every literal string an extended regex of plain alternatives matches: `a|b` gives `a` and `b`,
+/// one group `x(a|b)y` gives `xay` and `xby`, and `\.` stands for `.`.
+fn literal_alternatives(pattern: &str) -> Vec<String> {
+    let mut alternatives = Vec::new();
+    let mut depth = 0_usize;
+    let mut from = 0;
+    for (at, character) in pattern.char_indices() {
+        match character {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '|' if depth == 0 => {
+                alternatives.push(&pattern[from..at]);
+                from = at + 1;
+            }
+            _ => {}
+        }
+    }
+    alternatives.push(&pattern[from..]);
+
+    let mut names = Vec::new();
+    for alternative in alternatives {
+        let alternative = alternative.replace("\\.", ".");
+        match (alternative.find('('), alternative.rfind(')')) {
+            (Some(open), Some(close)) if open < close => {
+                let (head, tail) = (&alternative[..open], &alternative[close + 1..]);
+                for inner in alternative[open + 1..close].split('|') {
+                    names.push(format!("{head}{inner}{tail}"));
+                }
+            }
+            _ => names.push(alternative),
+        }
+    }
+    names
+}
+
+/// No skill, agent or command rendered under `.opencode/` names a Claude Code tool, hook event or
+/// store path from pack text gate 4. `doc-comment-discipline.md` is skipped, as the gate skips it:
+/// it lists such names as words to keep out of source comments.
+#[test]
+fn opencode_instructions_name_no_claude_tools() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    let root = project.path();
+    init_both(root)?;
+    let names = gate4_names()?;
+    for known in ["subagent_type", "`Agent`", ".claude/"] {
+        assert!(
+            names.iter().any(|name| name == known),
+            "gate 4's names lack {known}: {names:?}"
+        );
+    }
+
+    let mut hits = Vec::new();
+    for kind in ["skills", "agents", "commands"] {
+        for file in files_under(&root.join(".opencode").join(kind))? {
+            if file
+                .file_name()
+                .is_some_and(|name| name == "doc-comment-discipline.md")
+            {
+                continue;
+            }
+            let text = String::from_utf8_lossy(&fs::read(&file)?).into_owned();
+            for (number, line) in text.lines().enumerate() {
+                for name in &names {
+                    if line.contains(name.as_str()) {
+                        hits.push(format!("{}:{}: {name}", file.display(), number + 1));
+                    }
+                }
+            }
+        }
+    }
+    assert!(hits.is_empty(), "{}", hits.join("\n"));
+    Ok(())
+}
+
 #[test]
 fn rendered_files_keep_no_pack_syntax_and_names_match_their_paths() -> TestResult {
     if skip_without_airsl()? {
@@ -873,7 +967,7 @@ fn the_lua_gate_tests_the_packs_and_is_part_of_dod() -> TestResult {
         runs_over_packs("airsl test"),
         "[tasks.lua] does not run `airsl test` over packs"
     );
-    for gate in 1..=3 {
+    for gate in 1..=4 {
         let message = format!("pack text gate {gate}");
         assert!(lua.contains(&message), "[tasks.lua] has no `{message}`");
     }
@@ -888,7 +982,7 @@ fn the_lua_gate_tests_the_packs_and_is_part_of_dod() -> TestResult {
 }
 
 mod tests {
-    use super::{Version, frontmatter_name, parse_version};
+    use super::{Version, frontmatter_name, literal_alternatives, parse_version};
 
     const fn version(core: (u32, u32, u32), pre_release: bool) -> Version {
         Version { core, pre_release }
@@ -935,5 +1029,14 @@ mod tests {
         );
         assert_eq!(frontmatter_name("---\ndescription: d\n---\nname: z"), None);
         assert_eq!(frontmatter_name("no frontmatter"), None);
+    }
+
+    #[test]
+    fn expands_the_gate_pattern_into_literal_names() {
+        assert_eq!(
+            literal_alternatives("a b|`(Read|Task)`|\\.claude/|x(1|2)y"),
+            ["a b", "`Read`", "`Task`", ".claude/", "x1y", "x2y"]
+        );
+        assert_eq!(literal_alternatives("single"), ["single"]);
     }
 }

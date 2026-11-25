@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01]
 built-on: 63f62977694c
@@ -112,3 +112,29 @@ scenario prints `FAIL S8a`.
 
 - `cargo make opencode-check` prints `ok S1` … `ok S8b` and exits 0.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green.
+
+## Review findings
+
+One reviewer pass over the diff of plans 04-06. The reviewer read `check.mjs`, and the orchestrator ran `cargo make opencode-check`: `ok S1` … `ok S8b`. The reviewer named nothing as blocking. All seven findings were fixed on the author's word.
+
+After the fixes:
+
+- `cargo make opencode-check` → `ok S1` … `ok S8b`, `Build Done`
+- `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0
+
+- 🟡 fixed — A signal between S8b's start and its stop left the service running. `requireNoService` now records the scenario's env in `serviceEnv`, and `cleanup()` runs `opencode service stop` there until a stop succeeds. Seen: in the mutated run below, S8b failed with its service still up, and no OpenCode service process was left after the check exited.
+- 🟡 fixed — `.messages ?? []` could pass empty. `sessionMessages` now requires a non-empty `messages` array: `the session export has no messages: …`.
+- 🟡 / ❓ fixed — A developer's own service could be seen or stopped. S8a and S8b first run `requireNoService`. It refuses with `an OpenCode background service already runs at <url>; stop it and run the check again` and stops nothing. Whether the port is shared across HOMEs is still unproven; the guard holds either way.
+- 🔵 fixed — The header now says a scenario's background service is not in a group the check kills: the scenario stops it, and so does the cleanup at exit or on a signal.
+- 🔵 fixed — Every status read goes through `serviceStatus`, which reports a non-zero exit with its code: `opencode service status exited <code>: …`.
+- 🔵 fixed — Nothing caught a missing stop. Before the fix, `sessionMessages` stopped the service itself, so removing the `finally` stop still passed. Now `sessionMessages` does not stop it: the `finally` (`stopService`) is the only stop, `requireStopped` checks that none is left, and the session is read after that. Seen: with S8b's `stopService` removed, `FAIL S8b: a background service is left running at http://127.0.0.1:49374`; restored, `ok S8b`.
+- 🔵 fixed — S8a's in-session command now writes stdout only (`opencode service status > status.txt`), as the plan says.
+
+## Deviations
+
+- 2026-11-25 — One `claudestacks:coder` built this plan with no task-briefer brief; it read the plan's tasks directly. It built Tasks 1 and 2 together and made no per-task commit.
+- 2026-11-25 — Seen failing:
+  - Without the `PATH` helper: `FAIL S8a: opencode service status in the session exited 127: zsh:1: command not found: opencode`.
+  - With `service start` replaced by `--version`: `FAIL S8b: opencode service status printed "stopped", not a URL`.
+  - `--auto` did not change either result.
+- 2026-11-25 — Review fixes moved the after-run session read out of the `try`: the read now runs after the `finally` stop and `requireStopped`. The plan's order of assertions is otherwise kept.

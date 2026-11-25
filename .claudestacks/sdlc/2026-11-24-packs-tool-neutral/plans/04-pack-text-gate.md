@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 02, 03]
 built-on: 63f62977694c
@@ -97,3 +97,32 @@ land, and record the output.
 
 - `cargo make lua` ends with `pack text gates: 4 passed`.
 - `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` green.
+
+## Review findings
+
+One reviewer pass over the diff of plans 04-06. The reviewer re-ran the DoD: exit 0, `pack text gates: 4 passed`. It named nothing as blocking. All four findings were fixed on the author's word.
+
+After the fixes:
+
+- `cargo make lua` → `pack text gates: 4 passed`
+- `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod` → exit 0, `packs` tests 19 passed
+
+- 🔵 fixed — The gate 4 comment did not describe every excluded file. It now names each kind (READMEs and the changelog, Lua tests, the statusline and transcript-path scripts, `doc-comment-discipline.md`), in both `Makefile.toml` and `probes/final/gate4.sh`. The two stay byte-identical (`cmp` equal).
+- 🔵 fixed — Gate 4 excluded `docstring-discipline.md`, which holds no gate 4 name. The exclusion is removed from both files, and gate 4 still passes.
+- 🔵 fixed — `CLAUDE_ONLY_NAMES` was a hand-kept copy of the gate's names. The test now reads them from gate 4's pattern in `Makefile.toml`:
+  - `gate4_names` extracts the pattern, and `literal_alternatives` expands it. `expands_the_gate_pattern_into_literal_names` unit-tests the expansion.
+  - The test asserts that `subagent_type`, `` `Agent` `` and `.claude/` are among the names read.
+  - Seen following the gate: with `|with the skill tool` added to the pattern, the test failed on `.opencode/commands/core-discuss.md:4: with the skill tool`. `Makefile.toml` was then restored (`cmp` equal).
+- 🔵 fixed — The skip for `docstring-discipline.md` did nothing. It is removed, and the doc names only `doc-comment-discipline.md`.
+
+## Deviations
+
+- 2026-11-25 — No task-briefer ledger or briefs were used. The plan is small (two tasks), so the orchestrator read it and built both tasks inline instead of through coders.
+- 2026-11-25 — No context-handoff session was started. Each of the run's two subagents (plan 06's coder, then one reviewer) wrote to a literal temp path.
+- 2026-11-25 — Plans 04, 05 and 06 ran as one batch with one review over their joint diff. Per-task commits were not made.
+- 2026-11-25 — The plan's "seen failing" runs on a scratch copy of the tree were done in place instead. `` Spawn helpers with the `Agent` tool. `` was appended to `packs/core/agents/reviewer.md`, and the file was restored from a backup afterwards (`cmp` equal). Outputs:
+  - `` [tasks.lua] has no `pack text gate 4` ``
+  - `` .opencode/agents/core-reviewer.md:106: `Agent` ``
+  - `` packs/core/agents/reviewer.md:114: Spawn helpers with the `Agent` tool. `` then `pack text gate 4: tool-specific names in neutral pack text` (exit 1)
+- 2026-11-25 — The new test's doc first said "rendered for OpenCode". Clippy's `doc_markdown` lint refused `OpenCode` under `-D warnings`, so the doc now says "rendered under `.opencode/`".
+- 2026-11-25 — The review fixes changed `probes/final/gate4.sh`, the file the plan copies the block from: a new comment, and `--exclude=docstring-discipline.md` dropped. The spec was then amended to match (spec §13, A2; proof `probes/raw/a11-gate4-amended.txt`).

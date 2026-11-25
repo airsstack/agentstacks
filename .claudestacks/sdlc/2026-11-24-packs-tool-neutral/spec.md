@@ -279,7 +279,9 @@ copied byte for byte to:
 - `packs/journal/native/claude/skills/journal-capture/session.md`
 - `packs/journal/native/opencode/skills/journal-capture/session.md`
 
-`a8-final-session-rendered.txt` shows both installed and rendered. The Claude file:
+`a8-final-session-rendered.txt` shows both installed and rendered; the OpenCode file's
+`mktemp` failure branch was added after (§13), and `a12-opencode-session-amended.txt` shows the
+amended file equal to the shipped one and rendered. The Claude file:
 
 ````markdown
 # Session key and transcript
@@ -325,8 +327,10 @@ the project directory they resolved.
     as restarted. Tell the user `this OpenCode session does not run on the
     background service, so the journal was written without the transcript`,
     and pass an empty `tpath` and an empty `cleanup`.
-  - Otherwise run `mktemp "{{var tmpdir}}/journal-XXXXXX"` and take its output
-    as `<export>`, then run
+  - Otherwise run `mktemp "{{var tmpdir}}/journal-XXXXXX"`. If it fails, tell
+    the user `no temporary file could be made, so the journal was written
+    without the transcript`, and pass an empty `tpath` and an empty `cleanup`.
+    Otherwise take its output as `<export>`, then run
 
     ```sh
     opencode session export "<session_id>" > "<export>"
@@ -411,14 +415,16 @@ permissions: [{"action":"*","effect":"deny","resource":"*"},{"action":"external_
 ## 7. Pack text gate 4
 
 Added to `[tasks.lua]` in `Makefile.toml` after gate 3. The block is exactly
-`probes/final/gate4.sh`, which F7 ran:
+`probes/final/gate4.sh`, which F7 ran and, as amended (§13), `a11-gate4-amended.txt` ran:
 
 ```sh
 # Gate 4 keeps neutral pack text free of one tool's tool names, events and store. It reads
-# grep's status before filtering out native/<tool>/, as gate 3 does. The excluded files are
-# about one tool on purpose, or are history (CHANGELOG.md).
+# grep's status before filtering out native/<tool>/, as gate 3 does. It skips the READMEs and
+# CHANGELOG.md (documentation and history), the Lua tests, the scripts that read one tool's
+# own files (statusline*.lua, transcript-path.lua), and doc-comment-discipline.md, which lists
+# such names as words to keep out of source comments.
 rc=0
-found=$(grep -rnE 'subagent_type|TodoWrite|Task / Agent|`(Agent|Task|Bash|Read|Write|Edit|MultiEdit|Grep|Glob|Skill|WebFetch|WebSearch|AskUserQuestion|NotebookEdit)`|CLAUDE_CONFIG_DIR|CLAUDE_SESSION_ID|\.claude/|transcript JSONL|SessionStart|PreToolUse|PostToolUse|SubagentStop|UserPromptSubmit' packs/ --exclude=README.md --exclude=CHANGELOG.md --exclude='*_test.lua' --exclude='statusline*.lua' --exclude=transcript-path.lua --exclude=doc-comment-discipline.md --exclude=docstring-discipline.md) || rc=$?
+found=$(grep -rnE 'subagent_type|TodoWrite|Task / Agent|`(Agent|Task|Bash|Read|Write|Edit|MultiEdit|Grep|Glob|Skill|WebFetch|WebSearch|AskUserQuestion|NotebookEdit)`|CLAUDE_CONFIG_DIR|CLAUDE_SESSION_ID|\.claude/|transcript JSONL|SessionStart|PreToolUse|PostToolUse|SubagentStop|UserPromptSubmit' packs/ --exclude=README.md --exclude=CHANGELOG.md --exclude='*_test.lua' --exclude='statusline*.lua' --exclude=transcript-path.lua --exclude=doc-comment-discipline.md) || rc=$?
 if [ "$rc" -gt 1 ]; then
   echo "pack text gate 4: grep failed over packs/ (exit $rc)" >&2
   exit 1
@@ -434,7 +440,8 @@ fi
 - `Makefile.toml:201` becomes `echo "pack text gates: 4 passed"`.
 - `packs.rs` `the_lua_gate_tests_the_packs_and_is_part_of_dod` loops `for gate in 1..=4`
   (`crates/agentstacks-cli/tests/packs.rs:751`).
-- On today's tree the block reports exactly the 46 lines and exits 1 (F7). After §4-§5 it finds none.
+- On today's tree the block reports exactly the 46 lines and exits 1 (F7; the amended block reports
+  the same 46, `a11-gate4-amended.txt`). After §4-§5 it finds none (`a11`: exit 0).
 - It uses only `grep -rnE`, `--exclude` and a `grep -v` filter applied after grep's status is read,
   as gates 1-3 do on CI (`Makefile.toml:175,183,190,195`). The pattern holds no `'''`, so it fits
   the TOML literal string.
@@ -459,6 +466,7 @@ fi
 | E14 | Files outside the project | the main agent reads, creates and removes them without a prompt (F20). Agents can after §6a (F21, F22). | §6a |
 | E15 | An agent with `tools: []` | deny-all plus the external allow; still no usable tool. | §6a |
 | E16 | A third tool with no todo list | W4 makes the todo list optional. | §4 |
+| E17 | `mktemp` fails | no export; the user is told `no temporary file could be made, so the journal was written without the transcript`; empty `tpath` and `cleanup`. | OpenCode `session.md` |
 
 ## 9. Versions, changelog and docs
 
@@ -499,15 +507,16 @@ fi
 | `the_lua_gate_tests_the_packs_and_is_part_of_dod` | `packs.rs` | gates 1-4 are in the lua task |
 | `five_packs_install_on_both_tools` | `packs.rs` | `init` with `ext/claude`, `ext/opencode` and the five packs exits 0, and its skip lines are exactly the 7 of F1 |
 | `journal_session_lookup_is_per_tool` | `packs.rs` | `.claude/skills/journal-capture/session.md` and `.opencode/skills/journal-capture/session.md` equal the rendered texts of `a8-final-session-rendered.txt` |
-| `opencode_instructions_name_no_claude_tools` | `packs.rs` | no file under `.opencode/skills/`, `.opencode/agents/` or `.opencode/commands/` matches gate 4's pattern, except the two files gate 4 also excludes (`doc-comment-discipline.md`, `docstring-discipline.md`, rendered as skill references) |
+| `opencode_instructions_name_no_claude_tools` | `packs.rs` | no file under `.opencode/skills/`, `.opencode/agents/` or `.opencode/commands/` holds a name of gate 4's pattern, read from `Makefile.toml`, except `doc-comment-discipline.md`, which gate 4 also excludes (rendered as a skill reference) |
 | `opencode_agents_reach_outside_the_project` | `packs.rs` | every `.opencode/agents/*.md` has the `external_directory` allow rule right after the deny-all rule |
 | the `opencode` expected fixtures | `crates/agentstacks/tests/opencode.rs` | the rendered agents equal the updated expected files |
-| S8a `journal export, no service` | `check.mjs` | in a `--standalone` session with no background service, the shell's `opencode service status` prints `stopped` and exits 0; after the run, the session has no message whose text starts with `The server restarted` |
-| S8b `journal export, running service` | `check.mjs` | after `opencode service start` in the isolated HOME, a `--standalone` session's shell runs `opencode session export "$OPENCODE_SESSION_ID" > export.json`: exit 0, the file parses, `info.id` equals the session id; after the run, no `The server restarted` message; then `opencode service stop` |
+| S8a `journal export, no service` | `check.mjs` | refuses to start while `opencode service status` prints anything but `stopped`, stopping nothing; in a `--standalone` session with no background service, the shell's `opencode service status` prints `stopped` and exits 0; then `opencode service stop`, and `service status` prints `stopped`; after that, the session has a non-empty `messages` list and none whose text starts with `The server restarted` |
+| S8b `journal export, running service` | `check.mjs` | refuses to start while a service already runs, as S8a; after `opencode service start` in the isolated HOME, a `--standalone` session's shell runs `opencode session export "$OPENCODE_SESSION_ID" > export.json`: exit 0, the file parses, `info.id` equals the session id; then `opencode service stop`, and `service status` prints `stopped`; after that, a non-empty `messages` list and no `The server restarted` message |
 | `claudevs-check` | `cargo make claudevs-check` | unchanged; its tests read no pack (F5) |
 
 - S8a and S8b read the session after the run the way `o12-standalone-status-stopped.txt` does:
-  `opencode service stop`, then `opencode session export --standalone <id>`.
+  `opencode service stop`, then `opencode session export --standalone <id>`. A service a scenario
+  started is also stopped by the check's cleanup at exit or on a signal.
 - `check.mjs` runs OpenCode by absolute path and hands it the caller's `PATH` (`check.mjs:33,141,257`),
   on which the shell cannot find `opencode` (F19). So S8a and S8b, unlike S1-S7, prepend to
   OpenCode's `PATH` a scratch directory holding a link named `opencode` to the pinned binary.
@@ -537,3 +546,13 @@ fi
   does this one.
 - Starting OpenCode's background service for the user.
 - Hooks that OpenCode cannot run (the 7 skips of F1).
+
+## 13. Amendments
+
+Made 2026-11-25 after plans 01-06 were built, so the spec reads as the shipped code does.
+
+| # | Change | Proof |
+|---|---|---|
+| A1 | §5.2: the OpenCode `session.md` handles a failing `mktemp` (E17). | `a12-opencode-session-amended.txt` |
+| A2 | §7: the gate 4 comment names each excluded kind of file. `--exclude=docstring-discipline.md` is dropped, because that file holds none of gate 4's names. | `a11-gate4-amended.txt`: the same 46 lines on the F7 tree, exit 0 today |
+| A3 | §10: `opencode_instructions_name_no_claude_tools` reads its names from gate 4's pattern and skips only `doc-comment-discipline.md`. S8a and S8b refuse to run beside a service that is already running, check that none is left, and require a non-empty export. | `cargo make opencode-check`: `ok S1` … `ok S8b`; `AGENTSTACKS_REQUIRE_AIRSL=1 cargo make dod`: exit 0 (plans 04 and 06, `## Review findings`) |

@@ -14,8 +14,10 @@ the project directory they resolved.
     as restarted. Tell the user `this OpenCode session does not run on the
     background service, so the journal was written without the transcript`,
     and pass an empty `tpath` and an empty `cleanup`.
-  - Otherwise run `mktemp "{{var tmpdir}}/journal-XXXXXX"` and take its output
-    as `<export>`, then run
+  - Otherwise run `mktemp "{{var tmpdir}}/journal-XXXXXX"`. If it fails, tell
+    the user `no temporary file could be made, so the journal was written
+    without the transcript`, and pass an empty `tpath` and an empty `cleanup`.
+    Otherwise take its output as `<export>`, then run
 
     ```sh
     opencode session export "<session_id>" > "<export>"
