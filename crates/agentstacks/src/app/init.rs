@@ -7,9 +7,10 @@
 //! # Responsibilities
 //!
 //! - [`init`] refuses when the file is already there, collapses repeated arguments, classifies
-//!   each one with [`classify`], resolves it (the newest `packs-v*` tag of the official
-//!   repository, or the name in the manifest of a project directory), refuses two arguments of one
-//!   option that share a key, and writes the text [`render_project`] returns.
+//!   each one with [`classify`], resolves it (the newest `packs-v*` tag of the official repository
+//!   with the major version of the `api`, or the name in the manifest of a project directory),
+//!   refuses two arguments of one option that share a key, and writes the text [`render_project`]
+//!   returns.
 //! - It collects every refusal of the arguments before it stops, and writes nothing then. Git
 //!   missing from `PATH` is one refusal at `init` that names every official argument.
 //!
@@ -21,17 +22,18 @@
 
 use std::io::ErrorKind;
 
+use crate::app::local::local_tree;
+use crate::app::newest::{NewestError, newest_release};
 use crate::port::{Git, Workspace};
 use crate::types::extension::Extension;
 use crate::types::name::{PackName, ToolName};
 use crate::types::pack::Pack;
-use crate::types::plan::StepError;
 use crate::types::project::{
     GitUrl, PROJECT_FILE, Pin, ProjectError, Source, SubPath, render_project,
 };
-use crate::types::report::{Diagnostic, Diagnostics, FormatError, Location};
-use crate::types::resolve::{FetchError, latest_tag};
-use crate::types::shorthand::{Argument, Flag, TAG_PREFIX, classify};
+use crate::types::report::{AlreadyGiven, Diagnostic, Diagnostics, FormatError, Location};
+use crate::types::resolve::FetchError;
+use crate::types::shorthand::{Argument, Flag, ShorthandError, classify};
 
 /// The location of refusals that belong to no argument and no file: `init` itself.
 const INIT: &str = "init";
@@ -53,8 +55,8 @@ enum Outcome {
 /// Writes `agentstacks.toml` listing `tools` and `packs`.
 ///
 /// Each argument is an official name or a directory in the project. An official name is written as
-/// the official repository at its newest `packs-v*` tag, with the directory inside it. A directory
-/// is written as given, under the name in its manifest.
+/// the official repository at its newest `packs-v*` tag of the `api` major version, with the
+/// directory inside it. A directory is written as given, under the name in its manifest.
 ///
 /// # Errors
 ///
@@ -98,7 +100,7 @@ pub fn init<W: Workspace, G: Git>(
         let error = FetchError::GitNotFound {
             needed_by: without_git,
         };
-        refusals.push(Diagnostic::new(Location::file(INIT), error));
+        refusals.push(Diagnostic::new(Location::verbatim(INIT), error));
     }
     let tools = named(tools, ToolName::new, &mut refusals);
     let packs = named(packs, PackName::new, &mut refusals);
@@ -146,12 +148,9 @@ fn collect<W: Workspace, G: Git>(
             .iter()
             .find(|(_, earlier)| earlier.key == resolved.key)
         {
-            let error = ProjectError::AlreadyGiven {
-                noun: flag.noun(),
-                key: resolved.key,
-                first: first.clone(),
-            };
-            refusals.push(Diagnostic::new(Location::file(text), error));
+            let error =
+                ProjectError::from(AlreadyGiven::new(flag.noun(), resolved.key, first.as_str()));
+            refusals.push(Diagnostic::new(Location::verbatim(text), error));
             continue;
         }
         given.push((text, resolved));
@@ -167,24 +166,23 @@ fn resolve<W: Workspace, G: Git>(
     arg: &str,
     text: &str,
 ) -> Outcome {
-    let at = || Location::file(text);
+    let at = || Location::verbatim(text);
     match classify(flag, arg) {
         Err(refused) => Outcome::Refused(refused.into()),
         Ok(Argument::Official { url, subdir }) => official(git, arg, &url, subdir, text),
+        // `init` has no git option, so only `ext add` meets a git URL.
+        Ok(Argument::Git(_)) => {
+            Outcome::Refused(Diagnostic::new(at(), ShorthandError::NotOfficial(flag)).into())
+        }
         Ok(Argument::Path(path)) => {
-            let tree = match workspace.source_tree(&path) {
-                Ok(Some(tree)) => tree,
-                Ok(None) => {
-                    return Outcome::Refused(Diagnostic::new(at(), StepError::Outside).into());
-                }
-                Err(error) => {
-                    let located = Diagnostic::new(Location::file(path.as_str()), error);
-                    return Outcome::Refused(located.into());
-                }
+            let tree = match local_tree(workspace, &path, at()) {
+                Ok(tree) => tree,
+                Err(refusal) => return Outcome::Refused(refusal.into()),
             };
             let loaded = match flag {
                 Flag::Pack => Pack::load(&tree).map(|pack| pack.manifest().name().to_string()),
-                Flag::Tool => {
+                // `Flag::Ext` is the source of `ext add`, which never reaches `init`.
+                Flag::Tool | Flag::Ext => {
                     Extension::load(&tree).map(|extension| extension.manifest().name().to_string())
                 }
             };
@@ -199,21 +197,15 @@ fn resolve<W: Workspace, G: Git>(
     }
 }
 
-/// Resolves the official name `arg` to the newest release tag of the official repository.
+/// Resolves the official name `arg` to the newest release tag of the official repository that has
+/// the major version of the `api`.
 fn official<G: Git>(git: &G, arg: &str, url: &GitUrl, subdir: SubPath, text: &str) -> Outcome {
-    let tags = match git.list_tags(url, TAG_PREFIX) {
-        Ok(tags) => tags,
-        Err(FetchError::GitNotFound { .. }) => return Outcome::NeedsGit,
+    let tag = match newest_release(git, url) {
+        Ok(tag) => tag,
+        Err(NewestError::Fetch(FetchError::GitNotFound { .. })) => return Outcome::NeedsGit,
         Err(error) => {
-            return Outcome::Refused(Diagnostic::new(Location::file(text), error).into());
+            return Outcome::Refused(Diagnostic::new(Location::verbatim(text), error).into());
         }
-    };
-    let Some((tag, _)) = latest_tag(&tags, TAG_PREFIX) else {
-        let error = ProjectError::NoReleaseTag {
-            prefix: TAG_PREFIX.to_owned(),
-            url: url.to_string(),
-        };
-        return Outcome::Refused(Diagnostic::new(Location::file(text), error).into());
     };
     Outcome::Resolved(Resolved {
         key: arg.to_owned(),
@@ -239,7 +231,7 @@ fn named<N, E>(
         match make(&resolved.key) {
             Ok(name) => entries.push((name, resolved.source)),
             Err(_) => refusals.push(Diagnostic::new(
-                Location::file(text),
+                Location::verbatim(text),
                 ProjectError::InvalidName,
             )),
         }
@@ -289,9 +281,9 @@ mod tests {
             .collect()
     }
 
-    /// A git whose official repository lists `packs-v0.1.0` and `packs-v0.2.0`.
+    /// A git whose official repository lists `packs-v1.0.0` and `packs-v1.1.0`.
     fn git() -> Result<FakeGit, Box<dyn std::error::Error>> {
-        Ok(FakeGit::new().tags(&url()?, listing(&["packs-v0.1.0", "packs-v0.2.0"])?))
+        Ok(FakeGit::new().tags(&url()?, listing(&["packs-v1.0.0", "packs-v1.1.0"])?))
     }
 
     fn pack_tree(root: &str, name: &str) -> FakeFileTree {
@@ -385,16 +377,16 @@ mod tests {
         let expected = render_project(
             &[(
                 ToolName::new("claude")?,
-                official_source("extensions/claude", "packs-v0.2.0")?,
+                official_source("extensions/claude", "packs-v1.1.0")?,
             )],
             &[
                 (
                     PackName::new("core")?,
-                    official_source("packs/core", "packs-v0.2.0")?,
+                    official_source("packs/core", "packs-v1.1.0")?,
                 ),
                 (
                     PackName::new("sdlc")?,
-                    official_source("packs/sdlc", "packs-v0.2.0")?,
+                    official_source("packs/sdlc", "packs-v1.1.0")?,
                 ),
             ],
         );
@@ -412,7 +404,7 @@ mod tests {
             &[],
             &[(
                 PackName::new("core")?,
-                official_source("packs/core", "packs-v0.2.0")?,
+                official_source("packs/core", "packs-v1.1.0")?,
             )],
         );
         assert_eq!(workspace.project_written(), Some(expected));
@@ -461,7 +453,36 @@ mod tests {
         let result = init(&workspace, &git, &[], &strings(&["core"]));
         assert_eq!(
             refused(result)?,
-            ["--pack \"core\": no packs-v release tag in https://github.com/airsstack/agentstacks"]
+            [
+                "--pack \"core\": no packs-v1 release tag in https://github.com/airsstack/agentstacks"
+            ]
+        );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn init_official_picks_api_major() -> TestResult {
+        let git = FakeGit::new().tags(&url()?, listing(&["packs-v1.0.0", "packs-v2.0.0"])?);
+        let workspace = FakeWorkspace::new();
+        init(&workspace, &git, &[], &strings(&["core"]))
+            .map_err(|refusals| format!("{refusals:?}"))?;
+        let written = workspace.project_written().ok_or("a written file")?;
+        assert!(written.contains("tag = \"packs-v1.0.0\""), "{written}");
+        assert!(!written.contains("packs-v2.0.0"), "{written}");
+        Ok(())
+    }
+
+    #[test]
+    fn init_no_major_tag_refusal() -> TestResult {
+        let git = FakeGit::new().tags(&url()?, listing(&["packs-v0.2.0"])?);
+        let workspace = FakeWorkspace::new();
+        let result = init(&workspace, &git, &[], &strings(&["core"]));
+        assert_eq!(
+            refused(result)?,
+            [
+                "--pack \"core\": no packs-v1 release tag in https://github.com/airsstack/agentstacks"
+            ]
         );
         assert_eq!(workspace.project_written(), None);
         Ok(())
@@ -505,6 +526,17 @@ mod tests {
         assert_eq!(
             refused(result)?,
             ["--pack \"./x\": resolves outside the project"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn init_shows_every_argument_as_written() -> TestResult {
+        let workspace = FakeWorkspace::new().source_outside(&LocalPath::new("./x//out")?);
+        let result = init(&workspace, &git()?, &strings(&["./x//out"]), &[]);
+        assert_eq!(
+            refused(result)?,
+            ["--tool \"./x//out\": resolves outside the project"]
         );
         Ok(())
     }

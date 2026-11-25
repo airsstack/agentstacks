@@ -1,27 +1,34 @@
-//! Classifying one `init` argument as an official name or a path.
+//! The official source, and classifying one `init` or `ext add` argument as an official name, a
+//! path or a git URL.
 //!
 //! `init --pack <arg>` and `init --tool <arg>` take either a bare name from the official
-//! repository or a directory in the project. The decision is a rule over the text alone, so it
-//! lives here and the flow that calls it stays a sequence of steps.
+//! repository or a directory in the project. `ext add <source>` also takes a git URL. The decision
+//! is a rule over the text alone, so it lives here and the flows that call it stay a sequence of
+//! steps.
 //!
 //! # Responsibilities
 //!
-//! - [`Flag`]: which option the argument came from, for the refusal text and the noun it uses.
+//! - [`Flag`]: which option or command the argument came from, for the refusal text and the noun it
+//!   uses.
 //! - [`OFFICIAL_REPOSITORY`], [`TAG_PREFIX`], [`OFFICIAL_PACKS`], [`OFFICIAL_TOOLS`]: the one place
 //!   the official source is named.
-//! - [`Argument`]: the result, either the official repository with the directory inside it, or a
-//!   project path.
+//! - [`official_major`], [`release_prefix`]: the rule that the official release tags keep the major
+//!   of the `api`, and the text of that prefix.
+//! - [`Argument`]: the result, either the official repository with the directory inside it, a
+//!   project path, or (for `ext add` only) a git URL.
 //! - [`ShorthandError`]: the refusal of a bare name the official repository does not hold.
-//! - [`classify`]: the rule. An argument containing `/` or starting with `.` is a path; anything
-//!   else is an official name, even when a directory of that name exists.
+//! - [`classify`]: the rule. For `ext add`, an argument containing `://` or starting with `git@` is
+//!   a git URL. Then an argument containing `/` or starting with `.` is a path; anything else is an
+//!   official name, even when a directory of that name exists.
 //!
 //! # Non-responsibilities
 //!
-//! Choosing the tag, reading the directory a path names, and turning duplicates into one key
-//! belong to the `init` flow.
+//! Choosing among the tags of a repository belongs to `types/resolve`. Reading the directory a path
+//! names and turning duplicates into one key belong to the `init` flow.
 
 use std::fmt;
 
+use crate::types::api::API_MAJOR;
 use crate::types::project::GitUrl;
 use crate::types::project::LocalPath;
 use crate::types::project::SourceError;
@@ -35,6 +42,40 @@ pub const OFFICIAL_REPOSITORY: &str = "https://github.com/airsstack/agentstacks"
 /// The prefix of the release tags that mark a version of the official packs and extensions.
 pub const TAG_PREFIX: &str = "packs-v";
 
+/// The release prefix with the major of the `api` this agentstacks speaks, such as `packs-v1`: the
+/// tags `init` and `ext add` pick from the official repository start with it.
+#[must_use]
+pub fn release_prefix() -> String {
+    format!("{TAG_PREFIX}{API_MAJOR}")
+}
+
+/// The major version a release tag must have, or `None` when any major is accepted.
+///
+/// It is the major of the `api` when `url` is the official repository and `prefix` is
+/// [`TAG_PREFIX`], so a binary never moves to a release of a later `api`. Every other source
+/// accepts all its tags.
+///
+/// The URL is compared byte for byte with [`OFFICIAL_REPOSITORY`], so a `.git` suffix or another
+/// case makes it a third-party source.
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::GitUrl;
+/// use agentstacks::types::shorthand::official_major;
+///
+/// let official = GitUrl::new("https://github.com/airsstack/agentstacks")?;
+/// assert_eq!(official_major(&official, "packs-v"), Some(1));
+/// assert_eq!(official_major(&official, "rel-"), None);
+/// let other = GitUrl::new("https://github.com/acme/packs")?;
+/// assert_eq!(official_major(&other, "packs-v"), None);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[must_use]
+pub fn official_major(url: &GitUrl, prefix: &str) -> Option<u64> {
+    (url.as_str() == OFFICIAL_REPOSITORY && prefix == TAG_PREFIX).then_some(API_MAJOR)
+}
+
 /// The pack names the official repository holds under `packs/`.
 pub const OFFICIAL_PACKS: [&str; 5] = [
     "core",
@@ -47,7 +88,7 @@ pub const OFFICIAL_PACKS: [&str; 5] = [
 /// The tool names the official repository holds under `extensions/`.
 pub const OFFICIAL_TOOLS: [&str; 2] = ["claude", "opencode"];
 
-/// The `init` option an argument came from.
+/// The `init` option or the command an argument came from.
 ///
 /// # Examples
 ///
@@ -56,6 +97,7 @@ pub const OFFICIAL_TOOLS: [&str; 2] = ["claude", "opencode"];
 ///
 /// assert_eq!(Flag::Pack.to_string(), "--pack");
 /// assert_eq!(Flag::Tool.noun(), "tool");
+/// assert_eq!(Flag::Ext.to_string(), "ext add");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flag {
@@ -63,6 +105,8 @@ pub enum Flag {
     Pack,
     /// `--tool`.
     Tool,
+    /// The source of `ext add`: a tool, from a git URL as well as a path or an official name.
+    Ext,
 }
 
 impl Flag {
@@ -71,32 +115,39 @@ impl Flag {
     pub const fn noun(self) -> &'static str {
         match self {
             Self::Pack => "pack",
-            Self::Tool => "tool",
+            Self::Tool | Self::Ext => "tool",
         }
     }
 
     const fn official(self) -> &'static [&'static str] {
         match self {
             Self::Pack => &OFFICIAL_PACKS,
-            Self::Tool => &OFFICIAL_TOOLS,
+            Self::Tool | Self::Ext => &OFFICIAL_TOOLS,
         }
     }
 
     const fn directory(self) -> &'static str {
         match self {
             Self::Pack => "packs",
-            Self::Tool => "extensions",
+            Self::Tool | Self::Ext => "extensions",
         }
+    }
+
+    const fn takes_git_url(self) -> bool {
+        matches!(self, Self::Ext)
     }
 }
 
 impl fmt::Display for Flag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "--{}", self.noun())
+        match self {
+            Self::Pack | Self::Tool => write!(f, "--{}", self.noun()),
+            Self::Ext => f.write_str("ext add"),
+        }
     }
 }
 
-/// Where an `init` argument says a pack or tool comes from.
+/// Where an `init` or `ext add` argument says a pack or tool comes from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Argument {
     /// A name from the official repository: the repository and the directory inside it.
@@ -108,9 +159,11 @@ pub enum Argument {
     },
     /// A directory in the project, as written.
     Path(LocalPath),
+    /// A git URL, as written. Only [`Flag::Ext`] produces it.
+    Git(GitUrl),
 }
 
-/// The refusal of an `init` argument that is a bare name but not an official one.
+/// The refusal of an argument that is a bare name but not an official one.
 ///
 /// # Examples
 ///
@@ -125,19 +178,29 @@ pub enum Argument {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ShorthandError {
     /// The name is not one the official repository holds for this option.
-    #[error("not an official {}; pass a path, or add a git source to agentstacks.toml", .0.noun())]
+    #[error("not an official {}; {}", .0.noun(), hint(*.0))]
     NotOfficial(Flag),
 }
 
-/// Classifies `arg`, given with `flag`, as an official name or a project path.
+/// What to do instead of a name that is not official.
+const fn hint(flag: Flag) -> &'static str {
+    match flag {
+        Flag::Pack | Flag::Tool => "pass a path, or add a git source to agentstacks.toml",
+        Flag::Ext => "pass a path or a git URL",
+    }
+}
+
+/// Classifies `arg`, given with `flag`, as an official name, a project path or a git URL.
 ///
-/// An argument containing `/` or starting with `.` is a path. Anything else is a name and must be
-/// official.
+/// For [`Flag::Ext`], an argument containing `://` or starting with `git@` is a git URL; `init`
+/// takes none. Then an argument containing `/` or starting with `.` is a path. Anything else is a
+/// name and must be official.
 ///
 /// # Errors
 ///
-/// A [`Diagnostic`] located at the flag and the argument as written (`--pack "x"`): an unknown
-/// name, or a path that is absolute or climbs out of the project.
+/// A [`Diagnostic`] located at the flag and the argument as written (`--pack "x"`, `ext add "x"`):
+/// an unknown name, a git URL that leads with `-`, or a path that is absolute or climbs
+/// out of the project.
 ///
 /// # Examples
 ///
@@ -154,10 +217,21 @@ pub enum ShorthandError {
 ///     refused.to_string(),
 ///     "--pack \"x\": not an official pack; pass a path, or add a git source to agentstacks.toml",
 /// );
+///
+/// let refused = classify_argument(Flag::Ext, "x").err().ok_or("expected a refusal")?;
+/// assert_eq!(
+///     refused.to_string(),
+///     "ext add \"x\": not an official tool; pass a path or a git URL",
+/// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn classify(flag: Flag, arg: &str) -> Result<Argument, Diagnostic> {
-    let at = || Location::file(format!("{flag} \"{arg}\""));
+    let at = || Location::verbatim(format!("{flag} \"{arg}\""));
+    if flag.takes_git_url() && (arg.contains("://") || arg.starts_with("git@")) {
+        return GitUrl::new(arg)
+            .map(Argument::Git)
+            .map_err(|error| Diagnostic::new(at(), SourceError::from(error)));
+    }
     if arg.contains('/') || arg.starts_with('.') {
         return LocalPath::new(arg)
             .map(Argument::Path)
@@ -316,6 +390,75 @@ mod tests {
             refusal(Flag::Pack, "../x")?,
             "--pack \"../x\": must stay inside the project"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn ext_classifies_url_path_and_official() -> TestResult {
+        for text in ["https://example.com/x.git", "git@host:x.git"] {
+            assert_eq!(
+                accepted(Flag::Ext, text)?,
+                Argument::Git(GitUrl::new(text)?)
+            );
+        }
+        for text in ["./ext/x", "ext/x"] {
+            assert_eq!(
+                accepted(Flag::Ext, text)?,
+                Argument::Path(LocalPath::new(text)?)
+            );
+        }
+        let Argument::Official { url, subdir } = accepted(Flag::Ext, "claude")? else {
+            return Err("expected an official name".into());
+        };
+        assert_eq!(url.as_str(), OFFICIAL_REPOSITORY);
+        assert_eq!(subdir.as_str(), "extensions/claude");
+        Ok(())
+    }
+
+    #[test]
+    fn ext_not_official_text() -> TestResult {
+        assert_eq!(
+            refusal(Flag::Ext, "x")?,
+            "ext add \"x\": not an official tool; pass a path or a git URL"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dash_name_is_not_official() -> TestResult {
+        assert_eq!(
+            refusal(Flag::Ext, "-x")?,
+            "ext add \"-x\": not an official tool; pass a path or a git URL"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ext_dash_url_refused_verbatim() -> TestResult {
+        assert_eq!(
+            refusal(Flag::Ext, "--upload-pack=x://y")?,
+            "ext add \"--upload-pack=x://y\": URL must not start with \"-\""
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn init_still_takes_no_url() -> TestResult {
+        for flag in [Flag::Pack, Flag::Tool] {
+            let text = "https://example.com/x.git";
+            assert_eq!(
+                accepted(flag, text)?,
+                Argument::Path(LocalPath::new(text)?),
+                "{flag}"
+            );
+            assert_eq!(
+                refusal(flag, "git@host:x.git")?,
+                format!(
+                    "{flag} \"git@host:x.git\": not an official {}; pass a path, or add a git source to agentstacks.toml",
+                    flag.noun()
+                )
+            );
+        }
         Ok(())
     }
 }

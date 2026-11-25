@@ -2,15 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: core, CLI, both extensions, packs and claudevs built; first release configured
+## Status: 1.0, `api = 1` frozen; core, CLI, both extensions, packs and claudevs built
 
 The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
-hook runtime, the five CLI commands, the claude and opencode extensions, the five official packs and
-the claudevs crates are built and tested.
+hook runtime, the CLI commands (`init`, `plan`, `apply`, `doctor`, `update`, `ext add`,
+`ext test`), the claude and opencode extensions, the five official packs and the claudevs crates
+are built and tested.
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built
-crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doctor · update
+crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doctor · update · ext add · ext test
 crates/claudevs/          deterministic Claude Code setup test engine, moved from claudestacks
 crates/claudevs-cli/      the claudevs binary
 extensions/claude/        the official claude tool extension (adapter.lua under airsl)
@@ -51,8 +52,9 @@ packs ──► tool extension (adapter.lua under airsl, zero grants) ──► 
 | **Operation** | What an extension proposes: write file, copy file, require binary, or skip-with-reason; the core adds delete for removed packs. There is no merge or run-command operation: a config file shared with the user is read (declared in `extension.toml` `reads`) and rewritten whole by the extension. |
 | **Lock** | Pinned versions plus a hash of every written file. `apply` never silently overwrites user edits. |
 
-CLI surface: `init --tool <t> --pack <p>` · `plan` · `apply` · `doctor` · `update`. There is no plugin
-marketplace. For Claude Code, the CLI writes native `.claude/` project config.
+CLI surface: `init --tool <t> --pack <p>` · `plan` · `apply` · `doctor` · `update` · `ext add` ·
+`ext test`. There is no plugin marketplace. For Claude Code, the CLI writes native `.claude/`
+project config.
 
 ## Invariants (do not break)
 
@@ -67,8 +69,8 @@ marketplace. For Claude Code, the CLI writes native `.claude/` project config.
   language (OpenCode hooks are JavaScript plugins), generate a thin shim that only forwards events
   to airsl.
 - **The official extensions use the public API** that community extensions use, with no private
-  hooks. Both Claude and OpenCode run on it; it stays `api = 0` (unstable) until it is frozen as
-  `api = 1` in M3.
+  hooks. Both Claude and OpenCode run on it; it is frozen as `api = 1`, and 1.x changes
+  are additive only (book ch06-06).
 - `airsl` comes from crates.io, never as a path dependency. Never use the `aisdk-*` crate names,
   because that family belongs to another project.
 
@@ -110,7 +112,7 @@ with the API: when `book/src/ch06-01-extensions.md` or `book/src/ch06-02-hooks.m
 
 ```text
 crates/agentstacks/      types · port · app · fs · process · host (see book/src/ch07-00-architecture.md)
-crates/agentstacks-cli/  init · plan · apply · doctor · update
+crates/agentstacks-cli/  init · plan · apply · doctor · update · ext add · ext test
 crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (built; same crate names)
 extensions/{claude,opencode}/   official tool extensions (Lua); both are built
 packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python (built)
@@ -118,7 +120,8 @@ book/                    mdBook, published to airsstack.github.io/agentstacks/ (
 ```
 
 Roadmap: **M1** claude extension + the claudestacks plugins converted to packs · **M2** opencode
-extension on the same API · **M3** freeze `api = 1`, authoring docs, `ext add` / `ext test`.
+extension on the same API · **M3** freeze `api = 1`, authoring docs, `ext add` / `ext test` (built;
+1.0).
 
 ## Porting claudestacks plugins into packs
 
@@ -142,7 +145,7 @@ cargo make claudevs-check      # claudevs fixture corpus; deliberately not part 
 cargo make opencode-check      # real OpenCode + a mock model; deliberately not part of dod
 cargo make book                # serve the book at http://localhost:3000
 cargo make book-build          # build the book once into book/book/ (CI also fails on [ERROR] lines)
-cargo make lua                 # airsl check + airsl test over extensions/ and packs/, then the fingerprint gate (part of dod)
+cargo make lua                 # airsl check + airsl test over extensions/ and packs/, the fingerprint gate, the pack text gates and the api-0 gate (part of dod)
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
 

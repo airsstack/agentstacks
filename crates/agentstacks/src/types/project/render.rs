@@ -68,7 +68,7 @@ fn section<'a>(entries: impl Iterator<Item = (&'a str, &'a Source)>) -> Item {
 }
 
 /// The keys of one entry, in the order `git`, `tag` or `rev`, `subdir`, or the single `path`.
-fn entry(source: &Source) -> Table {
+pub(super) fn entry(source: &Source) -> Table {
     let mut table = Table::new();
     match source {
         Source::Git { url, pin, subdir } => {

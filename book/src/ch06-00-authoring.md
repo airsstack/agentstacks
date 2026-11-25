@@ -6,8 +6,9 @@ one line:
 > Build an agentstacks extension for `<tool>`. Follow
 > https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-00-authoring.md
 
-Everything here is `api = 0`: the extension API is unstable and may change until it is frozen as
-`api = 1`. Pin the agentstacks version you build against.
+Everything here is `api = 1`, which is frozen for every 1.x release: what stays and what a 1.x
+release may add is on [the stability page](ch06-06-stability.md). If your extension uses something
+a later 1.x release added, declare the oldest agentstacks it works with in `[requires]` (step 2).
 
 ## Read first
 
@@ -15,7 +16,7 @@ Fetch these before writing code. They are the contract; this page only tells you
 
 | Document | What it gives you |
 |---|---|
-| [ch06-01-extensions.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-01-extensions.md) | the `api = 0` Lua surface: manifest, events, operations, coverage, validation, every refusal |
+| [ch06-01-extensions.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-01-extensions.md) | the `api = 1` Lua surface: manifest, `[requires]`, events, operations, coverage, validation, every refusal |
 | [ch06-02-hooks.md](https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-02-hooks.md) | the hook command line, the shared runtime, the neutral event and result, the translator contract |
 | [adapter.lua](https://raw.githubusercontent.com/airsstack/agentstacks/main/extensions/claude/adapter.lua) | the official Claude Code extension, a complete worked example |
 | [demo pack](https://raw.githubusercontent.com/airsstack/agentstacks/main/crates/agentstacks-cli/tests/fixtures/project/packs/demo/pack.toml) | a small pack (one skill, one agent, one lua hook, one message hook) to test with |
@@ -24,7 +25,7 @@ Fetch these before writing code. They are the contract; this page only tells you
 
 ```text
 <tool>/
-  extension.toml      manifest: name, version, api = 0, entry, reads
+  extension.toml      manifest: name, version, api = 1, entry, reads, [requires]
   adapter.lua         the only file that calls agentstacks.*; answers `values` and `plan`
   lib/<rule>.lua      pure rules: no agentstacks.*, no require; plain data in, data out
   lib/<rule>_test.lua one test file per rule module, run with `airsl test`
@@ -58,17 +59,26 @@ how a hook blocks or adds context. List what it cannot express: those become ski
 [extension]
 name        = "mytool"
 version     = "0.1.0"
-api         = 0
+api         = 1
 description = "Renders packs into MyTool project config"
 entry       = "adapter.lua"
 # reads     = [".mytool/settings.json"]   # only for a config file shared with the user
+
+# Only when the extension uses something a later 1.x release added:
+# [requires]
+# agentstacks = ">=1.2"
 ```
+
+`api = 1` is required. A `[requires]` `agentstacks` range that excludes the running agentstacks is
+the only refusal returned, so an older agentstacks says to install a newer one instead of failing on
+a key it does not know (extensions.md section 2).
 
 ### 3. Start from a working adapter
 
-This adapter installs skills and agents, and skips every hook. It was run on the demo pack with
-airsl 0.1.4: `airsl test mytool` gave `1 passed, 0 failed (1 files)`, and `agentstacks init` wrote
-four files and showed two skips.
+This adapter installs skills and agents, and skips every hook. It was run with airsl 0.1.5 and
+agentstacks 1.0.0: `airsl test mytool` gave `1 passed, 0 failed (1 files)`, and
+`agentstacks ext test ./ext/mytool` applied five files in a temporary project, skipped eight
+items and ended in `passed`.
 
 ```lua
 -- lib/paths.lua: pure rules; no agentstacks.* here.
@@ -162,7 +172,8 @@ return {
 }
 ```
 
-Run `airsl test <tool>`. It must report `0 failed`.
+Run `airsl test <tool>`. It must report `0 failed`. `agentstacks ext test` (step 6) runs the same
+tests when the extension holds a `*_test.lua` file.
 
 ### 5. Hooks
 
@@ -185,7 +196,19 @@ Skip hooks until skills and agents work. Then, per hooks.md:
 
 ### 6. Run it for real
 
-In a scratch directory holding a copy of your extension and a pack (the demo pack works):
+Run the check. It builds a temporary project from your extension and a built-in conformance pack,
+runs your Lua tests, plans, applies and plans again, and writes nothing into your directory:
+
+```sh
+agentstacks ext test ./ext/mytool                      # the conformance pack only
+agentstacks ext test ./ext/mytool --pack ./packs/demo  # and your own pack too
+```
+
+The last line must be `passed`, with `second plan: nothing to change` above it. `failed` or no
+verdict exits 1. The report and every refusal are in [the command line](ch04-00-cli.md#10-ext-test).
+
+Then, in a scratch directory holding a copy of your extension and a pack (the demo pack works), use
+it like a user would:
 
 ```sh
 agentstacks init --tool ./ext/mytool --pack ./packs/demo --yes   # writes agentstacks.toml, applies
@@ -200,12 +223,19 @@ the tool itself on the scratch project and confirm it loads the skills, agents a
 ### 7. Before you call it done
 
 - [ ] `airsl test <tool>` reports `0 failed`.
+- [ ] `agentstacks ext test ./ext/<tool>` ends in `passed`.
 - [ ] `agentstacks plan` on the demo pack has no refusal; every item is written, copied or skipped.
 - [ ] Every skip reason tells the user what the tool cannot do.
 - [ ] `agentstacks apply --yes`, then `agentstacks plan` shows `0 to write`; `doctor` says `healthy`.
 - [ ] A user's own entries in a shared config file survive `apply`, and removing the tool removes
       only your entries.
 - [ ] Each hook fires in the real tool, and a `may_block` hook blocks.
+
+### 8. Share it
+
+A user adds your extension to a project with `agentstacks ext add` (see
+[the command line](ch04-00-cli.md#9-ext-add)): a git URL with `--tag` or `--rev` and `--subdir` for
+the directory inside the repository, or a directory of the project.
 
 ## Common refusals
 
@@ -216,5 +246,7 @@ the tool itself on the scratch project and confirm it loads the skills, agents a
 | `mytool/adapter.lua:12: write: path ".x" is already proposed at adapter.lua:9` | two operations target one path; merge them into one write |
 | `mytool/adapter.lua:9: read: ".env" is not in extension.reads` | add the path to `reads` in `extension.toml` |
 | `mytool/adapter.lua:1: require: invalid module name "lib/x" (use dots: lib.x)` | `agentstacks.require("lib.x")` |
+| `mytool/extension.toml: requires.agentstacks: ">=99" does not match agentstacks 1.0.0 (install a newer agentstacks)` | install a newer agentstacks, or lower the range to the oldest release your extension works with |
+| `mytool/extension.toml: extension.api: 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)` | set `api = 1` (and check the extension against [the API](ch06-01-extensions.md)) |
 
 The full refusal list is in extensions.md sections 9 to 12.

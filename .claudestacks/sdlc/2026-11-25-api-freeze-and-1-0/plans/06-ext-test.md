@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 05, 09]
 built-on: c187d693fbea
@@ -187,3 +187,33 @@ Makefile.toml                                      — modify: lua task covers c
 
 - `cargo make dod` is green, including `cargo make lua` over the conformance assets.
 - `agentstacks ext test extensions/claude` and `extensions/opencode` both print `passed`.
+
+## Review findings
+
+One `claudestacks:reviewer` over tasks 1–6 (`cargo make dod` exit 0; `ext test extensions/claude` and
+`ext test extensions/opencode` each exit 0 with last line `passed`, opencode with the two F11 skips):
+0🔴 1🟡 15🔵. Every code finding went to one fix coder; `cargo make dod` after the fix: exit 0.
+
+- fixed 🟡 `agentstacks-cli/src/command/ext/check.rs`: test `a_failed_verdict_is_refused_and_ends_stdout_with_failed`.
+- fixed 🔵 `agentstacks-cli/src/command/mod.rs:5` rewrapped; `crates/agentstacks/Cargo.toml` `testing` comment names `FakeScratch`.
+- fixed 🔵 `port/adapter/fake.rs`: queued-script doc matches behaviour.
+- fixed 🔵 `port/scratch/fake.rs`: no hard-coded `ext/`/`packs/`; `FakeWorkspace::source_tree` serves files under a prefix (test `source_tree_serves_the_files_held_under_a_directory`).
+- fixed 🔵 `process/binary.rs`: `skip_without_airsl` honours `AGENTSTACKS_REQUIRE_AIRSL` in both airsl contracts.
+- fixed 🔵 `types/check/lua.rs`: doctest reads an in-crate fixture; summary test uses airsl's real stdout shape.
+- fixed 🔵 `types/check/mod.rs`: doc says apply runs once; `GivenPack` and `NAME` re-exported.
+- fixed 🔵 `types/check/stage.rs`: `GivenPack` is a named struct; `FirstPlan { Planned, Applied }` replaces `plan` + `applied: bool`.
+- fixed 🔵 `Makefile.toml` comment rewrapped.
+- fixed 🔵 `book/src/ch07-00-architecture.md`: app, types and testing rows name ext, check and `FakeScratch`.
+- fixed 🔵 `book/src/ch04-00-cli.md` stderr row and `--tool/--pack` line: in plan 07 Task 3 (owner of the ch04 rewrite).
+- fixed 🔵 `types/check/verdict.rs:72`: a forget-only second plan now reads `second plan: 0 to write, 0 to delete, <f> forgotten (apply is not repeatable)` (fixed in the chain-wide cross-check pass; `cargo make dod` exit 0). See Deviations.
+- recorded 🔵 plan Files additions: see Deviations.
+
+## Deviations
+
+- 2026-11-25: Added beyond the Files list: `types/check/error.rs` `CheckError` (typed step-1 and airsl-spawn texts), `FormatError::{Stage, Check}`, `Verdict::of`, `app::ext::{Dir, FirstPlan, LuaOutcome, CheckReport, Checked}`, `FakeAdapter` queued scripts (one per run, so a second plan can be scripted), `FakeFileTree::relabel`, prefix source trees in `FakeWorkspace`. Each keeps the rule in `types/` or makes a flow testable with fakes.
+- 2026-11-25: `pack.toml` of the conformance asset carries `[pack] api = 1` (the brief read "api = 1 under [requires]"; `requires` has no api key).
+- 2026-11-25: A passing airsl run that prints nothing renders `lua tests: passed`; the spec gives only `lua tests: <last non-empty stdout line>`.
+- 2026-11-25: `wire::scratch()` is a separate function so `Ports` keeps four parameters.
+- 2026-11-25: The D20 second-plan refusal gains `, <f> forgotten` only when forget steps exist; with none it is the spec's text byte for byte. `book/src/ch04-00-cli.md` documents it.
+- 2026-11-25: Chain-wide cross-check renamed `Binary::test` to `Binary::airsl_test` (and its fake), `Dir.written`/`GivenPack.written` to `label`, `FakeFileTree::relabel` to `labelled`; added `types::name::AIRSL`, `app/local.rs` `local_tree`, `ProjectFile::refuse_legacy`, and one shared `AlreadyGiven` phrase (`StageError::Reserved` folded into it, texts unchanged).
+- 2026-11-25: Several coders wrote tests together with the code instead of watching them fail first (tasks 2, 3, 6); the flow (task 5) was seen red against a stub.

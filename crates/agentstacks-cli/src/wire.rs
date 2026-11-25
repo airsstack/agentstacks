@@ -4,6 +4,8 @@
 //!
 //! - [`open`] builds the ports the commands run over: the workspace at `-C <dir>` or the current
 //!   directory, with no search of the parents, and the git, binary and Lua adapters.
+//! - [`scratch`] is the adapter `ext test` opens directories and creates its temporary project
+//!   with. It is not part of [`Real`], because only that command needs it.
 //!
 //! # Non-responsibilities
 //!
@@ -17,7 +19,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use agentstacks::fs::StdWorkspace;
+use agentstacks::fs::{DiskScratch, StdWorkspace};
 use agentstacks::host::AirslAdapter;
 use agentstacks::process::{GitCli, SystemBinary};
 
@@ -47,6 +49,11 @@ pub(crate) fn open(dir: Option<&Path>, err: &mut impl Write) -> Result<Real, Out
             Err(Outcome::Refused)
         }
     }
+}
+
+/// The scratch space over the real disk.
+pub(crate) const fn scratch() -> DiskScratch {
+    DiskScratch
 }
 
 #[cfg(test)]

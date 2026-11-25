@@ -11,7 +11,10 @@
 //!   following a link.
 //! - [`Adapter`]: the engine that runs one tool extension, to open it and dispatch `values` and
 //!   `plan`.
-//! - [`Binary`]: whether a binary is on `PATH`, and what `airsl --version` printed.
+//! - [`Binary`]: whether a binary is on `PATH`, what `airsl --version` printed and how `airsl test`
+//!   ended in a directory, as a [`LuaTestRun`].
+//! - [`Scratch`]: a directory outside the project opened as a [`FileTree`], and a temporary project
+//!   created as a [`Workspace`].
 //! - [`Git`]: the remote side of a git source, its tags, a tag's commit and a commit's files.
 //! - [`Workspace`]: the project directory, the two project files, the state of a project path, the
 //!   tree behind a local source and the writes apply makes.
@@ -30,6 +33,7 @@ pub mod binary;
 pub mod fake;
 pub mod git;
 pub mod kind;
+pub mod scratch;
 pub mod tree;
 pub mod workspace;
 
@@ -38,9 +42,13 @@ pub use adapter::Adapter;
 #[doc(inline)]
 pub use binary::Binary;
 #[doc(inline)]
+pub use binary::LuaTestRun;
+#[doc(inline)]
 pub use git::Git;
 #[doc(inline)]
 pub use kind::EntryKind;
+#[doc(inline)]
+pub use scratch::Scratch;
 #[doc(inline)]
 pub use tree::FileTree;
 #[doc(inline)]
@@ -73,6 +81,12 @@ pub use git::FakeGit;
 #[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use git::GitCall;
+#[cfg(any(test, feature = "testing"))]
+#[doc(inline)]
+pub use scratch::FakeScratch;
+#[cfg(any(test, feature = "testing"))]
+#[doc(inline)]
+pub use scratch::ScratchCall;
 #[cfg(any(test, feature = "testing"))]
 #[doc(inline)]
 pub use workspace::FakeWorkspace;

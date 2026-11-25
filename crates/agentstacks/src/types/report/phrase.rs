@@ -11,6 +11,8 @@
 //!
 //! - [`ListedTwice`]: `<entry> listed twice`, generic over how the repeated entry is shown. A list
 //!   entry shows as [`Quoted`] text; the lock shows a typed entry with its kind in front.
+//! - [`AlreadyGiven`]: `<noun> "<key>" is already given by <first>`, for a pack or tool that two
+//!   arguments, or an argument and a built-in, both name.
 //! - [`MustBeRelative`]: `"<text>" must be relative`.
 //! - [`OutsideProject`]: `"<text>" must stay inside the project`. A refusal that names no value
 //!   uses the bare phrase, `OUTSIDE_PROJECT`.
@@ -86,6 +88,51 @@ impl ListedTwice<Quoted> {
     /// The refusal of a repeated list entry written as `text`.
     pub(in crate::types) fn text(text: impl Into<String>) -> Self {
         Self::new(Quoted::new(text))
+    }
+}
+
+/// A pack or tool that an earlier argument, or a built-in, already gives: `<noun> "<key>" is
+/// already given by <first>`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{noun} \"{key}\" is already given by {first}")]
+pub struct AlreadyGiven {
+    // The texts are `Box<str>` to keep a `Diagnostic` under clippy's large-error size.
+    noun: &'static str,
+    key: Box<str>,
+    first: Box<str>,
+}
+
+impl AlreadyGiven {
+    /// The refusal of `key`, a `noun` that `first` already gives; `first` is the earlier argument
+    /// as written, flag included, or the name of the built-in.
+    pub(crate) fn new(
+        noun: &'static str,
+        key: impl Into<String>,
+        first: impl Into<String>,
+    ) -> Self {
+        Self {
+            noun,
+            key: key.into().into_boxed_str(),
+            first: first.into().into_boxed_str(),
+        }
+    }
+
+    /// `pack` or `tool`.
+    #[must_use]
+    pub const fn noun(&self) -> &'static str {
+        self.noun
+    }
+
+    /// The shared key.
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// What gave it first.
+    #[must_use]
+    pub fn first(&self) -> &str {
+        &self.first
     }
 }
 
@@ -203,6 +250,19 @@ mod tests {
         assert_eq!(
             ListedTwice::new("tool \"claude\"").to_string(),
             "tool \"claude\" listed twice"
+        );
+    }
+
+    #[test]
+    fn already_given_names_the_key_and_what_gave_it_first() {
+        let refusal = AlreadyGiven::new("pack", "core", "--pack \"core\"");
+        assert_eq!(
+            refusal.to_string(),
+            "pack \"core\" is already given by --pack \"core\""
+        );
+        assert_eq!(
+            (refusal.noun(), refusal.key(), refusal.first()),
+            ("pack", "core", "--pack \"core\"")
         );
     }
 

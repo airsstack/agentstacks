@@ -12,12 +12,15 @@ mod show;
 mod wire;
 
 use std::io::{self, IsTerminal as _};
+use std::path::Path;
 use std::process::ExitCode;
 
+use agentstacks::types::project::GitFlags;
 use clap::Parser as _;
 
-use cli::{Cli, Command};
+use cli::{Cli, Command, Ext};
 use command::Console;
+use command::ext::{AddRequest, CheckRequest};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -38,6 +41,32 @@ fn main() -> ExitCode {
         Command::Apply { yes } => command::apply(&ports, yes, &mut console),
         Command::Doctor => command::doctor(&ports.workspace, &ports.binary, &mut console),
         Command::Update { yes } => command::update(&ports, yes, &mut console),
+        Command::Ext(Ext::Add {
+            source,
+            tag,
+            rev,
+            subdir,
+            yes,
+        }) => {
+            let request = AddRequest {
+                source: &source,
+                flags: GitFlags {
+                    tag: tag.as_deref(),
+                    rev: rev.as_deref(),
+                    subdir: subdir.as_deref(),
+                },
+                yes,
+            };
+            command::ext::add(&ports, request, &mut console)
+        }
+        Command::Ext(Ext::Test { extension, pack }) => {
+            let request = CheckRequest {
+                base: cli.dir.as_deref().unwrap_or_else(|| Path::new(".")),
+                extension: &extension,
+                packs: &pack,
+            };
+            command::ext::check(&ports, &wire::scratch(), request, &mut console)
+        }
     };
     drop(console);
     outcome.code()

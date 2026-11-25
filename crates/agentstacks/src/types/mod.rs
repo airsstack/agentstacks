@@ -8,6 +8,8 @@
 //! - [`api`]: the one `api` number and the version of this agentstacks, and the decision on the
 //!   `api` a file asks for, which every file reader takes.
 //! - [`report`]: where and what of every refusal, and the sorted collection a run reports.
+//! - [`check`]: the rules behind `ext test`: the scratch project's files, the Lua test decision and
+//!   the verdict.
 //! - [`name`]: names that parse on construction (pack, tool, item, option, binary, environment).
 //! - [`tokens`]: the token vocabulary, scanning text into located tokens, rendering values.
 //! - [`format`](mod@format): generic TOML field access by key path, and an own YAML value type.
@@ -19,7 +21,8 @@
 //! - [`pack`]: a pack directory read into one checked pack, with every rule that needs the files.
 //! - [`set`]: the checks over a whole project, ending in the [`ValidSet`] later stages accept.
 //! - [`project`]: the project file `agentstacks.toml` and the source values it is built from.
-//! - [`shorthand`]: classifying an `init` argument as an official name or a path.
+//! - [`shorthand`]: the official source, and classifying an `init` or `ext add` argument as an
+//!   official name, a path or (`ext add` only) a git URL.
 //! - [`op`]: an operation a tool extension proposes, and the validation of it.
 //! - [`json`]: editing the text of a JSON document at one key path.
 //! - [`plan`]: the step for each path, decided from the operation, the lock and the disk state.
@@ -35,6 +38,7 @@
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
 pub mod api;
+pub mod check;
 pub mod extension;
 pub mod format;
 pub mod frontmatter;
@@ -233,6 +237,8 @@ pub use project::Source;
 pub use project::SourceError;
 #[doc(inline)]
 pub use project::SubPath;
+#[doc(inline)]
+pub use report::AlreadyGiven;
 #[doc(inline)]
 pub use report::Diagnostic;
 #[doc(inline)]

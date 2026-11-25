@@ -41,6 +41,7 @@ use crate::types::project::SourceFields;
 use crate::types::project::error::ProjectError;
 use crate::types::report::Diagnostics;
 use crate::types::report::FieldError;
+use crate::types::report::LegacyProject;
 use crate::types::report::TypeWord;
 
 /// The name of the project file, the one place the name is written.
@@ -162,6 +163,18 @@ impl ProjectFile {
     #[must_use]
     pub const fn api(&self) -> ApiCheck {
         self.api
+    }
+
+    /// Refuses a file written for the `0.x` releases, which only `update` goes on with.
+    ///
+    /// # Errors
+    ///
+    /// [`ProjectError::LegacyProject`] when the file declares the legacy `api`.
+    pub fn refuse_legacy(&self) -> Result<(), ProjectError> {
+        match self.api {
+            ApiCheck::Legacy => Err(ProjectError::from(LegacyProject)),
+            ApiCheck::Current | ApiCheck::Unsupported(_) => Ok(()),
+        }
     }
 
     /// The tools the project installs, by name.
@@ -420,6 +433,11 @@ mod tests {
         assert_eq!(legacy.api(), ApiCheck::Legacy);
         let current = parse(&format!("api = 1\n{rest}")).map_err(|shown| shown.join("; "))?;
         assert_eq!(current.api(), ApiCheck::Current);
+        assert_eq!(
+            legacy.refuse_legacy().map_err(|error| error.to_string()),
+            Err("api 0 is from agentstacks 0.x (run agentstacks update)".to_owned())
+        );
+        assert_eq!(current.refuse_legacy(), Ok(()));
         Ok(())
     }
 

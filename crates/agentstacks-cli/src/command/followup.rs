@@ -2,9 +2,9 @@
 //!
 //! # Responsibilities
 //!
-//! - [`plan_then_apply`] is what `init` and `update` do once the file is rewritten: the same
-//!   plan, show and apply as `apply`, then the line on stderr that tells the author where the file
-//!   stands, and the exit outcome.
+//! - [`plan_then_apply`] is what `init`, `update` and `ext add` do once the file is rewritten: the
+//!   same plan, show and apply as `apply`, then the line on stderr that tells the author where the
+//!   file stands, and the exit outcome.
 //! - [`Rewrite`] says which of the two the file went through, for the wording of those lines.
 //!
 //! # Non-responsibilities
@@ -27,7 +27,7 @@ use crate::exit::Outcome;
 pub(super) enum Rewrite {
     /// `init` wrote it.
     Written,
-    /// `update` moved its tags.
+    /// `update` moved its tags, or `ext add` added a tool.
     Updated,
 }
 

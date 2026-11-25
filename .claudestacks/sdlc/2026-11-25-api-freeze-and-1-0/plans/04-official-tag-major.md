@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [03]
 built-on: c187d693fbea
@@ -76,3 +76,24 @@ crates/agentstacks/src/app/update.rs             — modify: passes the source U
 ## Proof
 
 - `cargo make dod` is green.
+
+## Review findings
+
+One `claudestacks:reviewer` over tasks 1–2 (`cargo make dod` exit 0): 0🔴 1🟡 9🔵, none blocking. Every
+code finding went to one fix coder; `cargo make dod` after the fix: exit 0 (651 passed, 0 failed).
+
+- fixed 🟡 `book/src/ch02-00-packs.md:21`: `update` now said to move to the newest release of the api it speaks (`packs-v1.*`).
+- fixed 🔵 `book/src/ch01-02-first-project.md:96`: "a newer `packs-v1.*` tag".
+- fixed 🔵 `book/src/ch05-00-plan-and-apply.md:332`: `latest_tag(tags, prefix, major)`.
+- fixed 🔵 `crates/agentstacks/src/app/init.rs`: module and `init` docs rewrapped to 100.
+- fixed 🔵 `crates/agentstacks/src/types/project/error.rs:62`: `NoReleaseTag` doc names prefix and major.
+- fixed 🔵 `crates/agentstacks/src/types/shorthand.rs`: module doc names the official source; choosing among tags is `types/resolve`.
+- fixed 🔵 `crates/agentstacks/src/types/shorthand.rs:72`: `API.unsigned_abs()` replaced by `types/api.rs` `API_MAJOR` (compile-time `API >= 0`), test `api_major_is_the_api`.
+- recorded 🔵 plan drift (official rule placement, untouched files, book edits): see Deviations.
+
+## Deviations
+
+- 2026-11-25: The rule "official" is `types/shorthand.rs` `official_major` (next to `OFFICIAL_REPOSITORY` and `TAG_PREFIX`), not `types/resolve/update.rs`. Both `init` (app) and `update` (types/resolve) need it; in `resolve/update.rs` `app/init.rs` would have imported from the update rule or copied it. Layering holds (a rule in `types/`). The reviewer judged the placement correct.
+- 2026-11-25: `app/update.rs` and `types/project/error.rs` did not need code changes: `UpdateQuery` already carried `url`, and `NoReleaseTag.prefix` is a `String` given `release_prefix()` = `packs-v1`. `error.rs` changed only in a doc line (review fix).
+- 2026-11-25: The book lines on how the official tag is chosen (`ch04-00-cli.md`, `ch05-00-plan-and-apply.md`, `ch01-02`, `ch02-00`) were updated in this plan, because CLAUDE.md requires a chapter to change with the code. Plan 07 builds on them.
+- 2026-11-25: Task 1 coder ran `cargo make dod` itself (exit 0) and the reviewer re-ran it (exit 0); the orchestrator did not run a third copy for the batch.

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 03, 04, 05, 06]
 built-on: c187d693fbea
@@ -116,3 +116,29 @@ CLAUDE.md                              — modify: status, invariant, CLI surfac
 
 - `cargo make book-build` is green.
 - The api-0 gate of plan 01 prints only kept lines.
+
+## Review findings
+
+One `claudestacks:reviewer` over tasks 1–4 (`cargo make dod` exit 0; `cargo make book-build` exit 0, 0
+`[ERROR]`; every quoted refusal found in `crates/`; every relative link resolves; the worked examples
+re-run on the built binary): 3🔴 4🟡 10🔵 code, 1🔴 2🟡 1🔵 spec. Every finding went to one fix coder;
+`cargo make book-build` after the fix: exit 0, 0 `[ERROR]`.
+
+- fixed 🔴 `README.md:81,86,91,96`: the example manifest pins `packs-v1.0.0` beside `api = 1`.
+- fixed 🟡 `README.md:106-107,115`: Tools table and Packs line name `packs-v1.0.0`.
+- fixed 🔴 `book/src/ch06-04-pack-authoring.md:313`, `ch06-05-pack-format.md:96-97`: the quoted legacy pack refusal stays; recorded as kept lines (Deviations).
+- fixed 🔴 spec: plan 07 Proof — the api-0 gate now prints only kept lines plus the two recorded below.
+- fixed 🟡 `book/src/ch03-01-from-0x.md:41`: the move prints `  api: 0 → 1` first, then a `note` row per git source with nothing newer.
+- fixed 🔵 `README.md` Documentation paragraph and M2 roadmap line; `CLAUDE.md` Status, CLI surface and roadmap lines rewrapped to 100.
+- fixed 🔵 `ch03-01` header-file list; `ch05-00` shorthand and tag-writer sentences; `ch06-04` exclude checklist and refusal-row preamble; `ch06-05:8` location wording.
+- fixed 🔵 `crates/agentstacks/README.md`, `crates/agentstacks-cli/README.md` Stability sections name the covered surfaces.
+- fixed 🟡 the api-0 gate was a manual grep: it is now the last step of `cargo make lua` (so `dod` and CI run it), a file allowlist in `Makefile.toml`. `cargo make dod` exit 0 with `api-0 gate: passed`; a planted `api = 0` file fails it (exit 1).
+- open 🟡 org-root `README.md` and `.github/profile/README.md` still say pre-release. See Deviations.
+
+## Deviations
+
+- 2026-11-25: Two lines beyond plan 01's "Kept lines" table hit the api-0 gate and are kept: `book/src/ch06-04-pack-authoring.md:313` and `book/src/ch06-05-pack-format.md:96-97`. Both quote the real legacy-pack refusal (`types/manifest/pack/file.rs`), the same kind as the kept `ch04-00-cli.md` legacy rows. Plan 01 is done and was not edited.
+- 2026-11-25: The api-0 gate runs in `cargo make lua` as a file allowlist (`Makefile.toml`), stricter in where and looser in kind than plan 01's table, which judges each line's kind by hand. A new legacy file must be added to the allowlist on purpose. `CLAUDE.md` Commands line for `cargo make lua` names it.
+- 2026-11-25: The org-root `README.md` and `.github/profile/README.md` live outside this repository. The run was confined to this worktree, and RELEASING.md Later releases step 6 has the maintainer commit the org docs at release. Not edited here.
+- 2026-11-25: README and ch01-02 name `packs-v1.0.0`, which exists only after the maintainer's release; ch06-04's worked example ran against a copy of `extensions/claude` because `--tool claude` refuses until that tag exists (`no packs-v1 release tag in https://github.com/airsstack/agentstacks`).
+- 2026-11-25: Tasks 1, 3 and 4 ran as one batch and Task 2 after it (Tasks 1 and 2 share `SUMMARY.md`). Task 1–4 coders ran `book-build` and the gates; the orchestrator ran `cargo make dod` at the end.

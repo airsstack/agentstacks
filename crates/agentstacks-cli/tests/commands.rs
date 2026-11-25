@@ -6,6 +6,7 @@
 //! its own: the rules are proven in the library, and these runs show that the commands, the claude
 //! extension and the airsl adapter hold together.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -217,6 +218,184 @@ fn plan_after_apply_reports_nothing_to_write() -> TestResult {
     assert_eq!(run.code, 0, "stderr: {}", run.stderr);
     let summary = run.stdout.lines().last().ok_or("stdout is empty")?;
     assert!(summary.starts_with("0 to write"), "{}", run.stdout);
+    Ok(())
+}
+
+#[test]
+fn ext_add_a_path_extension() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::new()?;
+    project.init()?;
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    copy_tree(
+        &manifest.join("../../extensions/opencode"),
+        &project.path("ext/opencode"),
+    )?;
+    let run = project.run(&["ext", "add", "./ext/opencode", "--yes"])?;
+
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    assert!(
+        run.stdout
+            .lines()
+            .any(|line| line == "agentstacks.toml: added tools.opencode"),
+        "{}",
+        run.stdout
+    );
+    let toml = fs::read_to_string(project.path("agentstacks.toml"))?;
+    assert!(toml.contains("[tools.opencode]"), "{toml}");
+    let planned = project.run(&["plan"])?;
+    assert_eq!(planned.code, 0, "stderr: {}", planned.stderr);
+    let summary = planned.stdout.lines().last().ok_or("stdout is empty")?;
+    assert!(summary.starts_with("0 to write"), "{}", planned.stdout);
+    Ok(())
+}
+
+/// The shipped extension `name` of this repository.
+fn shipped_extension(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../extensions")
+        .join(name)
+}
+
+/// Every file under `dir` with its bytes, keyed by its path relative to `dir`.
+fn snapshot(dir: &Path) -> Result<BTreeMap<PathBuf, Vec<u8>>, Box<dyn Error>> {
+    fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) -> TestResult {
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                walk(root, &path, out)?;
+            } else {
+                out.insert(path.strip_prefix(root)?.to_path_buf(), fs::read(&path)?);
+            }
+        }
+        Ok(())
+    }
+    let mut out = BTreeMap::new();
+    walk(dir, dir, &mut out)?;
+    Ok(out)
+}
+
+#[test]
+fn ext_test_claude_passes() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::empty()?;
+    let extension = shipped_extension("claude");
+    let run = project.run(&["ext", "test", &extension.display().to_string()])?;
+
+    assert_eq!(
+        run.code, 0,
+        "stdout: {}\nstderr: {}",
+        run.stdout, run.stderr
+    );
+    assert_eq!(run.stdout.lines().last(), Some("passed"), "{}", run.stdout);
+    assert!(run.stdout.starts_with("ext test claude "), "{}", run.stdout);
+    assert!(run.stdout.contains("\nlua tests: "), "{}", run.stdout);
+    assert!(
+        run.stdout.contains("\nsecond plan: nothing to change\n"),
+        "{}",
+        run.stdout
+    );
+    assert_eq!(run.stderr, "");
+    Ok(())
+}
+
+#[test]
+fn ext_test_opencode_passes() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::empty()?;
+    let extension = shipped_extension("opencode");
+    let run = project.run(&["ext", "test", &extension.display().to_string()])?;
+
+    assert_eq!(
+        run.code, 0,
+        "stdout: {}\nstderr: {}",
+        run.stdout, run.stderr
+    );
+    assert_eq!(run.stdout.lines().last(), Some("passed"), "{}", run.stdout);
+    let skips: Vec<&str> = run
+        .stdout
+        .lines()
+        .filter(|line| line.trim_start().starts_with("skip "))
+        .collect();
+    assert_eq!(skips.len(), 2, "{}", run.stdout);
+    assert!(
+        skips
+            .iter()
+            .any(|line| line
+                .contains("conformance/hook/2: opencode has no hook when a session ends")),
+        "{skips:?}"
+    );
+    assert!(
+        skips
+            .iter()
+            .any(|line| line
+                .contains("conformance/hook/6: opencode has no hook when a subagent stops")),
+        "{skips:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn ext_test_writes_nothing_outside_scratch() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::empty()?;
+    let extension = project.path("ext/claude");
+    copy_tree(&shipped_extension("claude"), &extension)?;
+    let before = snapshot(&extension)?;
+    let run = project.run(&["ext", "test", "ext/claude"])?;
+
+    assert_eq!(
+        run.code, 0,
+        "stdout: {}\nstderr: {}",
+        run.stdout, run.stderr
+    );
+    assert_eq!(snapshot(&extension)?, before);
+    let top: Vec<_> = fs::read_dir(project.path("."))?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(top, ["ext"]);
+    Ok(())
+}
+
+/// The text of the operating system's not-found error is the one Unix writes.
+#[cfg(unix)]
+#[test]
+fn ext_test_labels_paths_as_written() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = Project::empty()?;
+    let run = project.run(&["ext", "test", "ext/missing"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert_eq!(run.stdout, "");
+    assert_eq!(
+        run.stderr,
+        "ext/missing: No such file or directory (os error 2)\n"
+    );
+    Ok(())
+}
+
+/// The text of the operating system's not-found error is the one Unix writes.
+#[cfg(unix)]
+#[test]
+fn ext_add_without_project() -> TestResult {
+    let project = Project::empty()?;
+    let run = project.run(&["ext", "add", "./x", "--yes"])?;
+
+    assert_eq!(run.code, 1, "stdout: {}", run.stdout);
+    assert_eq!(
+        run.stderr,
+        "agentstacks.toml: No such file or directory (os error 2)\n"
+    );
     Ok(())
 }
 

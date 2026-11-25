@@ -11,6 +11,9 @@
 //! - [`StdWorkspace`]: the `Workspace` port over the project directory: where a path leads, what
 //!   is there, and the writes apply makes (a temporary file beside the target, a rename, a delete,
 //!   the lock).
+//! - [`DiskScratch`]: the `Scratch` port. It opens a directory outside the project as a
+//!   [`StdFileTree`] and creates a temporary project directory that its [`ScratchProject`] removes
+//!   on drop.
 //! - `Cache`: the git cache directory, where a fetched revision is kept, so the `process` adapter
 //!   that drives `git` leaves every disk step to this module. It is the one thing from `fs` that
 //!   `process` uses.
@@ -18,17 +21,20 @@
 //! # Non-responsibilities
 //!
 //! They add no rules about what a directory may hold or what a step is: refusing symlinked entries
-//! in a walk, hashing, and deciding what to write or remove belong to `types` and the flows. Running
-//! `git` belongs to `process`.
+//! in a walk, hashing, and deciding what to write or remove belong to `types` and the flows.
+//! Running `git` belongs to `process`.
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
 pub mod cache;
 pub mod disk;
+pub mod scratch;
 pub mod workspace;
 
 pub(crate) use cache::Cache;
 #[doc(inline)]
 pub use disk::StdFileTree;
+#[doc(inline)]
+pub use scratch::{DiskScratch, ScratchProject};
 #[doc(inline)]
 pub use workspace::StdWorkspace;

@@ -12,6 +12,10 @@
 //!   the workspace and records what came back as the real host does, and a proposal goes through
 //!   [`Proposals::propose`], so the duplicate-path and skip and cover rules run exactly as they
 //!   do with the real host.
+//! - A tool scripted more than once serves its scripts in order, one for each run of the tool: the
+//!   run moves on to the next script when its `plan` handler has been dispatched. The last script
+//!   is used up by its first run: a later run opens, has `values` refused with no diagnostics and
+//!   proposes no steps.
 //! - A tool with no script is refused when opened, with no diagnostics, so a test that forgot to
 //!   script it fails its exact-refusal assertion visibly.
 //! - [`AdapterCall`] is one entry of the call log that [`FakeAdapter::calls`] returns, with a copy
@@ -25,7 +29,7 @@
 //! steps are taken when used.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use crate::port::adapter::seam::Adapter;
 use crate::port::tree::FileTree;
@@ -99,7 +103,7 @@ pub enum AdapterCall {
 /// A scripted engine, keyed by the tool each extension is for.
 #[derive(Debug, Default)]
 pub struct FakeAdapter {
-    scripts: RefCell<BTreeMap<ToolName, ToolScript>>,
+    scripts: RefCell<BTreeMap<ToolName, VecDeque<ToolScript>>>,
     calls: RefCell<Vec<AdapterCall>>,
 }
 
@@ -110,10 +114,14 @@ impl FakeAdapter {
         Self::default()
     }
 
-    /// Scripts the extension of `tool`.
+    /// Scripts the extension of `tool`. A second script for the same tool serves its next run.
     #[must_use]
     pub fn tool(self, tool: &ToolName, script: ToolScript) -> Self {
-        self.scripts.borrow_mut().insert(tool.clone(), script);
+        self.scripts
+            .borrow_mut()
+            .entry(tool.clone())
+            .or_default()
+            .push_back(script);
         self
     }
 
@@ -121,6 +129,25 @@ impl FakeAdapter {
     #[must_use]
     pub fn calls(&self) -> Vec<AdapterCall> {
         self.calls.borrow().clone()
+    }
+}
+
+impl FakeAdapter {
+    /// The `plan` steps of the script serving `tool`, which then makes way for the next script
+    /// when one is queued.
+    fn next_run_steps(&self, tool: &ToolName) -> Vec<ScriptStep> {
+        let mut scripts = self.scripts.borrow_mut();
+        let Some(queue) = scripts.get_mut(tool) else {
+            return Vec::new();
+        };
+        let steps = queue
+            .front_mut()
+            .map(|script| std::mem::take(&mut script.steps))
+            .unwrap_or_default();
+        if queue.len() > 1 {
+            queue.pop_front();
+        }
+        steps
     }
 }
 
@@ -136,7 +163,12 @@ impl Adapter for FakeAdapter {
         self.calls
             .borrow_mut()
             .push(AdapterCall::Open(tool.clone()));
-        match self.scripts.borrow_mut().get_mut(&tool) {
+        match self
+            .scripts
+            .borrow_mut()
+            .get_mut(&tool)
+            .and_then(VecDeque::front_mut)
+        {
             None => Err(Diagnostics::new()),
             Some(script) => script.open.take().map_or(Ok(tool), Err),
         }
@@ -153,6 +185,7 @@ impl Adapter for FakeAdapter {
         self.scripts
             .borrow_mut()
             .get_mut(session)
+            .and_then(VecDeque::front_mut)
             .and_then(|script| script.values.take())
             .unwrap_or_else(|| Err(Diagnostics::new()))
     }
@@ -167,12 +200,7 @@ impl Adapter for FakeAdapter {
         self.calls
             .borrow_mut()
             .push(AdapterCall::Plan(session.clone(), input.clone()));
-        let steps = self
-            .scripts
-            .borrow_mut()
-            .get_mut(session)
-            .map(|script| std::mem::take(&mut script.steps))
-            .unwrap_or_default();
+        let steps = self.next_run_steps(session);
         let mut reads = Reads::default();
         let mut found = Diagnostics::new();
         for step in steps {
@@ -494,6 +522,25 @@ mod tests {
         assert_eq!(by_plan, opened);
         assert_eq!(values, &values_input("claude")?);
         assert_eq!(plan.root, path(".claude/agentstacks")?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_second_script_serves_the_next_run() -> TestResult {
+        let (claude, files) = extension("claude")?;
+        let first = ToolScript::new()
+            .values(Ok(values_result("claude")?))
+            .step(ScriptStep::Propose(write("claude", 1, ".claude/a")?));
+        let second = ToolScript::new()
+            .values(Ok(values_result("claude")?))
+            .step(ScriptStep::Propose(write("claude", 2, ".claude/b")?))
+            .step(ScriptStep::Propose(write("claude", 3, ".claude/c")?));
+        let adapter = FakeAdapter::new()
+            .tool(&tool("claude")?, first)
+            .tool(&tool("claude")?, second);
+        let workspace = FakeWorkspace::new();
+        assert_eq!(drive(&adapter, &claude, &files, &workspace)?, 1);
+        assert_eq!(drive(&adapter, &claude, &files, &workspace)?, 2);
         Ok(())
     }
 

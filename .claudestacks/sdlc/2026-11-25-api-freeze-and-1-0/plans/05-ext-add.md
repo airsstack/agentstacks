@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 02, 04]
 built-on: c187d693fbea
@@ -130,3 +130,33 @@ crates/agentstacks-cli/tests/commands.rs         — modify: ext add end to end
 
 - `cargo make dod` is green.
 - `agentstacks ext add --help` lists `--tag`, `--rev`, `--subdir`, `--yes`.
+
+## Review findings
+
+One `claudestacks:reviewer` over tasks 1–4 (`cargo make dod` exit 0; `ext add --help` lists `--tag`,
+`--rev`, `--subdir`, `--yes`): 0🔴 6🟡 16🔵 2❓. Every code finding went to one fix coder; `cargo make
+dod` after the fix: exit 0 (fmt, clippy, rustdoc, tests, doctests, lua 651 passed).
+
+- fixed 🟡 `app/newest.rs`: colocated tests for the newest tag, no tag of the major, and a fetch error.
+- fixed 🟡 `agentstacks-cli/src/command/ext/mod.rs`: plan reference removed; doc names the `added tools.<name>` line.
+- fixed 🟡 `app/init.rs`: every argument location is `Location::verbatim`; test `init_shows_every_argument_as_written`.
+- fixed 🟡 `app/ext/add.rs`: tests `subdir_not_found_is_located_at_the_source`, `cache_io_is_located_at_its_path`.
+- fixed 🟡 E14 literal: CLI test `ext_add_without_project` asserts `agentstacks.toml: No such file or directory (os error 2)`, exit 1.
+- fixed 🔵 `app/ext/add.rs`: module doc names every location; `add` takes `GitFlags`; steps described, not numbered; typed `ToolName` from the manifest (dead `InvalidName` branch gone).
+- fixed 🔵 `app/init.rs`: the two `NewestError` arms merged through `From<NewestError> for FormatError`.
+- fixed 🔵 `types/project/add.rs`: `add_tool` is `pub(crate)`.
+- fixed 🔵 `types/project/error.rs`: `GitOption { Tag, Rev, Subdir }` replaces `&'static str` option names.
+- fixed 🔵 `types/report/location.rs`: `Place { Path, Text }` replaces `verbatim: bool`; `file_path()` returns `Option<&Path>`.
+- fixed 🔵 `types/shorthand.rs`: "blank" dropped; tests `ext_dash_url_refused_verbatim`; `init_still_takes_no_url` asserts the Path result and the refusal.
+- resolved ❓ F2 inline output: the test's expected text matches `probes/deps-output-final.txt` "inline tools" byte for byte (` } , mytool = …`).
+- resolved ❓ F6 argv list: `cli.rs` `ext_add_parses` covers the `ext add` lines of P6/P6b; the `ext test` lines belong to plan 06.
+- recorded 🔵 plan drift items: see Deviations.
+
+## Deviations
+
+- 2026-11-25: Added beyond the Files list, each to keep one home per rule: `app/newest.rs` (newest official release lookup shared by `init` and `ext add`), `types/project` `GitFlags` and `GitOption`, `ProjectError::{GitNeedsPin, PinConflict, FlagNeedsGit, FlagValue}`, `types/report/location.rs` `Place` and `Location::verbatim` (the §5.4 texts quote the SOURCE as typed; `Location::file` rebuilt `https://` as `https:/`), `FakeWorkspace::set_project` (to test E15).
+- 2026-11-25: `PinConflict` text `--tag and --rev cannot be used together`: the spec has no text because clap makes it unreachable (F6); the flow still refuses it instead of panicking.
+- 2026-11-25: Git refusal locations: git missing and other git failures at `ext add`, a cache I/O failure at its cache path, a missing subdir or a subdir that is a file at `ext add "<SOURCE>"`, a path I/O error at the path (as `init`). The plan's Risks said "located `ext add`" for all.
+- 2026-11-25: `init` locations for its arguments now print the argument as typed (`Location::verbatim`), which changes `init` messages only for arguments containing `//` or `/./`.
+- 2026-11-25: `book/src/ch04-00-cli.md` gained the `ext add` grammar line, table row and stdout row in this plan (CLAUDE.md: book with the code). Plan 07 writes the full section.
+- 2026-11-25: Tasks 3 and 4 ran as separate batches; one review covered the whole plan.

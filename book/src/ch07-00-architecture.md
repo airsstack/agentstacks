@@ -21,11 +21,11 @@ ports, and is tested with fakes. Only the adapters touch the disk, `git`, the `a
 
 | Module | Holds | State |
 |---|---|---|
-| `types/` | the domain: the pack, extension, project and lock formats, and pure rules (operations, source resolution, plan steps, JSON text edit, the hook protocol) | built |
-| `port/` | traits only, each with a fake for tests: `FileTree`, `Workspace`, `Git`, `Binary`, `Adapter` | built |
-| `app/` | use cases, generic over ports: `plan`, `apply`, `doctor`, `update` | built |
-| `fs/` | adapter: `FileTree` and `Workspace` on the real disk | built |
-| `process/` | adapter: `Git` on the `git` CLI, `Binary` on `airsl --version` | built |
+| `types/` | the domain: the pack, extension, project and lock formats, and pure rules (operations, source resolution, plan steps, JSON text edit, the hook protocol, the `ext test` check rules) | built |
+| `port/` | traits only, each with a fake for tests: `FileTree`, `Workspace`, `Scratch`, `Git`, `Binary`, `Adapter` | built |
+| `app/` | use cases, generic over ports: `plan`, `apply`, `doctor`, `update`, `init`, and `ext` (`ext add`, `ext test`) | built |
+| `fs/` | adapter: `FileTree` and `Workspace` on the real disk, and `Scratch` (a directory outside the project, a temporary project that is removed on drop) | built |
+| `process/` | adapter: `Git` on the `git` CLI, `Binary` on `airsl --version` and `airsl test <dir>` | built |
 | `host/` | adapter: `Adapter` on the airsl sandbox, where extension Lua runs | built |
 
 The command-line crate `agentstacks-cli` is the composition root: it builds the real adapters and
@@ -84,7 +84,7 @@ fs      StdWorkspace::resolve returns the real disk state
 | What | How | Needs disk, git or airsl |
 |---|---|---|
 | every rule (`types/`) | unit tests on plain values | no |
-| every flow (`app/`): plan, apply order, conflicts, stale lock, doctor | unit tests with `FakeWorkspace`, `FakeGit`, `FakeBinary`, `FakeAdapter` | no |
+| every flow (`app/`): plan, apply order, conflicts, stale lock, doctor | unit tests with `FakeWorkspace`, `FakeGit`, `FakeBinary`, `FakeAdapter`, `FakeScratch` | no |
 | each adapter | one contract test: does the real adapter behave like its fake? | yes, only these |
 
 Logic is never tested only through an end-to-end run. If a rule can only be reached end to end, it

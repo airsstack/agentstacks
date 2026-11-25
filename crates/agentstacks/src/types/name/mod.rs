@@ -6,7 +6,8 @@
 //!
 //! - [`PackName`], [`ToolName`], [`ItemName`]: `kebab-case` names of packs, tools and pack items.
 //! - [`OptionName`]: a `snake_case` pack option name.
-//! - [`BinaryName`]: the name of a binary a pack requires or a hook may run.
+//! - [`BinaryName`]: the name of a binary a pack requires or a hook may run, and [`AIRSL`], the
+//!   name of `airsl`.
 //! - [`EnvName`]: an environment variable name a hook may read.
 //! - [`InvalidName`], [`InvalidEnvName`], [`InvalidOptionName`]: the refusal each constructor
 //!   returns, holding the refused value.
@@ -26,6 +27,8 @@ pub mod option;
 pub mod pack;
 pub mod tool;
 
+#[doc(inline)]
+pub use binary::AIRSL;
 #[doc(inline)]
 pub use binary::BinaryName;
 #[doc(inline)]

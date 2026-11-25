@@ -3,9 +3,9 @@
 **Set up any agentic coding tool from one CLI: write the content once, and agentstacks renders it in
 each tool's own format.**
 
-> **Status: pre-release (0.1.0).** The CLI and the Claude Code extension are released, with the
-> five official packs (`packs-v0.1.0`). The OpenCode extension is built and ships with the next
-> `packs-v*` release. The extension API is `api = 0` and will change. Coming from the claudestacks
+> **Status: 1.0.** The CLI, the Claude Code and OpenCode extensions and the five official packs are
+> built. The extension API is `api = 1` and frozen: 1.x changes are additive only
+> ([the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html)). Coming from the claudestacks
 > plugins? See
 > [the migration guide](https://airsstack.github.io/agentstacks/ch03-00-migration.html).
 
@@ -74,26 +74,26 @@ The official-names `init` above writes the manifest that the project commits:
 
 ```toml
 # agentstacks.toml
-api = 0
+api = 1
 
 [tools.claude]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v0.1.0"
+tag = "packs-v1.0.0"
 subdir = "extensions/claude"
 
 [packs.core]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v0.1.0"
+tag = "packs-v1.0.0"
 subdir = "packs/core"
 
 [packs.guideline-rust]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v0.1.0"
+tag = "packs-v1.0.0"
 subdir = "packs/guideline-rust"
 
 [packs.sdlc]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v0.1.0"
+tag = "packs-v1.0.0"
 subdir = "packs/sdlc"
 ```
 
@@ -103,8 +103,8 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 
 | Tool | Status |
 |---|---|
-| Claude Code | Released (`extensions/claude`, `packs-v0.1.0`) |
-| OpenCode | Built (`extensions/opencode`), ships with the next `packs-v*` release |
+| Claude Code | Released (`extensions/claude`, `packs-v1.0.0`) |
+| OpenCode | Released (`extensions/opencode`, `packs-v1.0.0`) |
 | Your own | Write a tool extension against the public API: [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html) |
 
 There is no plugin marketplace. Every tool is set up through the CLI, in that tool's native
@@ -112,7 +112,7 @@ project configuration.
 
 ## Packs
 
-The five packs come from the claudestacks plugins and are released as `packs-v0.1.0`:
+The five packs come from the claudestacks plugins and are released as `packs-v1.0.0`:
 
 | Pack | Contents |
 |---|---|
@@ -131,8 +131,8 @@ enough for real tools.
 Extensions run under [airsl](https://github.com/airsstack/airsl) with no file, network, or process
 access. An extension only *proposes* operations; the Rust core validates them, `plan` shows them,
 and the executor applies them. A third-party command never runs unannounced. The extension API is
-unstable (`api = 0`); both official tools run on it, and it stays `api = 0` until it is frozen as
-`api = 1` in M3.
+frozen as `api = 1`; both official tools run on it, and 1.x changes to it are additive only
+([the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html)).
 
 To write a tool extension, give your coding agent the guide
 [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html), or its raw link:
@@ -141,6 +141,9 @@ To write a tool extension, give your coding agent the guide
 Build an agentstacks extension for <tool>.
 Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch06-00-authoring.md
 ```
+
+Check a finished extension with `agentstacks ext test <EXTENSION>`, which runs it against a built-in
+conformance pack in a temporary project; add it to a project with `agentstacks ext add <SOURCE>`.
 
 ## Design rules
 
@@ -159,7 +162,7 @@ Follow https://raw.githubusercontent.com/airsstack/agentstacks/main/book/src/ch0
 agentstacks/
 ├─ crates/
 │  ├─ agentstacks/       core library: types · port · app · fs · process · host     built
-│  ├─ agentstacks-cli/   init · plan · apply · doctor · update                       built
+│  ├─ agentstacks-cli/   init · plan · apply · doctor · update · ext add · ext test   built
 │  ├─ claudevs/          deterministic test engine for Claude Code setups            built (moved from claudestacks)
 │  └─ claudevs-cli/      the claudevs binary                                         built
 ├─ extensions/           official tool extensions: claude/ built · opencode/ built
@@ -172,8 +175,8 @@ agentstacks/
 ## Documentation
 
 The agentstacks book, https://airsstack.github.io/agentstacks/, covers installing, the packs, moving
-from the claudestacks plugins, the CLI, plan and apply, writing a tool extension, the architecture,
-and claudevs. Its source is `book/src/`; contributors start with
+from the claudestacks plugins and from 0.x, the CLI, plan and apply, writing a tool extension,
+writing a pack, the pack format, the stability promise, the architecture, and claudevs. Its source is `book/src/`; contributors start with
 [Under the Hood](https://airsstack.github.io/agentstacks/ch07-00-architecture.html): the layers, the
 dependency rule, where logic lives, and how it is tested.
 
@@ -181,8 +184,8 @@ dependency rule, where logic lives, and how it is tested.
 
 ```text
 M1  claude extension (api = 0) ✓ released (0.1.0); the claudestacks plugins are packs
-M2  opencode extension on the same API ✓ built; ships with the next packs release
-M3  freeze api = 1; docs for writing packs and extensions; ext add / ext test
+M2  opencode extension on the same API ✓ released (packs-v0.2.0)
+M3  freeze api = 1; docs for writing packs and extensions; ext add / ext test ✓ built (1.0)
 ```
 
 ## Part of airsstack

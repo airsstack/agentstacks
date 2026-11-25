@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [07]
 built-on: c187d693fbea
@@ -56,3 +56,26 @@ RELEASING.md                           — modify: the 0.1.0 record titled as su
 
 - `cargo make dod`, `cargo make claudevs-check`, `cargo make opencode-check`, `cargo deny check` and `cargo make book-build` are green on the branch.
 - The spec §8 api-0 gate prints only the kept lines of plan 01.
+
+## Review findings
+
+One `claudestacks:reviewer` over Task 1 (`cargo make dod` exit 0; `cargo make book-build` exit 0, no
+`[ERROR]`): 0🔴 4🟡 7🔵 2❓. Every finding went to one fix coder; `cargo make book-build` after the
+fix: exit 0, no `[ERROR]`. No release step was run.
+
+- fixed 🟡 `RELEASING.md` Later releases: separate `<cli-version>`, `<packs-version>`, `<lib-version>` with "only when …" steps.
+- fixed 🟡 `RELEASING.md` step 3 recovery re-tags `packs-v<packs-version>` when the fix touches `packs/` or `extensions/`; step 4 has a failure path.
+- fixed 🟡 `RELEASING.md` step 5 regains the clean `main`, `cargo publish --workspace --dry-run`, crates.io poll check and partial-publish recovery gates.
+- fixed 🟡 `RELEASING.md` step 6 names `<milestone>`, not `foundation/03`.
+- fixed 🔵 `RELEASING.md`: precise 0.x warning; `curl -fsI` checks of the stability and from-0x pages; "step 6 onwards … step 5 onwards".
+- fixed 🔵 `crates/agentstacks-cli/CHANGELOG.md`: coverage wording matches `ch06-06-stability.md`; names `ext add --tag/--rev/--subdir/--yes`, `ext test --pack`.
+- fixed 🔵 `crates/agentstacks/CHANGELOG.md`: `ext add` also refuses an api 0 project.
+- resolved ❓ step-4 subshell: matches spec §8 command for command; only the version placeholders differ.
+- resolved ❓ api-0 gate over the four files: only plan 01's kept lines (1.0.0 move entries, 0.x history in `packs/CHANGELOG.md`).
+- recorded 🔵 plan Proof text: see Deviations.
+
+## Deviations
+
+- 2026-11-25: The plan's Proof says the CHANGELOGs "are included in the book where they are today"; nothing under `book/src` includes a CHANGELOG, so `book-build` does not exercise them. Checked by the reviewer instead.
+- 2026-11-25: Task 1 ran while plan 07's fix pass was in flight; the files are disjoint.
+- 2026-11-25: Plan Proof, run once each after every plan and the chain-wide cross-check: `cargo make dod` 0, `cargo make claudevs-check` 0, `cargo make opencode-check` 0, `cargo deny check` 0, `cargo make book-build` 0 with 0 `[ERROR]` lines.

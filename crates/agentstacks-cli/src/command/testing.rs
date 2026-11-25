@@ -174,6 +174,35 @@ pub(super) fn remote(serve: bool) -> Result<FakeGit, Box<dyn Error>> {
     Ok(git)
 }
 
+/// The `values` answer of the tool `tool` for `pack`.
+fn values_of(tool: &ToolName, pack: &Pack) -> Result<ValuesResult, Box<dyn Error>> {
+    let object = serde_json::json!({ "root": ".claude/agentstacks" });
+    let object = object.as_object().ok_or("an object")?;
+    let input = ValuesInput::new(tool.clone(), &[pack]);
+    ValuesResult::read(object, &input, Path::new("claude/adapter.lua"), |_| {
+        LuaType::Table
+    })
+    .map_err(|found| format!("{found:?}").into())
+}
+
+/// A proposal by `tool` to write `target` for the agent `coder` of the pack `core`.
+fn write_proposal(tool: &ToolName, target: &str) -> Result<Proposal, Box<dyn Error>> {
+    let core = PackName::new("core")?;
+    let coder = ItemName::new("coder")?;
+    Ok(Proposal {
+        op: Operation::Write {
+            path: OpPath::new(target)?,
+            content: b"agent".to_vec(),
+            covers: vec![ItemId::agent(&core, &coder)],
+        },
+        origin: Origin::Extension {
+            tool: tool.clone(),
+            file: adapter_path()?,
+            line: NonZeroUsize::new(1).ok_or("a line starts at 1")?,
+        },
+    })
+}
+
 /// The library fakes laid out as a project that plans to create [`AGENT_FILE`].
 pub(super) struct World {
     pub(super) ports: TestPorts,
@@ -183,32 +212,11 @@ impl World {
     /// A project with the tool `claude` and the pack `core` served from the project directory.
     /// `project` is the text of `agentstacks.toml`, or `None` for a project without one.
     fn build(project: Option<&str>, git: FakeGit) -> Result<Self, Box<dyn Error>> {
-        let core = PackName::new("core")?;
-        let coder = ItemName::new("coder")?;
         let claude = ToolName::new("claude")?;
 
         let pack = Pack::load(&core_tree()).map_err(|found| format!("{found:?}"))?;
-        let values = {
-            let object = serde_json::json!({ "root": ".claude/agentstacks" });
-            let object = object.as_object().ok_or("an object")?;
-            let input = ValuesInput::new(claude.clone(), &[&pack]);
-            ValuesResult::read(object, &input, Path::new("claude/adapter.lua"), |_| {
-                LuaType::Table
-            })
-            .map_err(|found| format!("{found:?}"))?
-        };
-        let proposal = Proposal {
-            op: Operation::Write {
-                path: OpPath::new(AGENT_FILE)?,
-                content: b"agent".to_vec(),
-                covers: vec![ItemId::agent(&core, &coder)],
-            },
-            origin: Origin::Extension {
-                tool: claude.clone(),
-                file: adapter_path()?,
-                line: NonZeroUsize::new(1).ok_or("a line starts at 1")?,
-            },
-        };
+        let values = values_of(&claude, &pack)?;
+        let proposal = write_proposal(&claude, AGENT_FILE)?;
         let script = ToolScript::new()
             .values(Ok(values))
             .step(ScriptStep::Propose(proposal));
@@ -253,6 +261,32 @@ impl World {
     /// of it is refused.
     pub(super) fn unserved() -> Result<Self, Box<dyn Error>> {
         Self::build(Some(GIT_PROJECT), remote(false)?)
+    }
+
+    /// Serves one more tool, `name`, from the directory `ext/<name>`: its extension loads, its
+    /// `values` are answered and its plan writes `.<name>/agents/coder.md`.
+    pub(super) fn with_tool(mut self, name: &str) -> Result<Self, Box<dyn Error>> {
+        let tool = ToolName::new(name)?;
+        let dir = format!("ext/{name}");
+        let manifest = format!(
+            "[extension]\nname = \"{name}\"\nversion = \"0.1.0\"\napi = 1\ndescription = \"d\"\nentry = \"adapter.lua\"\n"
+        );
+        let tree = || {
+            FakeFileTree::new(&dir)
+                .file("extension.toml", manifest.as_bytes())
+                .file("adapter.lua", b"")
+        };
+        let pack = Pack::load(&core_tree()).map_err(|found| format!("{found:?}"))?;
+        let proposal = write_proposal(&tool, &format!(".{name}/agents/coder.md"))?;
+        let script = ToolScript::new()
+            .values(Ok(values_of(&tool, &pack)?))
+            .step(ScriptStep::Propose(proposal));
+        let ports = &mut self.ports;
+        ports.workspace = std::mem::take(&mut ports.workspace)
+            .source(&LocalPath::new(&dir)?, tree())
+            .source(&LocalPath::new(&format!("./{dir}"))?, tree());
+        ports.adapter = std::mem::take(&mut ports.adapter).tool(&tool, script);
+        Ok(self)
     }
 
     /// A project with no `agentstacks.toml`, for `init`.

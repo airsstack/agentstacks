@@ -6,6 +6,7 @@
 //! - [`API`] is the one place the supported `api` is written. Every reader that checks the `api`
 //!   key of a file, and every refusal message that names the supported number, takes it from here,
 //!   so moving to another api number changes one line.
+//! - [`API_MAJOR`] is that number as the unsigned major a release tag carries.
 //! - [`VERSION`] is the product version of the running agentstacks as a semver value, so a range a
 //!   pack or extension requires can be tested against it.
 //! - [`check`] is the one rule on a found `api`: it is the current one, the legacy `0` of the
@@ -35,6 +36,22 @@ use crate::types::report::UnsupportedApi;
 /// assert_eq!(API, 1);
 /// ```
 pub const API: i64 = 1;
+
+/// The major version a release of the official packs and extensions must have to speak [`API`].
+///
+/// It is [`API`] as an unsigned number; the build fails when [`API`] is negative.
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::api::API_MAJOR;
+///
+/// assert_eq!(API_MAJOR, 1);
+/// ```
+pub const API_MAJOR: u64 = {
+    assert!(API >= 0, "API is a version number and cannot be negative");
+    API.unsigned_abs()
+};
 
 /// Reads one decimal component of the package version, `0` when it is not a number.
 ///
@@ -152,6 +169,11 @@ mod tests {
     #[test]
     fn api_is_one() {
         assert_eq!(API, 1);
+    }
+
+    #[test]
+    fn api_major_is_the_api() {
+        assert_eq!(API_MAJOR, 1);
     }
 
     #[test]

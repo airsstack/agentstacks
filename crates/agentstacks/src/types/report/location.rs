@@ -6,9 +6,11 @@
 //!
 //! # Responsibilities
 //!
-//! - Holds a file and at most one of a 1-based line or a dotted key path, so a location never
-//!   holds both.
-//! - Displays the file `/`-separated on every platform, then the line or key path:
+//! - Holds a path or verbatim text, and at most one of a 1-based line or a dotted key path, so a
+//!   location never holds both.
+//! - Displays a path `/`-separated on every platform, then the line or key path. A
+//!   [verbatim](Location::verbatim) location is shown exactly as given, for text such as
+//!   `ext add "https://example.com/x.git"` that is not a path:
 //!
 //!   | Location | Displays as |
 //!   |---|---|
@@ -49,9 +51,24 @@ use std::path::{Component, Path, PathBuf};
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Location {
-    file: PathBuf,
-    line: Option<NonZeroUsize>,
-    key_path: Option<String>,
+    place: Place,
+    at: Position,
+}
+
+/// What a location names: a path, shown `/`-separated, or text shown as given.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Place {
+    Path(PathBuf),
+    Text(String),
+}
+
+/// Where in the file: nowhere, a line or a key path, never two at once. One field keeps a
+/// [`Location`] small enough that a [`Diagnostic`](crate::types::Diagnostic) stays cheap to return.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Position {
+    File,
+    Line(NonZeroUsize),
+    Key(String),
 }
 
 impl Location {
@@ -69,9 +86,27 @@ impl Location {
     #[must_use]
     pub fn file(path: impl Into<PathBuf>) -> Self {
         Self {
-            file: path.into(),
-            line: None,
-            key_path: None,
+            place: Place::Path(path.into()),
+            at: Position::File,
+        }
+    }
+
+    /// A location that names text which is not a path, shown exactly as given: `//` and `/./` stay.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::Location;
+    ///
+    /// let text = "ext add \"https://example.com/x.git\"";
+    /// assert_eq!(Location::verbatim(text).to_string(), text);
+    /// assert_eq!(Location::file(text).to_string(), "ext add \"https:/example.com/x.git\"");
+    /// ```
+    #[must_use]
+    pub fn verbatim(text: impl Into<String>) -> Self {
+        Self {
+            place: Place::Text(text.into()),
+            at: Position::File,
         }
     }
 
@@ -93,9 +128,8 @@ impl Location {
     #[must_use]
     pub fn at_line(path: impl Into<PathBuf>, line: NonZeroUsize) -> Self {
         Self {
-            file: path.into(),
-            line: Some(line),
-            key_path: None,
+            place: Place::Path(path.into()),
+            at: Position::Line(line),
         }
     }
 
@@ -113,9 +147,8 @@ impl Location {
     #[must_use]
     pub fn at_key(path: impl Into<PathBuf>, key_path: impl Into<String>) -> Self {
         Self {
-            file: path.into(),
-            line: None,
-            key_path: Some(key_path.into()),
+            place: Place::Path(path.into()),
+            at: Position::Key(key_path.into()),
         }
     }
 
@@ -135,35 +168,48 @@ impl Location {
     #[must_use]
     pub fn set_level(project_file: impl Into<PathBuf>, key_path: Option<String>) -> Self {
         Self {
-            file: project_file.into(),
-            line: None,
-            key_path,
+            place: Place::Path(project_file.into()),
+            at: key_path.map_or(Position::File, Position::Key),
         }
     }
 
-    /// The file this location names.
+    /// The file this location names, or `None` for a [verbatim](Self::verbatim) location, which
+    /// names text and not a path.
     #[must_use]
-    pub fn file_path(&self) -> &Path {
-        &self.file
+    pub fn file_path(&self) -> Option<&Path> {
+        match &self.place {
+            Place::Path(path) => Some(path),
+            Place::Text(_) => None,
+        }
     }
 
     /// The 1-based line, when the location has one.
     #[must_use]
     pub const fn line(&self) -> Option<NonZeroUsize> {
-        self.line
+        match self.at {
+            Position::Line(line) => Some(line),
+            Position::File | Position::Key(_) => None,
+        }
     }
 
     /// The dotted key path, when the location has one.
     #[must_use]
     pub fn key_path(&self) -> Option<&str> {
-        self.key_path.as_deref()
+        match &self.at {
+            Position::Key(key_path) => Some(key_path),
+            Position::File | Position::Line(_) => None,
+        }
     }
 
     /// The file as a `/`-separated string: the path's components joined with `/`, each written
     /// as [`Path::display`] writes it.
     pub(crate) fn file_text(&self) -> String {
+        let path = match &self.place {
+            Place::Path(path) => path,
+            Place::Text(text) => return text.clone(),
+        };
         let mut text = String::new();
-        for component in self.file.components() {
+        for component in path.components() {
             if matches!(component, Component::RootDir) {
                 text.push('/');
                 continue;
@@ -180,10 +226,10 @@ impl Location {
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.file_text())?;
-        match (self.line, &self.key_path) {
-            (Some(line), _) => write!(f, ":{line}"),
-            (None, Some(key_path)) => write!(f, ": {key_path}"),
-            (None, None) => Ok(()),
+        match &self.at {
+            Position::Line(line) => write!(f, ":{line}"),
+            Position::Key(key_path) => write!(f, ": {key_path}"),
+            Position::File => Ok(()),
         }
     }
 }
@@ -196,6 +242,20 @@ mod tests {
 
     fn line(n: usize) -> Result<NonZeroUsize, Box<dyn std::error::Error>> {
         Ok(NonZeroUsize::new(n).ok_or("test line must be non-zero")?)
+    }
+
+    #[test]
+    fn verbatim_keeps_what_a_path_would_normalise() {
+        for text in [
+            "ext add \"https://example.com/x.git\"",
+            "ext add \"./a//b/\"",
+        ] {
+            let location = Location::verbatim(text);
+            assert_eq!(location.to_string(), text);
+            assert_eq!(location.file_path(), None);
+            assert_eq!(location.line(), None);
+            assert_eq!(location.key_path(), None);
+        }
     }
 
     #[test]
@@ -273,17 +333,17 @@ mod tests {
     #[test]
     fn accessors_return_constructed_parts() -> TestResult {
         let lined = Location::at_line("a.md", line(3)?);
-        assert_eq!(lined.file_path(), Path::new("a.md"));
+        assert_eq!(lined.file_path(), Some(Path::new("a.md")));
         assert_eq!(lined.line(), Some(line(3)?));
         assert_eq!(lined.key_path(), None);
 
         let keyed = Location::at_key("a.toml", "pack.api");
-        assert_eq!(keyed.file_path(), Path::new("a.toml"));
+        assert_eq!(keyed.file_path(), Some(Path::new("a.toml")));
         assert_eq!(keyed.line(), None);
         assert_eq!(keyed.key_path(), Some("pack.api"));
 
         let plain = Location::file("a.lock");
-        assert_eq!(plain.file_path(), Path::new("a.lock"));
+        assert_eq!(plain.file_path(), Some(Path::new("a.lock")));
         assert_eq!(plain.line(), None);
         assert_eq!(plain.key_path(), None);
         Ok(())

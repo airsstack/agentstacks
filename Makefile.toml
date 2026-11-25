@@ -13,11 +13,11 @@
 # The five cargo gate steps mirror the canonical command set in the
 # `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
 # file follows. The `lua` step is the project's own addition: it compiles and tests
-# the Lua under extensions/ and packs/ with `airsl check` and `airsl test`, runs
-# the sdlc pack's fingerprint shell script against fixed cases, then greps the
-# pack sources for leftover plugin syntax and unprefixed names. CI is
-# meant to run `cargo make dod`, so the pipeline and a local run are the same
-# command.
+# the Lua under extensions/, packs/ and the conformance pack asset with `airsl check` and
+# `airsl test`, runs the sdlc pack's fingerprint shell script against fixed cases, greps
+# the pack sources for leftover plugin syntax and unprefixed names, then fails on `api = 0`
+# text in any file outside a fixed allowlist. CI is meant to run
+# `cargo make dod`, so the pipeline and a local run are the same command.
 #
 # Install: cargo install --locked cargo-make cargo-deny
 #          plus the `airsl` binary on PATH for the `lua` step
@@ -100,7 +100,7 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua: airsl check and airsl test over extensions/ and packs/, the fingerprint gate, then the pack text gates"
+description = "Lua: airsl check and airsl test over extensions/, packs/ and the conformance pack asset, the fingerprint gate, the pack text gates, then the api-0 gate"
 # A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
 # needs shell expansion. `set -e` stops the run at the first failing step. The text
 # gates at the end fail on any line their grep prints: the `if` form is needed
@@ -110,8 +110,10 @@ script = '''
 set -e
 airsl check extensions
 airsl check packs
+airsl check crates/agentstacks/assets/conformance
 airsl test extensions
 airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git packs
+airsl test crates/agentstacks/assets/conformance
 
 # The fingerprint gate. `packs/sdlc/scripts/fingerprint.sh` is the one piece of
 # the status board with no Lua test: it exists for machines without airsl. It
@@ -216,6 +218,64 @@ if [ -n "$left" ]; then
   exit 1
 fi
 echo "pack text gates: 4 passed"
+
+# The api-0 gate. The supported API is 1, and `api = 0` text may stay only where a file records
+# the 0.x move or a legacy case on purpose (book/src/ch06-06-stability.md, book/src/ch03-01-from-0x.md):
+# release history, the quoted legacy refusals, and the tests and fixtures of the 0 -> 1 move. The
+# allowlist below is exact: one path per line, the files that hold such text today. A hit in any
+# other file fails, so a returning `api = 0` is caught, and a new legacy file is added here on
+# purpose. Untracked files count; ignored paths (target/, book/book/) do not. It reads grep's
+# status before filtering, as gates 3 and 4 do.
+rc=0
+found=$(git grep -lE --untracked 'api *= *0|api 0|speaks 0' -- crates extensions packs book README.md CLAUDE.md RELEASING.md ':(exclude)book/book') || rc=$?
+if [ "$rc" -gt 1 ]; then
+  echo "api-0 gate: git grep failed (exit $rc)" >&2
+  exit 1
+fi
+API0_KEEP="$FP_DIR/api0-keep"
+cat > "$API0_KEEP" <<'KEEP'
+README.md
+book/src/ch03-01-from-0x.md
+book/src/ch04-00-cli.md
+book/src/ch05-00-plan-and-apply.md
+book/src/ch06-04-pack-authoring.md
+book/src/ch06-05-pack-format.md
+book/src/ch06-06-stability.md
+crates/agentstacks-cli/CHANGELOG.md
+crates/agentstacks-cli/src/command/apply.rs
+crates/agentstacks-cli/src/command/testing.rs
+crates/agentstacks-cli/tests/commands.rs
+crates/agentstacks-cli/tests/fixtures/legacy/agentstacks.lock
+crates/agentstacks-cli/tests/fixtures/legacy/agentstacks.toml
+crates/agentstacks/CHANGELOG.md
+crates/agentstacks/src/app/doctor.rs
+crates/agentstacks/src/app/ext/add.rs
+crates/agentstacks/src/app/plan/flow.rs
+crates/agentstacks/src/app/plan/read.rs
+crates/agentstacks/src/app/update.rs
+crates/agentstacks/src/types/api.rs
+crates/agentstacks/src/types/extension/manifest.rs
+crates/agentstacks/src/types/format/fields.rs
+crates/agentstacks/src/types/lock/file.rs
+crates/agentstacks/src/types/lock/write.rs
+crates/agentstacks/src/types/manifest/error.rs
+crates/agentstacks/src/types/manifest/pack/file.rs
+crates/agentstacks/src/types/project/error.rs
+crates/agentstacks/src/types/project/file.rs
+crates/agentstacks/src/types/project/upgrade.rs
+crates/agentstacks/src/types/report/phrase.rs
+crates/agentstacks/tests/fixtures/extensions/invalid/api-zero/extension.toml
+crates/agentstacks/tests/fixtures/packs/pack-api-legacy/pack.toml
+crates/agentstacks/tests/pack.rs
+packs/CHANGELOG.md
+KEEP
+left=$(printf '%s\n' "$found" | grep -vxFf "$API0_KEEP" | grep -v '^$' || true)
+if [ -n "$left" ]; then
+  printf '%s\n' "$left"
+  echo "api-0 gate: api 0 text outside the allowlist in Makefile.toml (see book/src/ch06-06-stability.md)" >&2
+  exit 1
+fi
+echo "api-0 gate: passed"
 '''
 
 # ---------------------------------------------------------------------------

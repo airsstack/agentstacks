@@ -1,0 +1,73 @@
+render  = ["data/settings.json"]
+exclude = ["**/*_test.lua"]
+
+[pack]
+name        = "conformance"
+version     = "1.0.0"
+api         = 1
+description = "Every item kind and every hook event, for agentstacks ext test"
+
+[requires]
+airsl       = ">=0.1.5"
+agentstacks = ">=1.0"
+
+[options.flag]
+type        = "boolean"
+default     = true
+description = "A boolean option"
+
+[options.count]
+type        = "integer"
+default     = 3
+description = "An integer option"
+
+[options.label]
+type        = "string"
+default     = "conformance"
+description = "A string option"
+
+[[hooks]]
+kind  = "message"
+event = "session.start"
+match = ["startup", "resume", "clear", "compact"]
+text  = "Conformance: {{skill check}} is installed."
+
+[[hooks]]
+kind  = "lua"
+event = "session.start"
+run   = "hooks/event.lua"
+args  = ["{{option label}}"]
+
+[[hooks]]
+kind  = "lua"
+event = "session.end"
+run   = "{{root}}/hooks/event.lua"
+
+[[hooks]]
+kind  = "lua"
+event = "prompt.submit"
+run   = "{{root conformance}}/hooks/event.lua"
+args  = ["{{option flag}}", "{{option count}}"]
+
+[[hooks]]
+kind      = "lua"
+event     = "tool.before"
+match     = ["read", "edit", "write"]
+run       = "hooks/event.lua"
+may_block = true
+
+[[hooks]]
+kind  = "lua"
+event = "tool.after"
+match = ["edit"]
+run   = "hooks/event.lua"
+
+[[hooks]]
+kind   = "lua"
+event  = "agent.stop"
+agents = ["checker"]
+run    = "hooks/event.lua"
+[hooks.grants]
+read  = ["{{root}}"]
+write = ["{{var tmpdir}}"]
+env   = ["TMPDIR"]

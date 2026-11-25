@@ -23,6 +23,7 @@
 use crate::types::format::TomlFields;
 use crate::types::hooks::policy::Policy;
 use crate::types::manifest::ManifestError;
+use crate::types::name::AIRSL;
 use crate::types::name::BinaryName;
 use crate::types::name::EnvName;
 use crate::types::report::ListedTwice;
@@ -171,9 +172,6 @@ impl Grants {
         &self.exec
     }
 }
-
-/// The binary every hook may run without the pack requiring it.
-const AIRSL: &str = "airsl";
 
 /// Reads the path list at `key`: each path is scanned once and must be absolute or start with a
 /// `{{root}}`, `{{skill_dir}}` or `{{var}}` token. A path with a token refusal is not checked

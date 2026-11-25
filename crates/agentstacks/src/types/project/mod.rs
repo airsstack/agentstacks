@@ -27,6 +27,11 @@
 //! - [`SourceError`]: the refusals of the source values, wrapping those above.
 //! - [`ProjectError`]: the refusals of the project file with a wording of their own.
 //! - [`render_project`]: the text of a new project file from its tool and pack entries.
+//! - `add_tool`: an existing project file with one more `[tools.<name>]` table, its comments and
+//!   layout kept.
+//! - [`GitFlags`]: the `--tag`, `--rev` and `--subdir` of `ext add`, refused beside a path or an
+//!   official name and turned into a git [`Source`] beside a git URL, and [`GitOption`], which
+//!   names one of them in a refusal.
 //! - [`retag_project`]: an existing project file with new tags, its comments kept.
 //! - [`upgrade_project`]: an existing project file with its `api` moved from `0` to the current
 //!   one, its comments kept.
@@ -39,10 +44,12 @@
 //!
 //! This file is an export-only module with no executable logic, so it carries no inline tests.
 
+pub mod add;
 mod document;
 pub mod entry;
 pub mod error;
 pub mod file;
+pub mod flags;
 pub mod git;
 pub mod invalid;
 pub mod path;
@@ -55,6 +62,7 @@ pub mod upgrade;
 #[cfg(test)]
 mod testing;
 
+pub(crate) use add::add_tool;
 #[doc(inline)]
 pub use entry::PackEntry;
 #[doc(inline)]
@@ -63,6 +71,10 @@ pub use error::ProjectError;
 pub use file::PROJECT_FILE;
 #[doc(inline)]
 pub use file::ProjectFile;
+#[doc(inline)]
+pub use flags::GitFlags;
+#[doc(inline)]
+pub use flags::GitOption;
 #[doc(inline)]
 pub use git::CommitId;
 #[doc(inline)]

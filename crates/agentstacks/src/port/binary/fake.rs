@@ -8,7 +8,9 @@
 //!
 //! - [`FakeBinary`] holds the names that are on `PATH` and what `airsl --version` answers: not
 //!   found by default, or the text it printed with a zero exit, the text it printed with a
-//!   non-zero exit, or a spawn failure.
+//!   non-zero exit, or a spawn failure. It also holds what `airsl test` answers: a
+//!   [`LuaTestRun`] set with [`FakeBinary::airsl_test_run`], a spawn failure, or by default a
+//!   passing run with no output.
 //! - [`BinaryCall`] is one entry of the question log that [`FakeBinary::asked`] returns.
 //!
 //! # Non-responsibilities
@@ -20,9 +22,10 @@
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::io;
+use std::path::{Path, PathBuf};
 
-use crate::port::binary::seam::Binary;
-use crate::types::name::BinaryName;
+use crate::port::binary::seam::{Binary, LuaTestRun};
+use crate::types::name::{AIRSL, BinaryName};
 use crate::types::plan::{AirslAnswer, Exit};
 
 /// One question asked of a [`FakeBinary`].
@@ -32,6 +35,8 @@ pub enum BinaryCall {
     OnPath(BinaryName),
     /// [`Binary::airsl_version`].
     AirslVersion,
+    /// [`Binary::airsl_test`] of a directory.
+    AirslTest(PathBuf),
 }
 
 /// What the configured `airsl` does when asked its version.
@@ -42,11 +47,19 @@ enum Airsl {
     FailsToStart,
 }
 
+/// What the configured `airsl` does when asked to run the tests of a directory.
+#[derive(Debug, Clone)]
+enum TestScript {
+    Runs(LuaTestRun),
+    FailsToStart,
+}
+
 /// An in-memory `PATH`.
 #[derive(Debug, Default)]
 pub struct FakeBinary {
     names: BTreeSet<BinaryName>,
     airsl: Option<Airsl>,
+    test: Option<TestScript>,
     asked: RefCell<Vec<BinaryCall>>,
 }
 
@@ -85,6 +98,20 @@ impl FakeBinary {
         self
     }
 
+    /// Makes `airsl test` end with `run`.
+    #[must_use]
+    pub fn airsl_test_run(mut self, run: LuaTestRun) -> Self {
+        self.test = Some(TestScript::Runs(run));
+        self
+    }
+
+    /// Makes running `airsl test` fail with [`FakeBinary::denied`].
+    #[must_use]
+    pub fn airsl_test_spawn_failure(mut self) -> Self {
+        self.test = Some(TestScript::FailsToStart);
+        self
+    }
+
     /// The error a spawn failure carries.
     #[must_use]
     pub fn denied() -> io::Error {
@@ -103,7 +130,7 @@ impl Binary for FakeBinary {
         self.asked
             .borrow_mut()
             .push(BinaryCall::OnPath(name.clone()));
-        self.names.contains(name) || (name.as_str() == "airsl" && self.airsl.is_some())
+        self.names.contains(name) || (name.as_str() == AIRSL && self.airsl.is_some())
     }
 
     fn airsl_version(&self) -> AirslAnswer {
@@ -115,6 +142,21 @@ impl Binary for FakeBinary {
                 AirslAnswer::from_output(text.as_bytes(), Exit::Failure)
             }
             Some(Airsl::FailsToStart) => AirslAnswer::SpawnFailed(Self::denied()),
+        }
+    }
+
+    fn airsl_test(&self, dir: &Path) -> io::Result<LuaTestRun> {
+        self.asked
+            .borrow_mut()
+            .push(BinaryCall::AirslTest(dir.to_path_buf()));
+        match &self.test {
+            None => Ok(LuaTestRun {
+                success: true,
+                stdout: String::new(),
+                stderr: String::new(),
+            }),
+            Some(TestScript::Runs(run)) => Ok(run.clone()),
+            Some(TestScript::FailsToStart) => Err(Self::denied()),
         }
     }
 }
@@ -194,6 +236,29 @@ mod tests {
                 BinaryCall::AirslVersion,
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn fake_binary_test_returns_script() -> TestResult {
+        let run = LuaTestRun {
+            success: false,
+            stdout: "1 passed\n".to_owned(),
+            stderr: "boom\n".to_owned(),
+        };
+        let binary = FakeBinary::new().airsl_test_run(run.clone());
+        assert_eq!(binary.airsl_test(Path::new("/work/ext"))?, run);
+        assert_eq!(
+            binary.asked(),
+            [BinaryCall::AirslTest(PathBuf::from("/work/ext"))]
+        );
+
+        let failing = FakeBinary::new().airsl_test_spawn_failure();
+        let Err(error) = failing.airsl_test(Path::new("/work/ext")) else {
+            return Err("a spawn failure".into());
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(error.to_string(), FakeBinary::denied().to_string());
         Ok(())
     }
 }

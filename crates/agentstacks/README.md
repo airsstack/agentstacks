@@ -10,7 +10,10 @@ what most people want. Use this crate to drive the same core from your own code 
 
 ## Stability
 
-The API is unstable during `0.x`. Expect breaking changes between minor versions.
+The Rust API of this crate is the engine of the `agentstacks` command-line tool. It is not covered
+by the 1.x promise: it can change in any release. What is frozen (the pack format, the extension API
+(`api = 1`), the hook runtime, `agentstacks.toml`, `agentstacks.lock` and the command line) is on
+[the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html).
 
 ## Documentation
 

@@ -19,4 +19,4 @@ agentstacks.toml: packs.sdlc: sdlc requires pack "core", which agentstacks.toml 
 ```
 
 The packs are released together as `packs-v*` tags. `agentstacks update` moves a project to the
-newest one. One page per pack follows.
+newest release of the api it speaks (`packs-v1.*` for api 1). One page per pack follows.

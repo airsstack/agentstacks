@@ -1,8 +1,8 @@
 # Hooks
 
 How a pack hook runs, from the tool's command to the hook's result. This guide is for pack authors
-and extension authors. Everything in it is `api = 0`: unstable until both official extensions run
-on it.
+and extension authors. Everything in it is `api = 1`. What `api = 1` promises, and what a 1.x
+release may add, is on [the stability page](ch06-06-stability.md).
 
 A pack declares a hook once, in tool-neutral terms. The core builds one command line for it, the
 extension makes the tool run that command, and a runtime the core ships calls the hook's Lua module.
@@ -34,8 +34,8 @@ therefore becomes the module `core.hooks.enforce`.
 
 A hook in `pack.toml` (or in `native/<tool>/hooks.toml`) is checked when the pack loads.
 
-- `grants.policy = "pure"` is refused in `api = 0`. `confined` is the only allowed value:
-  - `hooks[1].grants.policy: "pure" is not supported in api 0 (airsl has no require under pure, airsstack/airsl#12)`
+- `grants.policy = "pure"` is refused in `api = 1`. `confined` is the only allowed value:
+  - `hooks[1].grants.policy: "pure" is not supported in api 1 (airsl has no require under pure, airsstack/airsl#12)`
   - `hooks[1].grants.policy: "foo" (expected confined)`
 - Each segment of the `run` path (after the `{{root <pack>}}` form, with `.lua` removed from the
   last one) must be require-able: letters, digits, `_` and `-` only. This also applies to

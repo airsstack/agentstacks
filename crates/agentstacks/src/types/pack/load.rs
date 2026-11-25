@@ -655,7 +655,11 @@ mod tests {
         let in_skill = pack
             .tokens()
             .iter()
-            .filter(|t| t.location().file_path().ends_with("SKILL.md"))
+            .filter(|t| {
+                t.location()
+                    .file_path()
+                    .is_some_and(|file| file.ends_with("SKILL.md"))
+            })
             .count();
         assert_eq!(in_skill, 2, "each text of the skill is scanned once");
         for expected in [

@@ -1,8 +1,8 @@
 # The Extension API
 
 A tool extension is the Lua that turns packs into one tool's files. This guide is the contract an
-extension author codes against. Everything in it is `api = 0`: unstable until both official
-extensions run on it, and free to change until then.
+extension author codes against. Everything in it is `api = 1`. What `api = 1` promises, and what a
+1.x release may add, is on [the stability page](ch06-06-stability.md).
 
 Every message below is shown with the claude extension as the example (`claude/adapter.lua`), the
 way the core prints it for that tool. Another tool prints its own name and file in its place.
@@ -22,7 +22,7 @@ every operation, and `apply` is the only writer.
   whole. See [section 11](#11-agentstacksjsonedit).
 - The operations are `write`, `copy`, `skip` and `require_binary`. The core adds `delete` and its
   own writes ([section 7](#7-operations)).
-- Everything here is `api = 0`.
+- Everything here is `api = 1`.
 
 ## 2. `extension.toml`
 
@@ -40,7 +40,35 @@ entry = "adapter.lua"
 reads = [".claude/settings.json"]
 ```
 
-Each entry follows the lock's file path rule: relative, inside the project, `/` as the separator.
+The optional `[requires]` table holds one key, `agentstacks`, a version range. Declare it when the
+extension uses something a later 1.x release added (see [the stability
+page](ch06-06-stability.md#what-authors-do)):
+
+```toml
+# example: an extension that needs a feature added in 1.2
+[extension]
+name = "mytool"
+version = "0.1.0"
+api = 1
+description = "Renders packs into MyTool project config"
+entry = "adapter.lua"
+
+[requires]
+agentstacks = ">=1.2"
+```
+
+An agentstacks outside the range refuses the extension, and that is the only refusal returned. The
+operators `=`, `>`, `>=`, `<`, `<=`, `~`, `^` and wildcards are accepted. Refusals:
+
+| Case | Refusal |
+|---|---|
+| the range excludes this agentstacks | `extension.toml: requires.agentstacks: ">=99" does not match agentstacks 1.0.0 (install a newer agentstacks)` |
+| not a version range | `extension.toml: requires.agentstacks: "nope" is not a version range` |
+| not a string | `extension.toml: requires.agentstacks: expected string, got integer` |
+| `requires` is not a table | `extension.toml: requires: expected table, got string` |
+| another key in `requires` | `extension.toml: requires.foo: unknown key` |
+
+Each `reads` entry follows the lock's file path rule: relative, inside the project, `/` as the separator.
 Entries are normalised (`./a` is `a`, `a//b` is `a/b`) before the duplicate check. A repeated entry
 is quoted as written. Refusals:
 
@@ -61,7 +89,9 @@ harmless. Writing to them is not allowed ([section 9](#9-validation)).
 
 1. The core resolves the extension's source (`agentstacks.toml`, a git tag or a project path) and
    loads it with `Extension::load`, which checks `extension.toml`.
-2. `api = 0` is required by the manifest.
+2. `api = 1` is required by the manifest. An extension written for the 0.x releases is refused as
+   `extension.api: 0 is from agentstacks 0.x (this agentstacks speaks 1; set api = 1, or use a newer release of it)`,
+   and any other number as `extension.api: <n> not supported (this agentstacks speaks 1)`.
 3. Every `.lua` file of the extension is read into memory. Lua never touches the disk.
 
 A `.lua` file that is not UTF-8 is refused: `<tool>/<file>: not valid UTF-8`.
@@ -135,7 +165,7 @@ a table. A second `agentstacks.on` for the same event replaces the first: the la
 The payload the extension receives. Example: claude extension.
 
 ```json
-{ "api": 0, "tool": "claude",
+{ "api": 1, "tool": "claude",
   "packs": [ { "name": "core", "version": "0.3.0", "skills": ["status"], "agents": ["coder"] } ],
   "vars": ["session_id", "tmpdir"] }
 ```
@@ -217,7 +247,7 @@ Every text in the payload is already rendered, and each id is a string to copy b
 extension.
 
 ```json
-{ "api": 0, "tool": "claude", "root": ".claude/agentstacks",
+{ "api": 1, "tool": "claude", "root": ".claude/agentstacks",
   "packs": [ { "name": "core", "version": "0.3.0",
     "skills": [ { "id": "core/skill/status", "name": "status", "dir": ".claude/skills/core-status",
                   "meta": { "description": "…", "invocation": "user" },

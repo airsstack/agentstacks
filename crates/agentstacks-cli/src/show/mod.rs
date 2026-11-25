@@ -2,6 +2,7 @@
 //!
 //! # Responsibilities
 //!
+//! - [`check_text`] is the `ext test` report, as the stdout and stderr texts.
 //! - [`diff_lines`] is the unified diff of an updated shared file.
 //! - [`doctor_text`] is the doctor report.
 //! - [`update_text`] is the update list, and [`has_newer`] says whether it moves the `api` or names
@@ -18,11 +19,13 @@
     reason = "explicit pub(crate) documents the crate-wide visibility intent at each item"
 )]
 
+mod check;
 mod diff;
 mod doctor;
 mod plan;
 mod update;
 
+pub(crate) use check::check_text;
 pub(crate) use diff::diff_lines;
 pub(crate) use doctor::doctor_text;
 pub(crate) use plan::{nothing_to_change, plan_text, written_and_deleted};

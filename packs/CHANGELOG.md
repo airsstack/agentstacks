@@ -5,6 +5,20 @@ together under `packs-v*` tags, which `agentstacks init` and `agentstacks update
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each pack and extension
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [packs-v1.0.0] - Unreleased
+
+### Changed
+
+- Every pack and tool extension is on `api = 1`, the frozen API of agentstacks 1.0, and at version
+  1.0.0: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`, and the `claude` and
+  `opencode` extensions. They need agentstacks 1.0 or newer; agentstacks 0.x refuses them, so run
+  `agentstacks update` with 1.0 to move a project.
+- The headers of the written files `runtime.lua` and the Claude and OpenCode translators and
+  plugin say `api 1`. The first apply after `update` shows each as an `update` step of a locked
+  file, not as a user edit.
+- From this release the tag's major version is the API: a 1.x agentstacks resolves `packs-v1.*`
+  only, so `packs-v2.*` waits for `api = 2`.
+
 ## [packs-v0.2.0] - 2026-11-25
 
 ### Added

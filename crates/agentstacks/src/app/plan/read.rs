@@ -18,10 +18,9 @@
 use std::path::Path;
 
 use crate::port::Workspace;
-use crate::types::ApiCheck;
 use crate::types::lock::Lockfile;
-use crate::types::project::{PROJECT_FILE, ProjectError, ProjectFile};
-use crate::types::report::{Diagnostic, Diagnostics, LegacyProject, Location};
+use crate::types::project::{PROJECT_FILE, ProjectFile};
+use crate::types::report::{Diagnostic, Diagnostics, Location};
 
 /// The file the lock is read from.
 pub(super) const LOCK_FILE: &str = "agentstacks.lock";
@@ -46,15 +45,12 @@ pub(super) fn read_inputs<W: Workspace>(workspace: &W) -> Result<Inputs, Diagnos
         Ok(text) => ProjectFile::parse(Path::new(PROJECT_FILE), &text)
             .map_err(|found| refusals.extend(found))
             .ok()
-            .filter(|project| match project.api() {
-                ApiCheck::Legacy => {
-                    refusals.push(Diagnostic::new(
-                        Location::file(PROJECT_FILE),
-                        ProjectError::from(LegacyProject),
-                    ));
+            .filter(|project| match project.refuse_legacy() {
+                Ok(()) => true,
+                Err(error) => {
+                    refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
                     false
                 }
-                ApiCheck::Current | ApiCheck::Unsupported(_) => true,
             }),
         Err(error) => {
             refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
