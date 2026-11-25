@@ -86,7 +86,7 @@ pub const OFFICIAL_PACKS: [&str; 5] = [
 ];
 
 /// The tool names the official repository holds under `extensions/`.
-pub const OFFICIAL_TOOLS: [&str; 2] = ["claude", "opencode"];
+pub const OFFICIAL_TOOLS: [&str; 3] = ["claude", "musecode", "opencode"];
 
 /// The `init` option or the command an argument came from.
 ///
@@ -292,6 +292,16 @@ mod tests {
         };
         assert_eq!(url.as_str(), OFFICIAL_REPOSITORY);
         assert_eq!(subdir.as_str(), "extensions/opencode");
+        Ok(())
+    }
+
+    #[test]
+    fn official_tool_musecode_expands_to_extensions_subdir() -> TestResult {
+        let Argument::Official { url, subdir } = accepted(Flag::Tool, "musecode")? else {
+            return Err("expected an official name".into());
+        };
+        assert_eq!(url.as_str(), OFFICIAL_REPOSITORY);
+        assert_eq!(subdir.as_str(), "extensions/musecode");
         Ok(())
     }
 
