@@ -1,0 +1,18 @@
+[pack]
+name = "core"
+version = "0.1.0"
+api = 1
+description = "A pack both tools render"
+
+[requires]
+airsl = ">=0.1.4"
+
+[[hooks]]
+kind = "message"
+event = "session.start"
+text = "Welcome"
+
+[[hooks]]
+kind = "lua"
+event = "tool.before"
+run = "hooks/enforce.lua"

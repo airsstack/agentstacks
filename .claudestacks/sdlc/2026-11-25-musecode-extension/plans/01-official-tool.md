@@ -62,8 +62,9 @@ rustdoc `-D warnings`, tests, doctests, lua). Commit `feat(agentstacks): musecod
 
 One reviewer pass over the batch of plans 01-03 (verdict: compliant, `blocking: none`, 0🔴).
 
-- 🔵 open — `extensions/musecode/` has no `extension.toml`/`adapter.lua` yet, so `--tool musecode`
-  resolves to a directory that cannot load until plan 04 lands; do not merge this plan alone.
+- 🔵 fixed (by plan 04) — `extensions/musecode/` has no `extension.toml`/`adapter.lua` yet, so
+  `--tool musecode` resolves to a directory that cannot load until plan 04 lands. Plan 04 added both:
+  `cargo test -p agentstacks --test musecode musecode_manifest_loads` passes (part of `28 passed`).
 - Verified: `cargo test -p agentstacks official_tool` → `3 passed` (incl.
   `official_tool_musecode_expands_to_extensions_subdir`, first seen failing with
   `--tool "musecode": not an official tool; pass a path, or add a git source to agentstacks.toml`);

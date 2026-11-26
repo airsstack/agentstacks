@@ -1,0 +1,35 @@
+{
+  "theme": "dark",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "echo user-hook",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"additionalContext\":\"Hello\",\"hookEventName\":\"SessionStart\"}}' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"core.hooks.enforce\" \"0\" \"neutral\"' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit|Write"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# 0: a native lua hook on an event the neutral set has no name for
+[[hooks]]
+kind = "lua"
+event = "Stop"
+run = "hooks/enforce.lua"
+may_block = true
+
+# 1: a native lua hook on an event the neutral hook 2 renders on, so the order within an event shows
+[[hooks]]
+kind = "lua"
+event = "PreToolUse"
+run = "hooks/enforce.lua"

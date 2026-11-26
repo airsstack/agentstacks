@@ -1,0 +1,18 @@
+[pack]
+name = "demo"
+version = "0.1.0"
+api = 1
+description = "A small pack for the end-to-end runs"
+
+[requires]
+airsl = ">=0.1.4"
+
+[[hooks]]
+kind = "message"
+event = "session.start"
+text = "Welcome"
+
+[[hooks]]
+kind = "lua"
+event = "tool.before"
+run = "hooks/guard.lua"

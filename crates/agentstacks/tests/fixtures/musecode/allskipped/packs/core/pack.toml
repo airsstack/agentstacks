@@ -1,0 +1,14 @@
+[pack]
+name = "core"
+version = "0.1.0"
+api = 1
+description = "A pack whose only lua hook Muse Code cannot filter"
+
+[requires]
+airsl = ">=0.1.4"
+
+[[hooks]]
+kind = "lua"
+event = "agent.stop"
+agents = ["coder"]
+run = "hooks/enforce.lua"

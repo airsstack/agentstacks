@@ -11,19 +11,20 @@
 //! the real `airsl` binary and the recorded payloads under `tests/fixtures/claude/payloads`.
 
 pub mod common;
+pub mod translator;
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Output;
 
 use agentstacks::fs::StdFileTree;
 use agentstacks::types::plan::{Action, Plan};
-use agentstacks::types::protocol::{Blocking, HookCommand, HookKind, RUNTIME_LUA};
+use agentstacks::types::protocol::{HookKind, RUNTIME_LUA};
 use agentstacks::types::{Extension, SubPath};
-use common::{copy_tree, module, proposed, run_piped, run_plan, skip_without_airsl, skips};
+use common::{proposed, run_plan, skip_without_airsl, skips};
 use tempfile::TempDir;
+use translator::run::Run;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -220,33 +221,7 @@ fn no_lua_hook_writes_no_translate() -> TestResult {
 /// Where the extension root sits in the project the translator tests build.
 const ROOT: &str = ".claude/agentstacks";
 
-/// One run of a hook module under the shipped runtime and the expected translator.
-struct Run<'a> {
-    /// The hook module under `payloads/hooks`.
-    hook: &'a str,
-    /// The recorded payload under `payloads/input`.
-    payload: &'a str,
-    blocking: Blocking,
-    kind: HookKind,
-}
-
-impl<'a> Run<'a> {
-    /// A neutral hook that may not block.
-    const fn new(hook: &'a str, payload: &'a str) -> Self {
-        Self {
-            hook,
-            payload,
-            blocking: Blocking::MayNot,
-            kind: HookKind::Neutral,
-        }
-    }
-
-    /// The same run for a hook declared `may_block`.
-    const fn may_block(mut self) -> Self {
-        self.blocking = Blocking::May;
-        self
-    }
-
+impl Run<'_> {
     /// The same run for a native hook.
     const fn native(mut self) -> Self {
         self.kind = HookKind::Native;
@@ -254,67 +229,10 @@ impl<'a> Run<'a> {
     }
 }
 
-/// A project directory holding the expected translator, the shipped runtime and the hook modules.
-fn translator_project() -> Result<TempDir, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let root = dir.path().join(ROOT);
-    fs::create_dir_all(root.join("core/hooks"))?;
-    fs::write(root.join("runtime.lua"), RUNTIME_LUA)?;
-    fs::copy(
-        fixture("full")
-            .join("expected")
-            .join(ROOT)
-            .join("translate.lua"),
-        root.join("translate.lua"),
-    )?;
-    copy_tree(
-        &fixture("payloads").join("hooks"),
-        &root.join("core/hooks"),
-        None,
-    )?;
-    Ok(dir)
-}
-
-/// Runs `case` with the argument vector `HookCommand` builds and the payload on stdin, from the
-/// project directory, or returns `None` when `airsl` cannot run and is not required.
-fn run_hook(case: &Run<'_>) -> Result<Option<Output>, Box<dyn Error>> {
-    if skip_without_airsl()? {
-        return Ok(None);
-    }
-    let dir = translator_project()?;
-    let argv = HookCommand::new(
-        SubPath::new(ROOT)?,
-        module(case.hook)?,
-        case.blocking,
-        case.kind,
-    )
-    .argv();
-    let payload = fs::read(fixture("payloads/input").join(format!("{}.json", case.payload)))?;
-    Ok(Some(run_piped(&argv, dir.path(), &payload)?))
-}
-
-/// The expected stdout under `payloads/expected/<name>.out` or stderr under `<name>.err`.
-fn recorded(name: &str) -> Result<String, Box<dyn Error>> {
-    Ok(fs::read_to_string(fixture("payloads/expected").join(name))?)
-}
-
 /// Runs `case` and compares stdout with `<out>.out` and stderr with `<err>.err`, or with nothing
 /// when `err` is `None`.
 fn check(case: &Run<'_>, out: &str, err: Option<&str>) -> TestResult {
-    let Some(output) = run_hook(case)? else {
-        return Ok(());
-    };
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        recorded(&format!("{out}.out"))?
-    );
-    let want_err = match err {
-        Some(name) => recorded(&format!("{name}.err"))?,
-        None => String::new(),
-    };
-    assert_eq!(String::from_utf8_lossy(&output.stderr), want_err);
-    assert!(output.status.success());
-    Ok(())
+    translator::run::check(TOOL, ROOT, case, out, err)
 }
 
 #[test]

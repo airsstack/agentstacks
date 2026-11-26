@@ -1,0 +1,10 @@
+api = 1
+
+[tools.claude]
+path = "extensions/claude"
+
+[tools.musecode]
+path = "extensions/musecode"
+
+[packs.core]
+path = "packs/core"

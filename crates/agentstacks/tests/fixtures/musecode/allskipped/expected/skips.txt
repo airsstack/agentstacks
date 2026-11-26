@@ -1,0 +1,1 @@
+core/hook/0: musecode gives hooks no agent name at agent stop, so it cannot run this hook for only the listed agents

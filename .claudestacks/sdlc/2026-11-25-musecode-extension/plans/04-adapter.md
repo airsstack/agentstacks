@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [02, 03]
 built-on: c1dbedb148db
@@ -173,3 +173,52 @@ Definition of Done is green. Commit `test(agentstacks): musecode translator on r
 ## Proof
 
 - `cargo test -p agentstacks --test musecode` passes; `cargo make dod` green.
+
+## Review findings
+
+One reviewer pass per batch (Task 1, Task 2, Task 3); verdicts: Task 1 compliant-with-amendments,
+`blocking:` demo fixture restore (🟡); Task 2 and Task 3 compliant-with-amendments, `blocking: none`.
+0🔴 in every pass.
+
+- 🟡 fixed (T1) — demo fixture had its two `[[hooks]]` removed; restored as a byte copy of
+  `crates/agentstacks-cli/tests/fixtures/project/packs/demo` (`diff -r` clean) with the expected
+  `.muse/hooks.json`, `translate.lua` and `guard.lua`, compared "without runtime.lua".
+- 🟡 fixed (T1) — lint-attribute comment/reasons on `pub mod common;` described future work; the
+  attributes are now gone (no `allow`/`expect` left in `musecode.rs`).
+- 🔵 fixed (T1) — over-100-column `//!` lines in `common/mod.rs` and `musecode.rs`; skipped skill `odd`
+  gained `references/x.md` (guards "skipped whole"); adapter header matches the file.
+- 🔵 fixed (T2) — module doc lists the fixtures without expected trees; one doc per `RUNTIME` /
+  `TRANSLATE`; within-event order guarded (native `PreToolUse` beside the neutral one in `full`);
+  sorted `covers` asserted; adapter.lua lines 15, 62, 83, 104 wrapped to ≤100 columns.
+- 🔵 fixed (T3) — `bash.json` added to `echo_maps_each_event`; the translator harness duplicated
+  from `claude.rs` moved to the shared `crates/agentstacks/tests/translator/run.rs`, used by
+  `claude.rs` and `musecode.rs` (no assertion changed).
+- Verified: `cargo test -p agentstacks --test musecode --test claude` → musecode `28 passed`, claude
+  `23 passed`, 0 failed; `cargo make dod` → rc 0, Lua `651 passed, 0 failed (25 files)`,
+  fingerprint gate 8 cases passed, pack text gates 4 passed. Every named test was first seen failing
+  (`not an extension` / `hook got no operation` / missing payload fixtures).
+
+## Deviations
+
+- 2026-11-26 — No commit made: the execute instruction did not ask for one. Board row at start was
+  clean (`execute 04`).
+- 2026-11-26 — Task 1 temporarily dropped the demo hooks (the core refuses an item with no operation:
+  `musecode/adapter.lua: demo/hook/0 got no operation (copy it, write it, or skip it with a reason)`);
+  Task 2 restored them, so the final fixture is the plan's byte copy.
+- 2026-11-26 — Review fixes were folded into the next task's coder (same files, one owner per file);
+  Task 3's nits went to a fresh fix coder.
+- 2026-11-26 — `allskipped/expected` includes `.muse/agentstacks/core/hooks/enforce.lua`: the core
+  copies a pack's hook module even when every hook is skipped (seen when the hand-written tree omitted
+  it).
+- 2026-11-26 — Expected `translate.lua` (demo, full) is the `TEXT` of `lib/translate.lua`, as opencode
+  does; the translator text is itself the rule. Every other expected file is hand-written from rules.
+- 2026-11-26 — Payload fixtures: `blk.lua` appends the event path to its reason so the deny test can
+  show the absolute path; `stop.json` keeps the recording but cuts `last_assistant_message` to its
+  first sentence; `end.json` is the recorded SessionEnd, not hand-made; `echo.lua` is claude's echo
+  (stderr `key=value`, returns nil), so the plan's "returns the neutral event as context" reads as
+  claude's role.
+- 2026-11-26 — `covers` is read through a `Recording` adapter wrapper in `musecode.rs` (a plan `Step`
+  keeps no `covers`).
+- 2026-11-26 — The shared translator harness lives in `crates/agentstacks/tests/translator/`, not
+  `common/hook.rs`: `common` is compiled into `opencode.rs` too, whose harness differs, and the unused
+  items would fail clippy `-D warnings` there. `opencode.rs` got an import-only edit.

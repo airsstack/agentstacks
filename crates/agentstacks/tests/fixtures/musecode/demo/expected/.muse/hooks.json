@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"demo.hooks.guard\" \"0\" \"neutral\"' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit|Write"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"additionalContext\":\"Welcome\",\"hookEventName\":\"SessionStart\"}}' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

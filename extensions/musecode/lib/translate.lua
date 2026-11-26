@@ -4,7 +4,7 @@
 local M = {}
 
 local TEXT = [==[
--- agentstacks translator for musecode, api 0.
+-- agentstacks translator for musecode, api 1.
 local M = {}
 
 local EVENTS = {
