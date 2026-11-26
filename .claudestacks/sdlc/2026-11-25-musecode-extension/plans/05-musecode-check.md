@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [04]
 built-on: c1dbedb148db
@@ -145,3 +145,58 @@ itself is spec §10 K1: it happens on the first push of the branch, and execute 
 
 - `cargo make musecode-check` → `ok S1` … `ok S6` locally; the CI job green on the branch after the
   push; `cargo make dod` green.
+
+## Review findings
+
+Two reviewer passes: Tasks 1-2 (compliant-with-amendments; `blocking:` V1, the reviewer's own re-run of
+`cargo make musecode-check` was refused by the permission system) and Task 3 (compliant,
+`blocking: none`). 0🔴.
+
+- 🟡 fixed (V1) — reviewer could not re-run the check; the fix coder re-ran it after the fixes:
+  `cargo make musecode-check` → `ok S1` … `ok S6`, `Build Done in 15.55 seconds`.
+- 🟡 fixed — the Muse safety rule was unguarded: `museEnvProblem(env)` now runs before every spawn
+  (TBH_CREDENTIAL_BACKEND=file, HOME and TMPDIR under scratch, no XDG_CONFIG_HOME) and prints
+  `FAIL S<n> unsafe Muse Code environment, not started: <why>`.
+- 🟡 fixed — ci.yml cache comment now says the path and key are bumped with VERSION in
+  `[tasks.musecode-check]`; that task's bump note names the ci.yml cache path and key.
+- 🔵 fixed — check.mjs comments (scratch HOME; Keychain text checked after each run), SIGHUP cleanup,
+  muse exit code / timeout in FAIL lines, mock stderr in `FAIL mock did not start`, numeric req-NNN
+  sort, `FAIL S<n> K4:` format, anchored `^- check-helper$` catalog check, exact `pwd` output
+  equality, S2 asserts the rendered `{{skill_dir hello}}` line and `references/note.md`; mock.mjs drops
+  the unused `text`/`repeat` steps and rejects a step with no name; the `lua` gate now runs
+  `airsl check` on both check packs (`5 file(s) compiled, 0 failed` each); a failed curl removes the
+  partial file (`musecode-check: <file>: download failed`).
+- 🔵 fixed — the checksum-mismatch branch has an automated guard: `[tasks.musecode-check]` holds the
+  check in a `verify` function and, offline and before the download or the real check, runs it on a
+  truncated temp copy of the kept binary (a stub when none is kept), expecting exit 1, the message
+  `musecode-check: <file>: checksum mismatch` and the file removed, or it stops with `musecode-check:
+  verify self-test failed: …`. Proof: `cargo make musecode-check` → `musecode-check: verify self-test
+  passed`, `ok S1` … `ok S6`, `Build Done in 15.87 seconds`; the extracted self-test with no kept
+  binary and with the kept one → `musecode-check: verify self-test passed`, exit 0; with `verify`'s
+  `rm -f` removed → `musecode-check: verify self-test failed: want exit 1, the mismatch message and
+  the file removed; got exit 1, 'musecode-check: muse-aarch64-macos: checksum mismatch'`, exit 1.
+- 🔵 fixed — the airsl pin copies in ci.yml have a gate: `cargo make lua` (part of `dod`) ends with the
+  airsl pin gate, which fails with `airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins in
+  .github/workflows/ci.yml differ or are missing; give every job the same version and hash` when the
+  jobs' `AIRSL_VERSION`/`AIRSL_SHA256` lines are not one version and one hash. Proof: `cargo make dod`
+  → `airsl pin gate: passed (3 jobs)`, rc 0; on a copy of ci.yml with one job at `0.1.6`, and with one
+  hash changed → that message after the distinct pins, exit 1.
+- ❓ open — K1: the job's Linux run is pending the first push (no push in this run); it waits for the
+  author's push.
+- Verified: `cargo make musecode-check` (macOS arm64) → `ok S1`, `ok S2`, `ok S3`, `ok S4`, `ok S5`,
+  `ok S6`; truncated binary → `musecode-check: muse-aarch64-macos: checksum mismatch`, exit 1, file
+  removed; next run re-downloaded (sha256 `d8faeec8…c27d`) and passed; `cargo make lua` → `651 passed,
+  0 failed (25 files)`; YAML parses (ruby, python3); no K4 event in any run.
+
+## Deviations
+
+- 2026-11-26 — No commit made: the execute instruction did not ask for one.
+- 2026-11-26 — Plan 05 Task 1 started while plan 04 Task 3 was still running (disjoint files; plan
+  04's adapter was complete). Tasks 1 and 2 were reviewed as one batch.
+- 2026-11-26 — K1 (Linux CI run) not proven: the author forbade a push. Pending the first push.
+- 2026-11-26 — mock.mjs started from `probes/harness/mock2.mjs`; the unused text/repeat steps were
+  later removed. check.mjs adds a K4 Keychain-text stop (author's K4 rule). S1 asserts the skip lines
+  on both `init` and `plan` output; S5 compares hook groups with `isDeepStrictEqual` (JSON key order
+  differs); S4's `pwd` result is a JSON record, so its `output` field is compared.
+- 2026-11-26 — The skill dir renders project-relative (`.agents/skills/check-hello/references/note.md`),
+  seen in the S2 read_skill result.
