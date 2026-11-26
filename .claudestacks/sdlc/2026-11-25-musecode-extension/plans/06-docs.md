@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-25
 depends-on: [01, 04, 05]
 built-on: c1dbedb148db
@@ -111,3 +111,90 @@ Commit `docs(repo): name Muse Code among the official tools`.
 ## Proof
 
 - `cargo make book-build` clean; `cargo make dod` green.
+
+## Review findings
+
+One reviewer pass over Tasks 1-3 (compliant-with-amendments; `blocking:` D1, D2, D9, D10); one fix
+coder for D1-D9 and P2.
+
+- 🔴 fixed (D1) — the page said skills only the opencode extension writes show in OpenCode; it now
+  says skills only the musecode extension writes (in `.agents/skills/`) do.
+- 🟡 fixed (D2) — only `--workspace <root>` from a subdirectory runs hooks there; a plain start in a
+  subdirectory loads no project config.
+- 🟡 fixed (D9) — OpenCode already shipped in `packs-v0.2.0`; ch01-02, ch04-00, introduction and README
+  now say only Muse Code ships with the next `packs-v*` release.
+- 🔵 fixed — D3 YAML `invocation: user`; D4 dropped context from neutral `agent.stop`/`session.end`
+  stated; D5 invented "J1" label removed; D6 prose reflowed to ≤100 columns; D7 ch06-03 limit matches
+  "Several tools"; D8 ch06-01/02 say unstable until frozen as `api = 1` in M3; P2 README M2 line
+  restored to match CLAUDE.md; CLAUDE.md `cargo make lua` line names the two check packs.
+- 🟡 fixed (D10) — the branch is rebased onto `main` `9ce5239` (`git rebase main`: 1edaa50, 1586178,
+  b738e28, c8cf6fe applied clean; the plan 04-06 work conflicted in CLAUDE.md, Makefile.toml,
+  README.md, book/src/{SUMMARY,ch01-02-first-project,ch04-00-cli,ch06-01-extensions,ch06-02-hooks,
+  introduction}.md and the three CHANGELOGs, each resolved keeping main's 1.0 text plus the musecode
+  additions). musecode is ported to `api = 1` as main ported claude/opencode (see Deviations); the
+  page is `book/src/ch06-07-musecode.md`, listed after `The 1.x Stability Promise`; the official tool
+  lists in ch04-00 (`--tool`, `ext add`), ch06-05 (`native/<tool>/`), introduction, README and
+  CLAUDE.md name musecode and keep the "ships with the next `packs-v*` release (`packs-v1.0.0` does
+  not include it)" / `--tool ext/musecode` note; the changelog entries sit under `## [Unreleased]`
+  above main's 1.0.0 entries. `packs.rs` `every_official_pack_and_extension_is_at_version_one_or_later`
+  counts `8` ("five packs and three extensions"). Proof: `grep -rn "api 0\|api = 0" extensions/musecode
+  crates/agentstacks/tests crates/agentstacks-cli/tests/musecode-check book/src README.md CLAUDE.md
+  *.md crates/*/CHANGELOG.md packs/CHANGELOG.md | grep -i muse` → no line (the other hits are main's
+  legacy-0 text); `cargo make dod` → rc 0, `api-0 gate: passed`, `651 passed, 0 failed (25 files)`,
+  `Build Done in 35.18 seconds`; `agentstacks ext test extensions/musecode` → `ext test musecode
+  1.0.0`, `lua tests: 85 passed, 0 failed (5 files)`, `10 to write, 0 to delete, 0 unchanged, 1
+  skipped`, `applied: 10 written, 0 deleted`, `second plan: nothing to change`, `passed`, exit 0;
+  `cargo make book-build` → rc 0, 0 `[ERROR]`, `toc.js` lists `6.7. Muse Code`.
+- 🔵 fixed — main's 1.0 text replaced the README/introduction `pre-release (0.1.0)` / `packs-v0.1.0`
+  lines and the OpenCode "ships with the next packs release" line; the remaining stale lines, in
+  `book/src/ch01-01-installation.md` (`AGENTSTACKS_VERSION=0.1.0`, ``prints `agentstacks 0.1.0` ``),
+  now say `1.0.0`. `grep -rnE "pre-release|packs-v0\.[12]|ships with the next" README.md
+  book/src/introduction.md book/src/ch01-0*.md CLAUDE.md` → only the Muse Code lines and the README
+  roadmap history (`M1 … released (0.1.0)`, `M2 … released (packs-v0.2.0)`), which main keeps.
+- Verified (before the D10 rebase): `cargo make book-build` → 0 `[ERROR]` lines, `ch06-04-musecode.html` in `toc.js` as 6.4;
+  all 14 skip reasons on the page match `extensions/musecode/lib/*.lua` (`grep -F`); no 5-/6-word
+  shingle shared with `probes/docs/*.txt` beyond event names; `grep -rn -i "both official\|both
+  extensions\|both are built\|both tools" book/src README.md CLAUDE.md` → no line; `cargo make dod`
+  exit 0.
+
+### Cross-check (plans 04-06, after all coders finished)
+
+One crate-wide consistency + guideline review (verdict: compliant, `blocking: none`; 1🟡 9🔵), fixed
+by the orchestrator:
+
+- 🟡 fixed — the committed MIT Muse Code SDK guide copies under `probes/docs/` carried no licence
+  notice; `probes/docs/LICENSE-muse-code-sdk` (upstream `LICENSE`, `gh api
+  repos/meta-models/muse-code-sdk/license` → `MIT`) added and named in `SOURCES.md`.
+- 🔵 fixed — ch06-04 says a blank `.muse/hooks.json` counts as `{}` and lists H2 among the reasons
+  worded as claude's; check.mjs names `museEnvProblem` and prints `FAIL S<n> Keychain:` (no spec id);
+  the `removed` fixture's unknown top-level key is a neutral `editor` key, not a Claude shape;
+  musecode.rs doc says stdout and stderr are compared; translator/mod.rs `//!` lines ≤100 columns.
+- 🔵 kept by design (no change) — `translator::run::Run.kind` is `pub(crate)` and claude.rs keeps its own `native()`
+  builder, so the musecode binary has no dead builder; over-100-column lines in the `.mjs` files follow
+  opencode-check's existing pattern.
+- Final gates (orchestrator, once each): `cargo make dod` → rc 0, Lua `651 passed, 0 failed (25
+  files)`, fingerprint gate 8 cases (both hashers), pack text gates 4 passed, `Build Done in 36.23
+  seconds`; `cargo test -p agentstacks --test musecode --test claude` → `28 passed` / `23 passed`;
+  `cargo make book-build` → rc 0, 0 `[ERROR]`; `cargo make musecode-check` → `ok S1` … `ok S6`,
+  `Build Done in 14.06 seconds`, no Keychain text.
+
+## Deviations
+
+- 2026-11-26 — No commit made: the execute instruction did not ask for one.
+- 2026-11-26 — Plan 06 ran while plan 05's review was in flight (docs files disjoint from plan 05's).
+- 2026-11-26 — The page has a section 9 "The check" (musecode-check) beyond the plan; ch06-03 §7's
+  "Both tools" bullet renamed "Several tools"; the journal README states that on Muse Code `capture`
+  and `note` run without the transcript and key the note to the first eight characters of the session
+  id (verified in `packs/journal/skills/{capture,note}/SKILL.md`); README intro names `.agents/` and
+  `.muse/`.
+- 2026-11-26 — `.github/profile/README.md` and the org-root workspace `README.md` (CLAUDE.md "How work
+  is done") live outside this repository and were not updated.
+- 2026-11-26 — The spec's `api = 0` (and its "unstable until `api = 1` in M3" wording, D8 above) is
+  superseded by main's api-1 chain, `2026-11-25-api-freeze-and-1-0` (commit `482e429`, its
+  `spec.md`): the extension API is frozen at `api = 1`. The musecode extension was ported the same way
+  as claude and opencode: `extension.toml` `version = "1.0.0"`, `api = 1`; the translator header (and
+  its test and the expected fixture copies) says `api 1`; `values_test.lua` payload `api = 1`; the
+  musecode fixtures and the musecode-check pack say `api = 1`; `musecode.rs` asserts version `1.0.0`.
+  The spec is not edited.
+- 2026-11-26 — The page is `book/src/ch06-07-musecode.md`, not the spec's `ch06-04-musecode.md`:
+  main took `ch06-04` … `ch06-06` for the pack authoring, pack format and stability pages.

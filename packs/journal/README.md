@@ -20,9 +20,12 @@ Install both:
 agentstacks init --tool claude --pack core --pack journal
 ```
 
-On OpenCode, pass `--tool opencode` (or both tools). `capture` and `note` read the session through
+On OpenCode, pass `--tool opencode` (or several tools). `capture` and `note` read the session through
 `opencode session export`, which needs `opencode` on `PATH` and OpenCode's background service
 running; otherwise they write without the transcript and say why.
+
+On Muse Code, pass `--tool musecode`. The pack ships no transcript lookup for it, so `capture` and
+`note` write without the transcript and key the note to the first eight characters of the session id.
 
 ## Documentation
 

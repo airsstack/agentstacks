@@ -4,21 +4,24 @@
 each tool's own format.**
 
 > **Status: 1.0.** The CLI, the Claude Code and OpenCode extensions and the five official packs are
-> built. The extension API is `api = 1` and frozen: 1.x changes are additive only
+> released. The Muse Code extension is built and ships with the next `packs-v*` release
+> (`packs-v1.0.0` does not include it). The extension API is `api = 1` and frozen: 1.x changes are
+> additive only
 > ([the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html)). Coming from the claudestacks
 > plugins? See
 > [the migration guide](https://airsstack.github.io/agentstacks/ch03-00-migration.html).
 
 Every agentic coding tool wants its setup in its own shape: Claude Code reads `.claude/`, OpenCode
-reads `.opencode/` and `opencode.json`, and the next tool will want something else. agentstacks
-keeps one tool-neutral copy of that setup (skills, agents, commands, hooks, rules) and writes it
-into each tool you use. Before anything is written, you see exactly what will change.
+reads `.opencode/` and `opencode.json`, Muse Code reads `.agents/` and `.muse/`, and the next tool
+will want something else. agentstacks keeps one tool-neutral copy of that setup (skills, agents,
+commands, hooks, rules) and writes it into each tool you use. Before anything is written, you see
+exactly what will change.
 
 ```text
  packs (tool-neutral content)
         │
         ▼
- tool extension ── claude · opencode · yours      Lua, sandboxed by airsl, zero authority
+ tool extension ── claude · musecode · opencode · yours      Lua, sandboxed by airsl, zero authority
         │
         ▼
  plan  ── every file write, copy and delete, and every required binary, shown before it happens
@@ -104,6 +107,7 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 | Tool | Status |
 |---|---|
 | Claude Code | Released (`extensions/claude`, `packs-v1.0.0`) |
+| Muse Code | Built (`extensions/musecode`), ships with the next `packs-v*` release |
 | OpenCode | Released (`extensions/opencode`, `packs-v1.0.0`) |
 | Your own | Write a tool extension against the public API: [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html) |
 
@@ -125,13 +129,13 @@ The five packs come from the claudestacks plugins and are released as `packs-v1.
 ## Extending agentstacks
 
 Anyone can write a pack (markdown, plus Lua for hooks) or a tool extension (Lua). The official
-Claude Code and OpenCode extensions are built on the same public API, so the API has to be good
-enough for real tools.
+Claude Code, Muse Code and OpenCode extensions are built on the same public API, so the API has to
+be good enough for real tools.
 
 Extensions run under [airsl](https://github.com/airsstack/airsl) with no file, network, or process
 access. An extension only *proposes* operations; the Rust core validates them, `plan` shows them,
 and the executor applies them. A third-party command never runs unannounced. The extension API is
-frozen as `api = 1`; both official tools run on it, and 1.x changes to it are additive only
+frozen as `api = 1`; all three official tools run on it, and 1.x changes to it are additive only
 ([the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html)).
 
 To write a tool extension, give your coding agent the guide
@@ -165,7 +169,7 @@ agentstacks/
 │  ├─ agentstacks-cli/   init · plan · apply · doctor · update · ext add · ext test   built
 │  ├─ claudevs/          deterministic test engine for Claude Code setups            built (moved from claudestacks)
 │  └─ claudevs-cli/      the claudevs binary                                         built
-├─ extensions/           official tool extensions: claude/ built · opencode/ built
+├─ extensions/           official tool extensions: claude/ built · musecode/ built · opencode/ built
 ├─ packs/                official packs: core · sdlc · journal · guideline-*         built
 ├─ install/              installer scripts, served on Pages                          built
 ├─ book/                 the agentstacks book (mdBook), on airsstack.github.io/agentstacks   built

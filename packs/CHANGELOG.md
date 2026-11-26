@@ -5,6 +5,12 @@ together under `packs-v*` tags, which `agentstacks init` and `agentstacks update
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each pack and extension
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The `musecode` tool extension at 1.0.0, on extension API `api = 1`, for Muse Code 1.4.25.
+
 ## [packs-v1.0.0] - 2026-11-25
 
 ### Changed

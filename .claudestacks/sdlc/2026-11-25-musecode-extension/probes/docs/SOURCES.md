@@ -1,7 +1,8 @@
 # Sources of the files in this directory
 
 Fetched on 2026-11-25. The `guides_*.txt` files are committed: they are text of the Muse Code SDK
-developer guides (`github.com/meta-models/muse-code-sdk`, MIT). The other files are copies of Meta
+developer guides (`github.com/meta-models/muse-code-sdk`, MIT; its licence text, fetched on
+2026-11-26, is `LICENSE-muse-code-sdk`). The other files are copies of Meta
 material with no license found; they are kept on the author's machine only (`.gitignore`) and
 listed here so every spec citation of them can be traced to its page.
 

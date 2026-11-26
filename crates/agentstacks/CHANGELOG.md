@@ -4,6 +4,12 @@ All notable changes to `agentstacks` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `musecode` is an official tool name.
+
 ## [1.0.0] - 2026-11-25
 
 The extension and pack API is frozen at `api = 1`. The Rust API of this crate is the engine of the

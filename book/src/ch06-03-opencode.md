@@ -149,10 +149,13 @@ sdlc and journal. The other `session.start` hooks of core, sdlc and journal are 
   context. The shim never reads or changes permissions.
 - **Nested projects.** OpenCode loads `.opencode/` from every parent directory, so two agentstacks
   projects, one inside the other, would load two shims. This is not supported.
-- **Both tools.** With `claude` and `opencode` both listed, OpenCode also reads `.claude/skills/`.
+- **Several tools.** With `claude` and `opencode` both listed, OpenCode also reads `.claude/skills/`.
   Skills only Claude has, such as `core-statusline`, or skills the opencode extension skipped, then
   show up in OpenCode with Claude's var forms. Set `OPENCODE_DISABLE_CLAUDE_CODE=1` to stop OpenCode
-  reading `.claude/skills/`.
+  reading `.claude/skills/`. With `musecode` and `opencode` both listed, OpenCode also reads
+  `.agents/skills/`, where the musecode extension writes its skills. A skill in both has one id and
+  the `.opencode` copy wins. A skill the opencode extension skips but the musecode extension writes
+  shows up in OpenCode with Muse Code's var forms.
 - **Subdirectories.** OpenCode started in a subdirectory still finds `.opencode/`. Hooks run from the
   project root; `cwd` in the payload is the subdirectory.
 
@@ -170,4 +173,4 @@ sdlc and journal. The other `session.start` hooks of core, sdlc and journal are 
   and OpenCode's title request reads it.
 - Files written by `shell`, `generate_image` or `generate_video` pass no tool hook as a read, edit or
   write.
-- With both tools listed, Claude-only skills show in OpenCode (section 7).
+- With several tools listed, skills written for Claude or Muse Code show in OpenCode (section 7).

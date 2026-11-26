@@ -357,7 +357,7 @@ does not declare is refused:
 
 ## 7. `native/<tool>/`
 
-Content for one tool only. `<tool>` is a tool name (`claude`, `opencode`); the extension of that
+Content for one tool only. `<tool>` is a tool name (`claude`, `musecode`, `opencode`); the extension of that
 tool reads the directory. A directory no installed tool claims is shown as a note in the plan,
 `note     native/other: not for claude`.
 
