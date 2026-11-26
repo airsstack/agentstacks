@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","tool_name":"edit_file","tool_input":{"path":"a.txt","find":"hello","replace":"bye"},"tool_use_id":"call_2","session_id":"01a21200-cef9-70e3-8faf-5c2246c2a997","turn_id":"01a21200-ec7b-7e13-bc75-2889d42a347a","cwd":"/p","transcript_path":null,"model":"fake-model","permission_mode":"bypassPermissions","model_provider":"meta"}

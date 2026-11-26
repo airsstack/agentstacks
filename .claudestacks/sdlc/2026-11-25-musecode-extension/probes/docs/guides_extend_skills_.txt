@@ -1,0 +1,426 @@
+Skills | Muse Code Developer DocsSkip to content
+## 
+# Skills
+After this page you can write a SKILL.md skill, put it where Muse Code
+finds it, check it with muse skills validate, and control when the model
+and you can invoke it. Everything here was run against Muse Code 1.3.0.
+## What a skill isSection titled “What a skill is”
+A skill is a directory with a SKILL.md file. The file starts with YAML
+front matter (a name and a description) and continues with Markdown
+instructions. Other files in the directory (scripts, reference documents,
+templates) are available to the model by path but are never run by
+Muse Code itself.
+Skills come from four sources:
+Source | 
+Where it lives | 
+Who sees it | 
+Built-in | 
+Ships inside the muse binary | 
+Everyone, in every project | 
+User (personal) | 
+Your config directory and home directory | 
+You, in every project | 
+Project | 
+Committed to the repository | 
+Anyone who clones the repository and trusts the folder | 
+Plugin | 
+Contributed by an installed plugin | 
+Anyone with the plugin installed | 
+This page covers the first three. Plugin skills use the same SKILL.md
+format; how to package one is in
+Packages and capabilities.
+## How the model uses a skillSection titled “How the model uses a skill”
+At session start Muse Code sends the model a catalog of the skills that are
+on: each entry carries the skill id, its scope, its display path and its
+description. The bodies are not sent. When the model decides a skill
+applies, it calls the built-in read_skill tool with the skill’s name, id
+or display path and receives the body as a tool result. The model is told
+that relative paths inside a body resolve against the skill’s directory.
+You can also invoke a skill yourself:
+/release-notes v1.2.0
+Typing /<skill-id> followed by optional arguments sends the skill body as
+your message, with your arguments appended after a blank line. The
+transcript shows what you typed, not the expanded body. /skill <id> [prompt]
+and /skills use <id> [prompt] do the same thing and also accept a display
+path instead of an id.
+When two skills share a name, the bare /<name> goes to the higher-ranked
+source: project beats user, user beats built-in, built-in beats plugin.
+A plugin skill stays reachable as /<plugin-id>:<skill-id>. Two skills of
+the same rank with the same id block each other until you disable one;
+muse skills list reports the conflict as a diagnostic.
+## Write a skillSection titled “Write a skill”
+A complete project skill:
+.agents/skills/release-notes/SKILL.md
+---
+name: release-notes
+description: Draft release notes from merged changes since the last tag. Use when the user asks for a changelog or release notes.
+metadata:
+  short-description: Draft release notes from recent changes
+argument-hint: "[since-tag]"
+---
+# Release notes
+1. Run `git log --oneline <since-tag>..HEAD`.
+2. Group the entries under Added, Changed and Fixed.
+3. Keep each bullet under 20 words.
+The front matter fields Muse Code reads:
+Field | 
+Required | 
+What it does | 
+name | 
+No | 
+The skill id. Defaults to the directory name, lowercased, with runs of other characters collapsed to -. An explicit name may use letters, digits, ., _, - and :, at most 128 characters, and may not start with bundled: or plugin:. | 
+description | 
+Yes | 
+What the skill does and when to use it. This is the text the model sees in the catalog, so write it as a trigger: “Use when …”. | 
+metadata.short-description | 
+No | 
+A one-line summary used when the catalog is compressed (see Limits). Set it on every skill. | 
+argument-hint | 
+No | 
+Shown next to the skill in the / palette, for example [since-tag]. | 
+user-invocable | 
+No | 
+false removes the /<name> shortcut. The model can still load the skill. | 
+disable-model-invocation | 
+No | 
+true makes the skill start in the user-invocable-only state: you can run it, the model cannot. An explicit activation setting (below) overrides this default. | 
+allowed-tools | 
+No | 
+Recorded as metadata and reported as a warning. It grants no tool permissions and is not enforced; the skill runs under your normal approval settings. | 
+Other keys are kept as unknown metadata. The Claude Code fields
+when_to_use, paths, context, agent, fallback and hooks produce a
+warning that says they are treated as metadata.
+### Validate itSection titled “Validate it”
+muse skills validate parses the front matter, checks the package and
+prints one line per problem. It never installs or runs anything.
+Terminal window
+muse skills validate ./skills/forecast
+valid  forecast
+Add --json for the file list, digests and a compatibility report:
+Terminal window
+muse skills validate ./skills/forecast --json
+{
+  "valid": true,
+  "id": "forecast",
+  "source_path": "./skills/forecast",
+  "files": [
+    {
+      "relative_path": "SKILL.md",
+      "sha256": "sha256:69bff4e8e1a3749f95b70c8e6bc72e47604233e2befafdd789633a9ef3cdf37b",
+      "bytes": 1152
+    }
+  ],
+  "diagnostics": [],
+  "compatibility": {
+    "profile": "agent-skills-common-subset",
+    "result": "compatible",
+    "known_fields": [
+      "description",
+      "metadata",
+      "name"
+    ],
+    "unknown_fields": [],
+    "unsupported_fields": [],
+    "allowed_tools": []
+  }
+}
+A missing description, a missing front matter block or a bad name fails
+with exit code 1:
+SKILL.md frontmatter must include description
+SKILL.md must start with YAML frontmatter
+install path is unsafe: Forecast Helper
+Warnings do not fail validation. A skill that declares allowed-tools and
+a Claude Code only field validates like this:
+diagnostic=unsupported-skill-field severity=warning path=./forecast/SKILL.md message=`allowed-tools` is recorded as advisory metadata but is not enforced and grants no tool permissions
+diagnostic=unsupported-skill-field severity=warning path=./forecast/SKILL.md message=Claude field `when_to_use` is not implemented by Muse Code and is treated as metadata
+valid  forecast
+Tip
+The built-in create-skill skill scaffolds and validates a new skill for
+you. Type /create-skill in a session.
+## Where skills load fromSection titled “Where skills load from”
+Muse Code scans these directories, in this order. Each skill is one
+subdirectory containing SKILL.md. $CONFIG_DIR is $XDG_CONFIG_HOME/muse
+when that variable is set and ~/.config/muse otherwise; it is also the
+spelling muse skills list prints.
+Scope | 
+Directory | 
+Notes | 
+User | 
+$CONFIG_DIR/skills/<id>/SKILL.md | 
+Where muse skills install and muse skills import put skills. Ranks first among user skills. | 
+User | 
+$HOME/.agents/skills/<id>/SKILL.md | 
+The cross-agent personal root. | 
+User | 
+$HOME/.claude/skills/<id>/SKILL.md | 
+Claude Code personal skills. On by default; see below to turn off. | 
+User | 
+$CODEX_HOME/skills/<id>/SKILL.md, or $HOME/.codex/skills/<id>/SKILL.md when CODEX_HOME is unset | 
+Codex personal skills. On by default; see below to turn off. | 
+Project | 
+<project>/.agents/skills/<id>/SKILL.md | 
+The recommended place for skills you commit. | 
+Project | 
+<project>/.codex/skills/<id>/SKILL.md | 
+Codex project skills. Always scanned. | 
+Project | 
+<project>/.claude/skills/<id>/SKILL.md | 
+Claude Code project skills. Always scanned. | 
+A non-absolute HOME or CODEX_HOME drops the affected roots rather than
+resolving them against the current directory.
+Skills found under a .claude or .codex directory are labelled in the
+model’s catalog as written for that agent, so the model weighs their
+applicability instead of following agent-specific instructions literally.
+To stop scanning the two Claude Code and Codex personal roots, add this to
+$CONFIG_DIR/settings.json:
+$CONFIG_DIR/settings.json
+{
+  "context": {
+    "foreign_personal_skills": false
+  }
+}
+With that setting, muse skills list --source user lists only
+$CONFIG_DIR/skills and $HOME/.agents/skills. The project-level
+.codex/skills and .claude/skills directories have no switch. If you
+would rather own a copy, muse skills import --from claude (or codex)
+copies the personal skills into $CONFIG_DIR/skills (see
+the command table).
+The user manual also mentions a rollout gate for these two roots. When that
+gate is off they are skipped even without this setting; $CONFIG_DIR/skills
+and $HOME/.agents/skills are unaffected either way.
+### Project skills and trustSection titled “Project skills and trust”
+Project skills load only from a trusted workspace. The first time you open
+a folder interactively, Muse Code asks “Do you trust this workspace?” and
+remembers the answer. In an untrusted folder the project scope is empty and
+the catalog carries a diagnostic:
+Terminal window
+muse skills list --source project
+No skills found.
+Diagnostics
+- project-skills-untrusted: project skills skipped because workspace is untrusted (.agents/skills)
+Pass --trust-workspace to a muse skills command (or to muse itself)
+to trust the folder for that one run without saving the decision:
+Terminal window
+muse skills list --source project --trust-workspace
+NAME  SCOPE  ACTIVATION  DESCRIPTION  PATH
+release-notes  project  on  Draft release notes from merged changes since the last tag. Use when the user asks for a changelog or release notes.  .agents/skills/release-notes/SKILL.md
+Caution
+A project skill is instructions the model follows in your session, and its
+directory can carry scripts the model may run through ordinary tools. Read
+.agents/skills in a repository before you trust it.
+## Activation statesSection titled “Activation states”
+Every skill is in one of three states:
+State | 
+You can run /<name> | 
+The model can read_skill it | 
+Drawer marker | 
+on | 
+Yes | 
+Yes | 
+[x] | 
+user-invocable-only | 
+Yes | 
+No (the tool reports the skill as disabled) | 
+[u] | 
+off | 
+No | 
+No | 
+[ ] | 
+The default is on, unless the front matter sets
+disable-model-invocation: true, which defaults the skill to
+user-invocable-only. Your explicit setting wins over the default.
+### Change a state from the command lineSection titled “Change a state from the command line”
+enable, user-only and disable take a skill id or display path and a
+--scope. Built-in skills may also be selected as bundled:<id> without a
+scope.
+Terminal window
+muse skills user-only forecast --scope user
+muse skills disable plan --scope built-in
+muse skills enable release-notes --scope project --trust-workspace
+forecast  user  user-invocable-only  $CONFIG_DIR/settings.json
+plan  built-in  off  $CONFIG_DIR/settings.json
+release-notes  project  on  $CONFIG_DIR/settings.json
+The state is stored in $CONFIG_DIR/settings.json. User and project skills are
+keyed by display path, built-in skills by bundled:<id> and plugin skills by
+plugin:<plugin-id>:<skill>.
+Project entries are grouped under the absolute project path, so the same
+repository can be configured differently in two checkouts. These commands
+rewrite the whole settings file; if it also holds mcpServers entries, read
+the caution on MCP servers
+first.
+$CONFIG_DIR/settings.json
+{
+  "schema_version": 1,
+  "skills": {
+    "activation": {
+      "user": {
+        "$CONFIG_DIR/skills/forecast/SKILL.md": "user-invocable-only"
+      },
+      "projects": {
+        "/private/tmp/skills-scratch/proj": {
+          ".agents/skills/release-notes/SKILL.md": "on"
+        }
+      },
+      "bundled": {
+        "bundled:plan": "off"
+      }
+    }
+  }
+}
+Older settings files may hold built-in keys in the form
+bundled://muse-core/skills/<dir>/SKILL.md; those keys are still read.
+--scope plugin works the same way for plugin skills. muse skills list
+shows their display paths as plugin://<plugin-id>/skills/<dir>/SKILL.md;
+a command accepts that path or plugin:<plugin-id>:<skill>, and the state is
+saved under plugin:<plugin-id>:<skill> (under the display path when another
+installed skill has the same id). Older settings files may hold
+plugin keys in the display-path form; those keys are still read.
+### Change a state in the terminal UISection titled “Change a state in the terminal UI”
+Type /skills to open the skills drawer. It lists every skill grouped by
+scope with its state marker. Space cycles the selected skill through
+on, user-invocable-only and off; Enter runs it; typing filters the
+list. /skills diagnostics shows the catalog diagnostics, and
+/skills reload rescans the directories after you add or edit a skill.
+A change made in the drawer applies to the running session and is saved to
+the same settings file.
+## The muse skills commandSection titled “The muse skills command”
+Terminal window
+muse skills --help
+usage: muse skills list [--source all|user|project|built-in|plugin] [--enabled-only] [--workspace <path>] [--trust-workspace] [--json]
+usage: muse skills inspect <skill-id-or-path> [--source all|user|project|built-in|plugin] [--workspace <path>] [--trust-workspace] [--json]
+usage: muse skills enable <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+usage: muse skills user-only <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+usage: muse skills disable <skill-id-or-path> --scope user|project|built-in|plugin [--workspace <path>] [--trust-workspace] [--json]
+usage: muse skills validate <path> [--json]
+usage: muse skills install <path> [--scope user] [--name NAME] [--force] [--json]
+usage: muse skills import --from claude|codex [--scope user] [--dry-run] [--force] [--json]
+usage: muse skills update <skill-id> [--json]
+usage: muse skills uninstall <skill-id> [--keep-files] [--json]
+Command | 
+What it does | 
+Flags worth knowing | 
+list | 
+Prints every skill with scope, state, description and path, then any diagnostics. | 
+--source filters by scope; --enabled-only hides off skills; --json adds per-skill context cost. | 
+inspect <id-or-path> | 
+Prints one skill’s metadata. | 
+--source to disambiguate; --json for front matter and diagnostics. | 
+enable, user-only, disable | 
+Set the activation state. | 
+--scope is required except for bundled:<id> selectors. | 
+validate <path> | 
+Check a skill directory without installing it. | 
+--json for the compatibility report. | 
+install <path> | 
+Copy a local skill directory into $CONFIG_DIR/skills/<id> and record it. | 
+--name installs under a different id; --force replaces an existing install. Only --scope user is supported. | 
+import --from claude|codex | 
+Copy personal skills from ~/.claude/skills or the Codex skills root into $CONFIG_DIR/skills. | 
+--dry-run reports without copying; --force replaces existing ids. Candidates that fail validation are placed under $CONFIG_DIR/skills/.muse/import-quarantine/ with a QUARANTINE.txt explaining why. | 
+update <id> | 
+Re-copy an installed skill from the path it was installed from. | 
+ | 
+uninstall <id> | 
+Remove an installed skill. | 
+--keep-files drops the install record but leaves the directory, so discovery still finds it. | 
+Every command accepts --workspace <path> to act on a project other than
+the current directory, and --json for machine-readable output. Usage
+errors exit with code 2; other failures exit with code 1.
+A few outputs, so you know what to expect:
+Terminal window
+muse skills install ./skills/forecast
+muse skills list --trust-workspace
+forecast  $CONFIG_DIR/skills/forecast
+NAME  SCOPE  ACTIVATION  DESCRIPTION  PATH
+grill  built-in  on  Run an explicitly requested decision interview and record each settled decision in durable project documentation.  built-in
+forecast  user  on  Explain a weather forecast for a place and date in plain language. Use when the user asks what the weather will be like, whether to bring an umbrella, or how to read a forecast they pasted.  $CONFIG_DIR/skills/forecast/SKILL.md
+release-notes  project  on  Draft release notes from merged changes since the last tag. Use when the user asks for a changelog or release notes.  .agents/skills/release-notes/SKILL.md
+The list above is trimmed to three rows; the full output lists every
+built-in skill first.
+Terminal window
+muse skills inspect grill
+id: grill
+name: grill
+scope: built-in
+activation: on
+path: built-in
+description: Run an explicitly requested decision interview and record each settled decision in durable project documentation.
+Terminal window
+muse skills import --from claude --dry-run
+candidates:0  installed:0  quarantined:0  skipped:0  failed:0
+Terminal window
+muse skills uninstall forecast
+forecast  removed:1  kept:0
+Built-in skills you will see in every install include plan, grill,
+taste, git, python-env, doctor, migrate and create-skill. Run
+muse skills list --source built-in for the current set and
+muse skills inspect <id> for any one of them. You can turn any built-in
+skill off with muse skills disable <id> --scope built-in.
+threejs, which the user manual lists with the built-in skills, ships as a
+bundled plugin rather than as a built-in skill, so muse skills list shows it
+under scope plugin with the path plugin://threejs/skills/threejs/SKILL.md;
+/threejs still invokes it.
+muse skills import copies skills only. The built-in migrate skill
+(/migrate) imports your Claude Code or Codex memory notes and MCP servers
+into Muse Code; use both when moving from another agent.
+## Limits and catalog compressionSection titled “Limits and catalog compression”
+Limit | 
+Value | 
+SKILL.md size | 
+262,144 bytes (256 KiB). A larger file fails validation with SKILL.md exceeds 262144 byte limit. | 
+Body returned by read_skill | 
+128 KiB. A longer body is truncated with a hint to read the rest. | 
+Skill directory | 
+At most 10,000 entries and 64 levels deep. | 
+Skill id | 
+At most 128 characters. | 
+Startup catalog | 
+24,000 bytes for all skills together. | 
+The catalog budget is why metadata.short-description matters. When the
+full catalog does not fit, Muse Code keeps every skill listed but shrinks
+rows: a compressed row keeps the id, scope, path and short-description
+and drops the full description. Rows are upgraded back to full detail in
+priority order while budget remains: skills that the session’s developer
+prompt names first, then built-in and plugin skills, then project skills, then user
+skills. A user skill with no short description in a large install may reach
+the model as an id and a path alone. The /skills drawer shows how many
+descriptions were compacted and how many ids, if any, were omitted.
+Keep a skill body focused. Put long reference material in sibling files
+and tell the model when to read them; the model reads them with its normal
+file tools after read_skill returns.
+## Skills, commands and pluginsSection titled “Skills, commands and plugins”
+ | 
+Skill | 
+Command | 
+Plugin | 
+What it is | 
+SKILL.md instructions the model loads on demand | 
+A Markdown prompt template expanded when you type /<command> args | 
+A directory that packages skills, commands, hooks and MCP servers | 
+Who invokes it | 
+You (/<name>) or the model (read_skill) | 
+You only | 
+Not invoked; installed and enabled | 
+Where it lives | 
+Any directory in the table above, or a plugin | 
+Only inside a plugin | 
+The plugin cache, after muse plugins install | 
+Needs review before it runs | 
+No | 
+No | 
+Hooks and MCP servers inside it do | 
+Choose a standalone skill when the knowledge belongs to you or to one
+repository. Choose a plugin when you want to distribute a skill together
+with a command, a hook or an MCP server, or install the same set on many
+machines with one command. The families and their manifest entries are in
+Packages and capabilities.
+## Next stepsSection titled “Next steps”
+Package a skill with a command and a hook in the
+plugin quickstart.
+Run a shell command on lifecycle events with Hooks.
+Read how plugin skills are catalogued and reviewed in
+Trust, review and scopes.
+List a session’s skills from the SDK with
+skill/list and see
+Plugins in SDK sessions.
+Back to the extending overview.

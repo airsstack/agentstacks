@@ -1,0 +1,12 @@
+api = 1
+
+[[tool]]
+name = "musecode"
+version = "0.1.0"
+path = "extensions/musecode"
+tree = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+[[file]]
+path = ".agents/skills/gone/SKILL.md"
+hash = "sha256:4b9f2c32577beb1ebc8ab2a1e226faaa9176a81cd4eedbaa22f8a0db919972b5"
+by = "musecode"

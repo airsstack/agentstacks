@@ -1,0 +1,17 @@
+PWD=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p3
+--- ENV
+_=/usr/bin/env
+HOME=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/mhome
+LANG=en_US.UTF-8
+LOGNAME=hiraq
+MUSE_SESSION_ID=01a21200-cef9-70e3-8faf-5c2246c2a997
+MUSE_THREAD_ID=01a21200-cef9-70e3-8faf-5c2246c2a997
+PWD=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p3
+SHELL=/bin/zsh
+SHLVL=1
+TERM=xterm-256color
+TMPDIR=/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/mtmp
+TRACEPARENT=00-01a21200ec7b7e13bc752889d42a347a-e4e35a32ef2c7095-01
+USER=hiraq
+--- STDIN
+{"hook_event_name":"PostToolUse","tool_name":"edit_file","tool_input":{"path":"a.txt","find":"hello","replace":"bye"},"tool_use_id":"call_2","tool_response":{"filePath":"/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p3/a.txt","structuredPatch":[{"oldStart":1,"oldLines":1,"newStart":1,"newLines":1,"lines":["-hello","+bye"]}]},"session_id":"01a21200-cef9-70e3-8faf-5c2246c2a997","turn_id":"01a21200-ec7b-7e13-bc75-2889d42a347a","cwd":"/private/tmp/claude-501/-Users-hiraq--herdr-worktrees-agentstacks-extension-musecode/08eae380-be82-415a-a612-6bf7f5a48a13/scratchpad/muse/probe/p3","transcript_path":null,"model":"fake-model","permission_mode":"bypassPermissions","model_provider":"meta"}

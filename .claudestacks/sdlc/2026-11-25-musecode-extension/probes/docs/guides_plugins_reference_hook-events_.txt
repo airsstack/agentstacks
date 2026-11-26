@@ -1,0 +1,434 @@
+Hook events and payloads | Muse Code Developer DocsSkip to content
+## 
+# Hook events and payloads
+Use this page to look up an event name, the keys a hook finds on stdin for
+that event, the output fields it may return and what each one does. It is
+the one reference for both kinds of hook: plugin hooks declared in a
+manifest and settings-level hooks declared in settings.json,
+.muse/hooks.json or a managed file. They share the event catalog, the
+stdin payload, the output schema and the size caps. For how hooks fit into a
+plugin, read Hooks in plugins first; for the
+settings-level form, its files and matchers, read
+Hooks. Every value here was checked against
+Muse Code 1.3.0.
+## EventsSection titled “Events”
+Every event below is accepted as a hook’s event in a native manifest and
+as a key of a settings-level hooks object, and is dispatched to approved
+plugin hooks and to loaded settings-level hooks alike. “Blocks” means exit 2 with stderr text or decision: "block"
+takes effect. “Context” means hookSpecificOutput.additionalContext takes
+effect. “Stops” means continue: false ends the turn.
+Event | 
+Fires when | 
+Blocks | 
+Context | 
+Stops | 
+SessionStart | 
+A session starts, resumes, is cleared, is forked, or continues after compaction. | 
+No | 
+Yes, JSON and plain stdout | 
+Yes | 
+UserPromptSubmit | 
+A user prompt is submitted, before the model sees it. | 
+Yes, the prompt is rejected | 
+Yes, JSON and plain stdout | 
+No | 
+PreToolUse | 
+A tool call has been validated and is about to run. | 
+Yes, via permissionDecision: deny or decision: block | 
+Yes | 
+No, rejected | 
+PermissionRequest | 
+A tool call is waiting for approval. | 
+Yes, via decision.behavior: deny | 
+No | 
+No, rejected | 
+PostToolUse | 
+A tool call finished successfully. | 
+Yes, the reason is feedback to the model | 
+Yes | 
+Yes | 
+PostToolUseFailure | 
+A tool call failed. | 
+Feedback only; the failed result stands | 
+Yes | 
+Yes | 
+PostToolBatch | 
+One batch of tool results was committed. | 
+Yes, feedback to the model | 
+Yes | 
+Yes | 
+PreLLMCall | 
+A model request is about to be sent. | 
+Yes | 
+Yes | 
+No | 
+PostLLMCall | 
+A model response was received. | 
+Yes | 
+Yes | 
+No | 
+PreCompact | 
+Context compaction is about to run. | 
+No | 
+No | 
+Yes, vetoes the compaction | 
+PostCompact | 
+Context compaction finished. | 
+No | 
+No | 
+No | 
+SubagentStart | 
+A child agent session starts, inside a turn. | 
+No | 
+Yes, JSON and plain stdout | 
+No | 
+SubagentStop | 
+A child agent wants to stop. | 
+Yes, the child keeps working | 
+No | 
+No | 
+Stop | 
+The model wants to end the turn. | 
+Yes, the model keeps working | 
+No | 
+Accepted; prefer exit 2 or decision: block | 
+StopFailure | 
+The turn ended because the model call failed. Observation only. | 
+No | 
+No | 
+No | 
+SessionEnd | 
+The session shuts down. Observation only. | 
+No | 
+No | 
+No | 
+Notification | 
+An approval prompt has been waiting for six seconds. Observation only. | 
+No | 
+No | 
+No, rejected | 
+SessionFork | 
+A fork of the session is being opened (the fork-tab verdict boundary). Observation only. | 
+No | 
+No | 
+No | 
+ToolUseStart | 
+An approved tool call crosses its execution-start boundary, before it runs. Observation only. | 
+No | 
+No | 
+No | 
+Where the “Stops” column says “No”, continue and stopReason are accepted
+by the schema but have no effect; where it says “rejected”, they fail the
+output. Where “Blocks” is “No”, exit 2 is recorded as a failure.
+Hooks run inside the session runtime, so a hook fires the same way whether
+the session belongs to the terminal UI, muse exec or muse serve. Nothing
+on the wire names a hook; Plugins in SDK sessions
+explains what a client sees.
+## Common stdin keysSection titled “Common stdin keys”
+Muse Code writes one JSON object to the hook’s stdin and closes it. These
+keys are present on every event unless noted.
+Key | 
+Type | 
+Meaning | 
+hook_event_name | 
+string | 
+The event name, spelled as in the table above. | 
+session_id | 
+string | 
+The session. | 
+turn_id | 
+string | 
+The turn. Omitted on SessionStart and SessionEnd. | 
+cwd | 
+string | 
+The working directory the hook runs in. Tool events use the tool’s effective directory; other events use the session’s. | 
+transcript_path | 
+string or null | 
+The session transcript file, when one exists. | 
+model | 
+string | 
+The model in use. | 
+permission_mode | 
+string | 
+The session’s permission mode. | 
+model_provider | 
+string | 
+The provider id. Present when Muse Code knows it for that event. Omitted for Claude, GPT and Gemini models served through the Meta gateway. | 
+agent_id, agent_type | 
+string | 
+Identity of a child agent session. Added together, only in child sessions, and only on PostToolBatch and StopFailure. | 
+muse plugins hook test does not add these keys: the fixture’s stdin
+object is delivered verbatim.
+## Event-specific stdin keysSection titled “Event-specific stdin keys”
+Event | 
+Keys | 
+SessionStart | 
+source: startup, resume, clear, compact or fork. | 
+UserPromptSubmit | 
+prompt: the submitted text. | 
+PreToolUse | 
+tool_name; tool_input: the tool arguments parsed as JSON, the raw string when they are not JSON, or {} when empty; tool_use_id. | 
+PermissionRequest | 
+tool_name, tool_input. There is no tool_use_id on this event. | 
+PostToolUse | 
+tool_name, tool_input, tool_use_id, tool_response: the tool’s own result, a string for text tools and an object for structured tools. | 
+PostToolUseFailure | 
+tool_name, tool_input, tool_use_id, error (string), is_interrupt (boolean, currently always false), duration_ms (number). | 
+PostToolBatch | 
+tool_calls: an array with one entry per committed call, each carrying tool_name, tool_input, tool_use_id and tool_response. | 
+PreLLMCall | 
+provider, request_id, attempt, step, messages (summaries, with text previews of at most 256 characters), message_count, tools (summaries), tool_count, options. | 
+PostLLMCall | 
+provider, request_id, attempt, step, status, response_id, usage, finish_reason, error, output_text_preview, tool_call_count, messages, message_count, tools, tool_count, options. | 
+PreCompact, PostCompact | 
+trigger: what started the compaction. | 
+SubagentStart | 
+subagent_id, child_session_id. | 
+SubagentStop | 
+subagent_id, child_session_id, stop_hook_active, last_assistant_message. | 
+Stop | 
+stop_hook_active: true when an earlier Stop hook already kept the model working this turn; last_assistant_message. | 
+StopFailure | 
+error (a category), error_details (when present), last_assistant_message (when present). | 
+SessionEnd | 
+reason. | 
+Notification | 
+notification_type: permission_prompt; title; message. | 
+## Output schemaSection titled “Output schema”
+Output is read only on exit 0 and only when stdout, after leading
+whitespace, starts with { or [. The value must be a JSON object. The
+schema is closed: a key that is not listed, a snake_case spelling, a wrong
+type, or a key used on an event that does not allow it rejects the whole
+output, the hook is recorded as failed with a diagnostic, and nothing from
+that output is applied.
+Field | 
+Type | 
+Allowed on | 
+Effect | 
+systemMessage | 
+string | 
+Every event | 
+Shown to the user as a brief status notice while a turn is running, not to the model; a hook that completes while no turn runs (for example SessionStart) shows nothing, and so does a message that arrives while a blocked, failed or timed-out hook notice is still showing (that notice keeps the slot for its five seconds). Control characters other than newline are replaced by spaces; at most 1000 characters are kept. | 
+suppressOutput | 
+boolean | 
+Every event | 
+Accepted for compatibility; no effect. | 
+continue | 
+boolean | 
+Every event except PreToolUse, PermissionRequest, Notification | 
+false stops the turn on the events marked “Stops: Yes” above. Evaluated before decision. | 
+stopReason | 
+string | 
+Same as continue | 
+The reason recorded with the stop. Optional. | 
+decision | 
+"block" | 
+Events marked “Blocks: Yes” | 
+Blocks the action. Requires a non-empty reason. On Stop and SubagentStop the model keeps working with reason as its instruction; on the post-tool events reason is feedback to the model. | 
+reason | 
+string | 
+With decision | 
+The block reason. | 
+hookSpecificOutput | 
+object | 
+Every event | 
+Container for the fields below. | 
+hookSpecificOutput.hookEventName | 
+string | 
+Required inside hookSpecificOutput | 
+Must equal the event that ran, in PascalCase. | 
+hookSpecificOutput.additionalContext | 
+string | 
+SessionStart, SubagentStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostToolBatch, PreLLMCall, PostLLMCall | 
+Appended to the model’s context. Blank strings are ignored. | 
+hookSpecificOutput.permissionDecision | 
+"deny", "ask" or "allow" | 
+PreToolUse | 
+deny blocks the call and needs a non-empty permissionDecisionReason. ask forces the approval prompt. allow is accepted only together with updatedInput; it rewrites the input and does not skip approval. | 
+hookSpecificOutput.permissionDecisionReason | 
+string | 
+PreToolUse | 
+The reason shown for a deny. Setting it without permissionDecision is an error. | 
+hookSpecificOutput.updatedInput | 
+object | 
+PreToolUse | 
+Replaces the tool input. The rewritten call still goes through approval. null counts as absent. | 
+hookSpecificOutput.decision | 
+object {"behavior": "allow" or "deny", "message": "..."} | 
+PermissionRequest | 
+allow approves the pending call; deny rejects it with message as the reason (default PermissionRequest hook denied approval). No other keys are allowed in the object. | 
+decision (top level) | 
+same object | 
+PermissionRequest | 
+Older spelling of hookSpecificOutput.decision, same rules. | 
+additionalContext is accepted only inside hookSpecificOutput, next to
+its hookEventName. A top-level additionalContext rejects that handler’s
+whole output on every event, with the diagnostic
+unsupported `additionalContext` in output of <Event> hook output.
+Plain stdout that does not start with { or [ is never an error. On
+SessionStart, SubagentStart and UserPromptSubmit it is added to the
+model’s context; elsewhere it is recorded and ignored.
+## Exit codes and statusesSection titled “Exit codes and statuses”
+Exit code | 
+Result | 
+0 | 
+stdout is parsed as above. Status completed, or blocked when the output blocked or stopped. | 
+2 with non-empty stderr, on an event that blocks | 
+Status blocked; stderr is the reason. On PostToolUseFailure the text is feedback only and the status is completed. | 
+2 otherwise, or any other code | 
+Status failed. | 
+Killed at timeoutMs | 
+Status timed_out, exit_code null, error hook timed out after <n>s (or <n>ms when timeoutMs is not a whole number of seconds). | 
+Session cancelled while running | 
+Status cancelled. | 
+No status ever ends the session by itself. A failed or timed_out hook is
+recorded and the turn continues without its output.
+## Size caps and timingSection titled “Size caps and timing”
+Limit | 
+Value | 
+When exceeded | 
+stdin payload | 
+256 KiB serialized | 
+The hook is not started for that event. | 
+stdout | 
+16 KiB | 
+The process tree is terminated, neither stream is parsed, and the hook is failed with error starting output_too_large: hook stdout exceeded its 16384-byte ceiling; the process tree was terminated and no stream was parsed. | 
+stderr | 
+16 KiB, independent of stdout | 
+Same as stdout, naming stderr. | 
+systemMessage | 
+1000 characters | 
+Truncated. | 
+Timeout | 
+Plugin hooks: timeoutMs, default 600000 ms; values below 1000 are raised to 1000. Settings-level hooks: timeout in seconds, default 600; 0 is raised to 1. | 
+The process is killed; status timed_out. | 
+## EnvironmentSection titled “Environment”
+The hook’s environment is cleared first. It then receives the variables in
+the first table when they are set in Muse Code’s own environment. A plugin
+hook always receives the variables in the second table as well; a
+settings-level hook does not, and a managed hook instead receives the names
+listed in managed_hooks_env_vars (see Hooks).
+Passed through | 
+Notes | 
+HOME, PATH, USER, LOGNAME, TMPDIR, TEMP, TMP, SHELL, LANG, LC_ALL, TERM | 
+On every platform. | 
+COMSPEC, PATHEXT, SystemRoot, WINDIR | 
+Windows only; names match case-insensitively there. | 
+PROVENANCE_PROVIDER_SCOPE | 
+Only when the process that launched Muse Code set it; a label naming that surface, not a secret. | 
+Set by Muse Code | 
+Value | 
+MUSE_PLUGIN_ID | 
+The plugin id. | 
+MUSE_PLUGIN_ROOT | 
+The installed, read-only copy of the plugin package. | 
+MUSE_PLUGIN_DATA_DIR | 
+<data dir>/plugins/data/<plugin-id>. Not created for you; run mkdir -p before writing. | 
+PLUGIN_ROOT, CLAUDE_PLUGIN_ROOT | 
+Same as MUSE_PLUGIN_ROOT. | 
+PLUGIN_DATA, CLAUDE_PLUGIN_DATA | 
+Same as MUSE_PLUGIN_DATA_DIR. | 
+Every hook, plugin or not, also receives two session variables, applied
+last so no other source can set them:
+Set by Muse Code | 
+Value | 
+MUSE_SESSION_ID | 
+The top-level chat the hook’s work belongs to. | 
+MUSE_THREAD_ID | 
+The chat or subagent the hook fires for; equal to MUSE_SESSION_ID in a top-level chat. | 
+A run with no real session gets neither. Nothing else is passed: no provider
+credentials and no proxy variables. Native
+plugin hook and MCP commands get no placeholder substitution; Muse Code rewrites
+exactly one argv element, the one that spells a relative path declared in
+the manifest, to the installed copy, and scripts read MUSE_PLUGIN_ROOT for
+other files.
+## Compatibility with Claude Code and Codex hooksSection titled “Compatibility with Claude Code and Codex hooks”
+Hook source | 
+Event names | 
+Command | 
+Selection | 
+Settings-level (settings.json, .muse/hooks.json, managed file) | 
+The 17 events above. | 
+A shell string, run through $SHELL -c. | 
+matcher groups; see Hooks. | 
+Native plugin (.muse-plugin) | 
+The 17 events above. | 
+Argv array, no shell. | 
+event only; no matcher. | 
+Claude Code (.claude-plugin, hooks/hooks.json) | 
+The 17 events, plus the alias PreUserTurn for UserPromptSubmit. | 
+A shell string, run through the shell. | 
+matcher groups; one if selector per handler on PreToolUse, PermissionRequest and PostToolUse. | 
+Codex (.codex-plugin) | 
+The 17 events except Notification, PostToolUseFailure, StopFailure and PostToolBatch, which fail validation with unsupported-hook-event. | 
+A shell string, run through the shell. | 
+matcher groups. | 
+Two behaviours differ from Claude Code on purpose. A bare
+permissionDecision: allow is rejected instead of auto-approving the call;
+add updatedInput or drop the field. And PermissionRequest accepts only
+behavior and message in its decision object; updatedInput,
+updatedPermissions and interrupt are rejected.
+Compatibility with other plugin formats
+covers the rest of the import rules.
+## A verified runSection titled “A verified run”
+The weather example declares a PostToolUse hook.
+With the plugin installed, this fixture and command exercised it:
+fixture.json
+{
+  "event": "PostToolUse",
+  "stdin": {
+    "hook_event_name": "PostToolUse",
+    "session_id": "test-session",
+    "cwd": "/tmp",
+    "tool_name": "read_file",
+    "tool_input": { "path": "README.md" },
+    "tool_response": { "ok": true }
+  }
+}
+Terminal window
+muse plugins hook test weather:log-tool-use --fixture fixture.json --json
+{
+  "decision": {
+    "should_block": false,
+    "block_reason": null,
+    "additional_contexts": [],
+    "updated_input": null,
+    "permission_decision": null,
+    "feedback_message": null,
+    "should_stop": false,
+    "stop_reason": null
+  },
+  "terminals": [
+    {
+      "run_id": "plugin:weather:log-tool-use:1",
+      "hook_key": "plugin:weather:log-tool-use",
+      "event": "post_tool_use",
+      "status_message": "Logging tool use",
+      "system_message": null,
+      "status": "completed",
+      "duration_ms": 244,
+      "exit_code": 0,
+      "effects": [],
+      "stdout": "",
+      "stderr": "",
+      "error": null
+    }
+  ],
+  "records": 2
+}
+decision is the aggregate the session would apply; terminals has one
+entry per hook run, with event in snake_case and effects naming what was
+applied (blocked, permission_denied, context, stopped, feedback).
+Without --json the same run prints
+hook-test	weather:log-tool-use	status=completed.
+## Next stepsSection titled “Next steps”
+Hooks in plugins: how a plugin hook is run and
+answered, with worked examples of each output form.
+Hooks: the settings-level form, its three
+sources, matchers and startup validation.
+A guard hook that blocks risky tool calls: a
+complete PreToolUse plugin.
+Manifest: the hook entry beside every other manifest field.
+The muse plugins command: hook test, approve and inspect.
+Validation diagnostics: unsupported-hook-event,
+unsupported-field and the other codes a hook entry can produce.

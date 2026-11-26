@@ -29,7 +29,9 @@ use agentstacks::fs::{StdFileTree, StdWorkspace};
 use agentstacks::types::plan::{Action, Plan};
 use agentstacks::types::protocol::{Blocking, HookCommand, HookKind, RUNTIME_LUA};
 use agentstacks::types::{Extension, SubPath};
-use common::{copy_tree, module, proposed, run_piped, run_plan, skip_without_airsl, skips};
+use common::hook::{module, run_piped};
+use common::tree::copy_tree;
+use common::{proposed, run_plan, skip_without_airsl, skips};
 use tempfile::TempDir;
 
 type TestResult = Result<(), Box<dyn Error>>;

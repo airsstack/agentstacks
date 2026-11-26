@@ -1,0 +1,126 @@
+local translate = require("translate")
+
+local EXPECTED = [==[
+-- agentstacks translator for musecode, api 1.
+local M = {}
+
+local EVENTS = {
+  SessionStart = "session.start",
+  SessionEnd = "session.end",
+  UserPromptSubmit = "prompt.submit",
+  PreToolUse = "tool.before",
+  PostToolUse = "tool.after",
+  SubagentStop = "agent.stop",
+}
+local TOOLS = { read_file = "read", edit_file = "edit", write_file = "write" }
+local SOURCES = { startup = true, resume = true, clear = true, compact = true }
+
+local function str(v)
+  if type(v) == "string" then
+    return v
+  end
+  return nil
+end
+
+-- Muse Code passes the path the model wrote; a relative one is made absolute against `cwd`.
+-- An empty path, or a missing or empty `cwd`, is passed through unchanged.
+local function absolute(path, cwd)
+  if path == nil or path == "" or path:sub(1, 1) == "/" or type(cwd) ~= "string" or cwd == "" then
+    return path
+  end
+  return cwd .. "/" .. path
+end
+
+function M.event(p)
+  local name = EVENTS[p.hook_event_name]
+  if name == nil then
+    return nil
+  end
+  local e = { event = name, session_id = p.session_id, cwd = p.cwd }
+  if name == "session.start" then
+    if SOURCES[p.source] then
+      e.source = p.source
+    end
+  elseif name == "prompt.submit" then
+    e.prompt = str(p.prompt)
+  elseif name == "tool.before" or name == "tool.after" then
+    local tool = TOOLS[p.tool_name]
+    if tool == nil then
+      return nil
+    end
+    e.tool = tool
+    if type(p.tool_input) == "table" then
+      e.path = absolute(str(p.tool_input.path), p.cwd)
+    end
+  elseif name == "agent.stop" then
+    e.last_message = str(p.last_assistant_message)
+  end
+  return e
+end
+
+local function encode(out)
+  return airsstack.json.encode(out) .. "\n"
+end
+
+function M.result(r, p)
+  if r == nil then
+    return nil
+  end
+  local event = p.hook_event_name
+  local ctx, blk = r.context, r.block
+  if ctx == nil and blk == nil then
+    return nil
+  end
+  if event == "PreToolUse" then
+    local o = { hookEventName = event }
+    if blk ~= nil then
+      o.permissionDecision = "deny"
+      o.permissionDecisionReason = blk
+    end
+    if ctx ~= nil then
+      o.additionalContext = ctx
+    end
+    return encode({ hookSpecificOutput = o })
+  elseif event == "UserPromptSubmit" or event == "PostToolUse" then
+    local out = {}
+    if blk ~= nil then
+      out.decision = "block"
+      out.reason = blk
+    end
+    if ctx ~= nil then
+      out.hookSpecificOutput = { hookEventName = event, additionalContext = ctx }
+    end
+    return encode(out)
+  elseif event == "SubagentStop" then
+    if blk == nil then
+      return nil
+    end
+    return encode({ decision = "block", reason = blk })
+  elseif event == "SessionStart" then
+    local parts = {}
+    if ctx ~= nil then
+      parts[#parts + 1] = ctx
+    end
+    if blk ~= nil then
+      parts[#parts + 1] = blk
+    end
+    return encode({ hookSpecificOutput = { hookEventName = event, additionalContext = table.concat(parts, "\n") } })
+  end
+  return nil
+end
+
+return M
+]==]
+
+return {
+  text_is_the_spec_translator = function()
+    assert(translate.text() == EXPECTED, "text() differs from the translator the extension writes")
+  end,
+
+  text_defines_event_and_result = function()
+    local text = translate.text()
+    assert(text:find("function M.event(p)", 1, true), "missing function M.event(p)")
+    assert(text:find("function M.result(r, p)", 1, true), "missing function M.result(r, p)")
+    assert(text:sub(-9) == "return M\n", "text must end with return M and a newline")
+  end,
+}

@@ -1,0 +1,142 @@
+Extending Muse Code | Muse Code Developer DocsSkip to content
+## 
+# Extending Muse Code
+Muse Code has four ways to add capabilities to a session: skills, hooks, MCP
+(Model Context Protocol) servers and plugins. After this page you can pick
+the right one for what you want to add and know which file or command
+configures it.
+## Extension typesSection titled “Extension types”
+Mechanism | 
+What it adds | 
+Read more | 
+Skills | 
+SKILL.md instruction packs the model loads on demand; you can also invoke one as /<skill-id> | 
+Skills | 
+Hooks | 
+Programs that run on a session event such as PreToolUse or Stop and can add context or block an action | 
+Hooks | 
+MCP servers | 
+External tool servers, run as a child process (stdio) or reached over HTTP, whose tools the model calls like built-in tools | 
+MCP servers | 
+Plugins | 
+One directory that packages skills, commands, hooks and MCP servers and installs with one command | 
+Plugins | 
+The first three are standalone. You configure them in your settings file, your
+home directory or the repository, and there is no package to install or
+review. A plugin packages the same three kinds of capability (plus
+prompt-template commands) into an installable unit with its own review step.
+This page owns the choice between them; each mechanism has its own page for
+the details, and the plugins track has its own overview.
+## Which mechanism to useSection titled “Which mechanism to use”
+You want | 
+Use | 
+Why | 
+One skill that lives with a repository and is checked in with the code | 
+A project skill under .agents/skills/ | 
+Teammates get it from the clone; nothing to install | 
+A skill for yourself, in every project you open | 
+A user skill under ~/.config/muse/skills/ or ~/.agents/skills/ | 
+Follows your account, not the repository | 
+A hook that runs only on your machine, or only in one repository | 
+A settings-level hook (hooks in settings.json), or a project hook in .muse/hooks.json | 
+No packaging and no review step; a project hook runs once you trust the workspace | 
+An MCP server that needs a token, headers or environment variables | 
+A settings-level MCP server (mcpServers in settings.json) | 
+Plugin MCP server entries carry no env, headers or credentials | 
+Skills, commands, hooks and MCP servers that install as one unit, share one id, or are published through a marketplace | 
+A plugin | 
+One directory, one install, one review | 
+Capabilities an SDK client should see in sessions served by muse serve | 
+A plugin installed on the host machine | 
+Served sessions read the host’s plugin store, and one install carries the skills, hooks and MCP tools together | 
+## Where each mechanism is configuredSection titled “Where each mechanism is configured”
+Your settings file is ~/.config/muse/settings.json, or
+$XDG_CONFIG_HOME/muse/settings.json when that variable is set. Workspace
+trust is the per-folder decision Muse Code records in trust.json beside it.
+Mechanism | 
+User level | 
+Project level | 
+Trust it needs | 
+Skills | 
+~/.config/muse/skills/ (or $XDG_CONFIG_HOME/muse/skills/) and ~/.agents/skills/; other roots are listed under Where skills load from | 
+<repo>/.agents/skills/<skill-id>/SKILL.md | 
+Project skills load only in a trusted workspace; user skills need no extra step | 
+Hooks | 
+The hooks member of settings.json | 
+<project-root>/.muse/hooks.json | 
+Project hooks run only after you trust the workspace; user hooks run from your own settings with no separate hook-level step | 
+MCP servers | 
+The mcpServers member of settings.json (the user manual’s mcp_servers, transport and mode spellings are also accepted there; see Legacy spellings) | 
+.mcp.json at the repository root, with the same mcpServers object; a directory between the root and your working directory can add its own | 
+Project servers load only in a trusted workspace; every tool call still goes through the ordinary approval flow | 
+Plugins | 
+muse plugins install <path> records the plugin in your user store | 
+None; --scope project still writes to your user store and adds nothing to the repository | 
+Skills and commands work at install; hooks and MCP servers wait for muse plugins approve | 
+A third hook source exists for centrally managed machines: a file named by the
+managed_hooks_path setting. Whoever controls that file controls what runs, so
+it is for administrators rather than for extending your own sessions.
+Caution
+Hooks and MCP servers run as ordinary processes with your user privileges,
+outside the sandbox that contains the agent’s own shell commands. Read a hook
+command or a server’s source before you configure or approve it.
+## How the mechanisms relateSection titled “How the mechanisms relate”
+One event catalog, one output protocol. A hook in settings.json, in
+.muse/hooks.json or in a plugin binds to the same event names, reads the
+same JSON on stdin and answers with the same exit codes and JSON fields.
+Hook events and payloads is the single
+reference for all of them.
+One tool naming pattern. Every MCP tool the model sees is named
+mcp__<server>__<tool>, where characters other than letters, digits and
+_ in either part become _. A settings server called my-tools exposes
+its search tool as mcp__my_tools__search. A plugin server’s name is
+plugin:<pluginId>:<serverId>, so its tools read
+mcp__plugin_<pluginId>_<serverId>__<tool>.
+One skill catalog. Built-in, user, project and plugin skills merge into
+one list. muse skills list shows them all with their scope, and an SDK
+client reads the same list through
+skill/list.
+Two kinds of trust. Workspace trust gates the files a repository
+contributes: project skills, .muse/hooks.json and .mcp.json. Plugin
+review gates the hooks and MCP servers inside a plugin, one capability at a
+time, bound to the exact definition you approved. Neither replaces the
+approval prompt for a tool call; see
+Trust, review and scopes.
+## The pagesSection titled “The pages”
+Skills: the SKILL.md format, where skills load from, how
+the model and the user invoke one, and the muse skills command.
+Hooks: the hooks settings shape and .muse/hooks.json,
+matchers, how a hook blocks or adds context, and how to test one.
+MCP servers: the mcpServers shape for stdio and
+HTTP servers, env and headers, required, and signing in with
+muse mcp login.
+The plugins track covers the packaged form:
+Plugins: what a plugin is, the two trust tiers, and how
+to manage plugins from the command line or the /plugins panel.
+Quickstart: your first plugin: build, install,
+approve and remove a small native plugin.
+Concepts: Hooks in plugins,
+MCP servers in plugins and
+Plugins in SDK sessions
+explain how the packaged forms differ from the standalone ones;
+Compatibility with other plugin formats
+covers installing a plugin written for Claude Code or Codex as it is.
+Examples: complete plugins with every file
+shown, including a guard hook and an MCP server.
+Reference: the manifest, the
+hook events and the
+muse plugins command.
+## Next stepsSection titled “Next steps”
+Start with Skills if you want to teach the agent a workflow;
+a user skill needs no trust or review step.
+Read Hooks to enforce a check or block an action before it
+happens.
+Read MCP servers to connect an external tool, especially
+one that needs credentials.
+Read Quickstart: your first plugin when you want
+several capabilities to travel together.
+Building a client? Quickstart: your first session covers
+the SDK, and Approvals explains how a client
+answers the approval requests that MCP tools raise.
+Day-to-day use of skills, hooks and MCP servers in the terminal is covered
+by the user manual.

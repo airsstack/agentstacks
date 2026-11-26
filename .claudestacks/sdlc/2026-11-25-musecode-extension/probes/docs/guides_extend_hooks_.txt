@@ -1,0 +1,533 @@
+Hooks | Muse Code Developer DocsSkip to content
+## 
+# Hooks
+After this page you can declare a hook in your settings, in a project, or in
+a managed file, know exactly what the hook process receives, and make it
+block an action, add context for the model or stop the turn. Every output
+block on this page came from Muse Code 1.3.0 running against an isolated
+configuration directory; startup lines that do not concern hooks are cut.
+## What a hook isSection titled “What a hook is”
+A hook is a shell command that Muse Code runs when something happens in a
+session: the session starts, you submit a prompt, a tool is about to run, the
+model wants to stop. The command reads one JSON object on stdin, does its
+work, and answers with its exit code and, optionally, a JSON object on
+stdout. Muse Code applies the answer: it rejects the prompt, blocks the tool
+call, appends context for the model, or keeps going.
+This page covers hooks you configure yourself, in settings and project
+files. Hooks that ship inside a plugin use the same events and the same
+answer protocol but are declared and activated differently;
+Hooks in plugins covers those, and the
+comparison later on
+this page lists the differences.
+## Where hooks come fromSection titled “Where hooks come from”
+Source | 
+File | 
+Trust needed | 
+When it loads | 
+Managed | 
+The file named by managed_hooks_path in your settings file. A relative path is resolved against the settings file’s directory. | 
+None. Whoever controls the file controls what runs. | 
+Session start. A missing file means no managed hooks and no warning. | 
+User | 
+The hooks member of your settings file: $XDG_CONFIG_HOME/muse/settings.json, by default ~/.config/muse/settings.json. | 
+None. It is your own configuration. | 
+Session start. | 
+Project | 
+<project-root>/.muse/hooks.json, committed with the project. | 
+The project folder must be trusted: accept the trust prompt in the terminal UI, or pass --trust-workspace to muse exec (--yolo also trusts the folder but disables approval and the sandbox as well). | 
+Session start, once the folder is trusted. Untrusted projects contribute no handlers. | 
+Muse Code reads the sources in that order: managed, then user, then
+project. Handlers from every source are kept in that order for the whole
+session, which matters when several hooks answer the same event (see
+How a hook runs). Editing any file takes effect at the
+next session, not in the running one.
+## The JSON shapeSection titled “The JSON shape”
+All three sources share one shape. A hooks object maps an event name to an
+array of matcher groups. Each group has an optional matcher and a
+hooks array of handlers. Each handler is one command.
+{
+  "hooks": {
+    "<EventName>": [
+      {
+        "matcher": "<optional selector>",
+        "hooks": [
+          { "type": "command", "command": "<shell command>", "timeout": 30 }
+        ]
+      }
+    ]
+  }
+}
+### Handler fieldsSection titled “Handler fields”
+Field | 
+Type | 
+Required | 
+Meaning | 
+type | 
+string | 
+Yes | 
+Must be "command". A handler without type, or with another value, is skipped with a startup warning. | 
+command | 
+string | 
+Yes | 
+The command line. It runs through your shell (see below). A blank string skips the handler. | 
+timeout | 
+integer | 
+No | 
+Seconds before the process is killed. Default 600; 0 is raised to 1. | 
+statusMessage | 
+string | 
+No | 
+Label shown in the terminal UI’s “Hooks running” row while the hook runs. | 
+async | 
+boolean | 
+No | 
+true makes the hook observation-only: it runs alongside the turn and its exit code and output never change anything. | 
+onFailure | 
+object | 
+No | 
+Another handler that runs only when this one fails (a non-zero exit that did not block) or times out. It may not set async or if and has no matcher of its own. Up to three levels deep. | 
+commandWindows (or command_windows) | 
+string | 
+No | 
+Used instead of command on Windows. A handler with only commandWindows is skipped elsewhere. | 
+outputCapabilities | 
+array of strings | 
+No | 
+Reserved for hooks that emit structured skill output. The only accepted value is ["skills.v1"], on a foreground UserPromptSubmit or PostToolUse handler. A non-array value rejects the whole file. | 
+Field names are case-sensitive and the set is closed. A handler with a key
+that is not in the table is skipped with a warning, because Muse Code cannot
+tell whether the unknown key was meant to narrow when the hook runs. Some
+keys from hook files written for other tools are recognised so that the
+warning can say why: shell, args, condition, rewakeMessage,
+rewakeSummary, once: true and asyncRewake: true each skip their
+handler; silent is accepted and ignored; if is accepted as a
+compatibility selector for the shell tool on PreToolUse,
+PermissionRequest and PostToolUse, and makes the handler inactive with a
+warning anywhere else.
+A typed field with the wrong type is treated differently: it rejects the
+whole file. "timeout": "10" (a string) means no hook in that file runs,
+and the startup warning says so. This keeps a typo from silently dropping
+one guard while its neighbours keep running.
+### MatchersSection titled “Matchers”
+A matcher narrows which occurrences of an event reach the group. What it is
+matched against depends on the event:
+Events | 
+Matched against | 
+PreToolUse, PermissionRequest, PostToolUse, PostToolUseFailure | 
+The tool name. The built-in tools also answer to the names other agents use: Bash or shell for the shell tool, Read, Edit, Write, Grep, WebFetch and WebSearch for the file, search and web tools. Glob is accepted but matches no built-in tool. | 
+SessionStart | 
+source: startup, resume, clear, compact or fork. | 
+SessionEnd | 
+reason. | 
+PreCompact, PostCompact | 
+trigger. | 
+SubagentStart, SubagentStop | 
+The child agent id. | 
+PreLLMCall, PostLLMCall | 
+The provider id. | 
+StopFailure | 
+The failure category. | 
+Notification | 
+notification_type, currently permission_prompt. | 
+UserPromptSubmit, Stop | 
+Nothing. A matcher other than * on these events is invalid, and the group is skipped with a warning. | 
+PostToolBatch | 
+Accepted for compatibility, but the group always runs. | 
+The grammar has three forms. An omitted matcher, an empty string, or *
+matches everything. A string made only of ASCII letters, digits, _ and |
+is a list of exact, case-sensitive alternatives: Bash|Edit|Write. Anything
+else is an unanchored, case-sensitive regular expression: ^web_. Whitespace
+is significant, so Read | Bash is a regex whose branches contain spaces and
+matches no tool. A regex that fails to compile skips its group with a warning.
+### User settingsSection titled “User settings”
+Hooks in your settings file live under the top-level hooks member. The
+settings file needs schema_version (a file without it is rejected as
+malformed). This example refuses any prompt that mentions the word
+secret; the verified run below shows what happens when
+it fires.
+~/.config/muse/settings.json
+{
+  "schema_version": 1,
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if grep -q secret; then echo 'prompt mentions a secret' >&2; exit 2; fi",
+            "timeout": 5,
+            "statusMessage": "Checking prompt"
+          }
+        ]
+      }
+    ]
+  }
+}
+The settings file also accepts hooks.state, a map that Muse Code reserves
+for per-hook enablement keyed by an internal identity. Muse Code 1.3.0 has
+no command that prints those keys, so to turn a hook off, remove it from the
+file.
+### Project fileSection titled “Project file”
+A project file is the same object, with the hooks member at the top level.
+Other top-level members are ignored. This example logs every prompt
+submitted in the project and appends a note to the model’s context before
+the shell tool runs:
+.muse/hooks.json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat >> .muse/prompts.log",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Run the test suite with make test.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
+Project hooks run only in a trusted folder. Running the same prompt twice
+from an untrusted project directory, once without and once with
+--trust-workspace, gives:
+Terminal window
+muse exec --provider echo "hello"
+muse: workspace root: /private/tmp/hooks-scratch-project/project (cwd default)
+echo: hello
+Terminal window
+muse exec --provider echo --trust-workspace "hello"
+muse: workspace root: /private/tmp/hooks-scratch-project/project (cwd default)
+muse: workspace trust: trusted source=run-flag
+echo: hello
+The log file was written only by the second run. --provider echo is a
+built-in provider that echoes the prompt without calling a model; it is
+enough to fire SessionStart, UserPromptSubmit and Stop and is used for
+every run on this page.
+### Managed fileSection titled “Managed file”
+A managed file is for hooks administered centrally: a machine image, a team
+bootstrap script, or a policy tool writes it and points your settings at it.
+Its content has the same shape as a project file. Two settings members
+belong to it:
+Setting | 
+Type | 
+Meaning | 
+managed_hooks_path | 
+string | 
+Path of the managed hooks file. Relative paths resolve against the settings file’s directory. | 
+managed_hooks_env_vars | 
+array of strings | 
+Names of environment variables passed from your environment into managed hooks only. Names must match [A-Za-z_][A-Za-z0-9_]*, must not repeat (case-insensitively), and must not be a provider credential name such as ANTHROPIC_API_KEY. | 
+~/.config/muse/settings.json
+{
+  "schema_version": 1,
+  "managed_hooks_path": "managed-hooks.json",
+  "managed_hooks_env_vars": ["CI_TOKEN"]
+}
+~/.config/muse/managed-hooks.json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env | cut -d= -f1 | sort | tr '\\n' ' ' > /tmp/managed-env.txt",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+With CI_TOKEN=secret OTHER_VAR=1 in the environment that started
+Muse Code, the managed hook above wrote this list of variable names (an identical
+hook declared in the user hooks member wrote the same list without
+CI_TOKEN):
+_ CI_TOKEN HOME LANG LOGNAME OLDPWD PATH PWD SHELL SHLVL TERM TMPDIR USER
+OTHER_VAR did not reach either hook. _, OLDPWD, PWD and SHLVL are
+set by the shell itself. A managed_hooks_env_vars entry that names a
+provider credential is refused when the settings file is read:
+invalid managed_hooks_env_vars[0]: provider credential names are not allowed
+managed_hooks_env_vars may appear only in the settings file. A hook file
+of any source that declares it is rejected whole.
+Note
+A managed file can also be written in a stricter form in which every handler
+carries a name and a timeout_ms (a whole number of seconds, in
+milliseconds). The presence of either key switches validation of the whole
+file to that stricter schema, which admits fewer events. Do not add those
+keys to an ordinary managed file.
+## EventsSection titled “Events”
+A handler binds to exactly one event. Muse Code 1.3.0 accepts these
+seventeen names, spelled exactly like this, as keys of the hooks object:
+SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest,
+PostToolUse, PostToolUseFailure, PostToolBatch, PreLLMCall,
+PostLLMCall, PreCompact, PostCompact, SubagentStart, SubagentStop,
+Stop, StopFailure, SessionEnd, Notification.
+The user manual lists fifteen of these. PostToolBatch and StopFailure
+are Claude Code-compatible additions that Muse Code 1.3.0 also accepts in
+every hook source.
+An unknown key skips that event with a startup warning and leaves the rest
+of the file alone. SessionEnd, StopFailure and Notification are
+observation only: a handler on them runs, but its exit code and output cannot
+block anything, add context or stop the session.
+The event catalog is shared with plugin hooks.
+Hook events and payloads is the
+reference for what each event means, which ones can block, add context or
+stop the turn, the keys each one puts on stdin, and the size caps. This
+page does not repeat the per-event tables. As an orientation, these are the first
+two payloads one session delivered to a hook declared for SessionStart and
+UserPromptSubmit whose command was cat >> events.jsonl (model is
+unknown because the echo provider has none):
+{"hook_event_name": "SessionStart", "source": "startup", "session_id": "01a0ae0d-1cdf-7221-b5e5-96159c9a1ec0", "cwd": "/private/tmp/hooks-scratch/project", "transcript_path": null, "model": "unknown", "permission_mode": "default"}
+{"hook_event_name": "UserPromptSubmit", "prompt": "hello hooks", "session_id": "01a0ae0d-1cdf-7221-b5e5-96159c9a1ec0", "turn_id": "96fcdb40-11de-46e5-bce7-84d8c45c7a68", "cwd": "/private/tmp/hooks-scratch/project", "transcript_path": null, "model": "unknown", "permission_mode": "default"}
+## How a hook runsSection titled “How a hook runs”
+Through your shell. The command string is passed to the shell named by
+SHELL as $SHELL -c '<command>', or to /bin/sh when SHELL is unset
+(on Windows, %COMSPEC% /C, defaulting to cmd.exe). The shell is resolved
+once at session start. A hook that ran with SHELL=/bin/zsh reported
+/bin/zsh as its interpreter; the same hook with SHELL=/bin/sh reported
+/bin/sh. Write portable sh syntax unless every machine that loads the
+file uses the same shell.
+In a cleared environment. The process inherits none of your environment.
+It receives HOME, PATH, USER, LOGNAME, TMPDIR, TEMP, TMP,
+SHELL, LANG, LC_ALL and TERM when they are set (plus COMSPEC,
+PATHEXT, SystemRoot and WINDIR on Windows), and
+PROVENANCE_PROVIDER_SCOPE when the process that launched Muse Code set
+it; a managed hook
+additionally receives the names listed in managed_hooks_env_vars. Provider
+API keys, proxy settings, toolchain variables and everything else are
+withheld. Muse Code sets MUSE_SESSION_ID to the top-level chat and
+MUSE_THREAD_ID to the chat or subagent the hook fires for (both equal in a
+top-level chat); any other value for those two names is replaced. The user
+hook in the managed example above, which ran before these two variables
+existed, saw exactly:
+_ HOME LANG LOGNAME OLDPWD PATH PWD SHELL SHLVL TERM TMPDIR USER
+In the payload’s working directory. The process starts in the absolute
+cwd written into its stdin: the session’s workspace for lifecycle events,
+the tool’s effective directory for tool events. Relative paths in a
+command, like .muse/prompts.log above, resolve from there.
+With one JSON object on stdin. Muse Code writes the payload and closes
+the stream. Read all of it before you exit. A payload over 256 KiB is not
+delivered and the hook is skipped for that occurrence.
+Under a timeout. When timeout seconds elapse the process tree is
+killed and the hook is recorded as timed_out. The session continues
+without its answer. stdout and stderr are each capped at 16 KiB; exceeding
+either cap kills the process and records the hook as failed.
+Together, in configured order. Every handler that matches an occurrence
+starts at the same time. Their answers are then applied in configured order:
+managed file, then settings, then project file, and within a file in the
+order written. The order only matters when answers conflict; for example,
+when two PreToolUse hooks both rewrite the tool input, the last one wins
+and the earlier rewrite is reported as ignored. An onFailure handler runs
+after the handler it belongs to has failed. A handler with async: true
+runs alongside everything else and never joins the decision.
+## How a hook answersSection titled “How a hook answers”
+Muse Code reads the exit code first, then stdout.
+Exit code | 
+Result | 
+0 | 
+Success. If stdout, after leading whitespace, starts with { or [ it is parsed as the JSON answer below. Other text on stdout is added to the model’s context on SessionStart, SubagentStart and UserPromptSubmit, and ignored elsewhere. | 
+2 with text on stderr | 
+Block, on events that can block: the prompt is rejected, the tool call is refused, the model keeps working instead of stopping. The stderr text is the reason. On PostToolUse and PostToolUseFailure the text is feedback to the model. | 
+Anything else | 
+Failure. The hook is recorded as failed and the session continues as if it had not run. | 
+The JSON answer is a closed, camelCase schema. These are the forms you will
+use most; Hook events and payloads
+lists every field, its type and which events accept it.
+To | 
+Write | 
+Block the action with a reason | 
+{"decision": "block", "reason": "..."} | 
+Refuse a tool call before approval (PreToolUse) | 
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}} | 
+Add context for the model | 
+{"hookSpecificOutput": {"hookEventName": "<Event>", "additionalContext": "..."}} | 
+Stop the turn | 
+{"continue": false, "stopReason": "..."} | 
+Show the user a line | 
+{"systemMessage": "..."} (at most 1000 characters; shown in the terminal UI) | 
+hookEventName must equal the event that ran. A key that is not in the
+schema, a snake_case spelling such as additional_context, or a key used on
+an event that does not accept it rejects the whole answer: the hook is
+recorded as failed, nothing from its output is applied, and the session
+continues. Muse Code does not guess what you meant, so test a new hook once
+before relying on it.
+Stop and SubagentStop hooks that block keep the model working. To
+prevent a loop, Muse Code allows at most max_consecutive_stop_hook_continuations
+consecutive continuations per turn (a settings member; default 8) and then
+completes the turn with a warning. stop_hook_active on the Stop payload
+tells your hook that an earlier Stop hook already intervened this turn.
+### A verified runSection titled “A verified run”
+With the user settings example above in place, a prompt containing the word
+secret is rejected before any model call:
+Terminal window
+muse exec --provider echo "please print the secret"
+muse: workspace root: /private/tmp/hooks-scratch-block/project (cwd default)
+run ended with Cancelled
+With --json, the run’s terminal record carries the hook’s stderr text as
+the reason:
+{"kind": "run_terminal", "terminal": "cancelled", "text": "", "reason": "prompt mentions a secret"}
+A prompt without the word goes through unchanged:
+Terminal window
+muse exec --provider echo "hello"
+muse: workspace root: /private/tmp/hooks-scratch-block/project (cwd default)
+echo: hello
+## Validation at startupSection titled “Validation at startup”
+Muse Code reads and validates every hook source when a session starts and
+reports problems on the startup lines: muse: lines on stderr for
+muse exec, and the session-start notices in the terminal UI. There is no
+separate validation command: muse --help lists no hooks command family,
+and muse config validate checks enterprise configuration documents, not
+your hooks. Fix the file and start a new session. The warning lines quoted
+in this section are shown without the leading internal rule code that the
+binary prints between the problem class and the message.
+What happens depends on the kind of problem:
+Problem | 
+Effect | 
+Example warning | 
+The file is not valid JSON, or a typed field has the wrong type | 
+The whole source contributes nothing. | 
+hooks.json: MalformedConfig: hook handler field `timeout` must be a non-negative integer, found a string | 
+An event name is unknown | 
+That event is skipped. | 
+hooks.json: UnsupportedEvent: unsupported hook event `OnSave`  | 
+A matcher is invalid | 
+That group is skipped. | 
+hooks.json: InvalidMatcher: `stop` is unmatchable; drop this group's matcher | 
+A handler has an unknown field, no type, an unsupported type, or an empty command | 
+That handler is skipped. | 
+hooks.json: UnsupportedHandler: unknown handler field `foo` may narrow execution, so this handler is skipped | 
+The settings file itself is malformed | 
+Settings fail to load and Muse Code does not start. | 
+malformed settings file at <path>: missing field `schema_version`  | 
+The managed file does not exist | 
+No managed hooks, no warning. | 
+(none) | 
+A project file with a string timeout produced this at startup:
+muse: Hooks: 0 runnable · 1 warning
+muse:   hooks.json: MalformedConfig: hook handler field `timeout` must be a non-negative integer, found a string
+A project file with one good PreToolUse group, one handler with an extra
+foo key, an OnSave event and a matcher on Stop produced this:
+muse: Hooks: 1 runnable · 3 warnings
+muse:   hooks.json: UnsupportedHandler: unknown handler field `foo` may narrow execution, so this handler is skipped
+muse:   hooks.json: UnsupportedEvent: unsupported hook event `OnSave`
+muse:   hooks.json: InvalidMatcher: `stop` is unmatchable; drop this group's matcher
+The first line counts runnable handlers across all sources. At most three
+detail lines are shown; further distinct problems are counted as hidden.
+The file name identifies the source: settings.json, hooks.json, or the
+managed file’s name.
+## SecuritySection titled “Security”
+Hooks run outside the sandbox and the approval flow that govern the agent’s
+own tools. A hook runs with your user’s privileges, through your shell, and
+can do anything you can do at a prompt. The only hardening is the cleared
+environment described above.
+Caution
+Only load hook files whose commands you have read. A project’s
+.muse/hooks.json runs as soon as you trust that folder, and a managed
+file runs with no trust step at all. Treat a hook line in a pull request the
+way you would treat a change to a build script.
+Keep these rules in mind:
+Do not put credentials in a command. The file is plain text and, for a
+project file, part of the repository.
+Use managed_hooks_env_vars to hand a managed hook a token from your
+environment. Provider credential names are refused, and the grant never
+applies to user or project hooks.
+A hook that writes files should write under the project or under TMPDIR
+and create directories it needs.
+async: true hooks cannot block, so use them for logging and metrics, not
+for guards.
+## Settings-level hooks compared with plugin hooksSection titled “Settings-level hooks compared with plugin hooks”
+ | 
+Settings-level hook | 
+Plugin hook | 
+Declared in | 
+settings.json, .muse/hooks.json, or the managed file | 
+The plugin manifest, capabilities.hooks | 
+Command form | 
+A shell string, run through $SHELL -c | 
+An argv array, run directly with no shell | 
+Selection | 
+Event, plus an optional matcher group | 
+Event only; the script inspects the payload | 
+Timeout | 
+timeout in seconds, default 600 | 
+timeoutMs in milliseconds, default 600000 | 
+Activation | 
+Present in the file, and the project folder trusted for project hooks | 
+Installed, enabled, and approved with muse plugins approve | 
+Trust | 
+By source: your settings and the managed file are trusted as written | 
+Per hook, by reviewing its definition; any change returns it to review | 
+Environment | 
+Cleared, plus the allowlist, plus managed_hooks_env_vars for managed hooks | 
+Cleared, plus the same allowlist, plus MUSE_PLUGIN_* variables | 
+Testing without a session | 
+Not available | 
+muse plugins hook test with a fixture | 
+Events, stdin payload, answer schema, size caps | 
+Identical | 
+Identical | 
+Choose a settings-level hook for something specific to you or to one
+project. Choose a plugin when the hook should be installed, versioned and
+reviewed as a unit with other capabilities, or shared with people who should
+not have to edit their settings. Hooks in plugins
+walks through the plugin side.
+## TroubleshootingSection titled “Troubleshooting”
+Symptom | 
+Likely cause | 
+What to do | 
+No hook runs and there is no warning | 
+The project folder is not trusted; or you edited the file during a session. | 
+Accept the trust prompt or pass --trust-workspace; start a new session. | 
+Hooks: 0 runnable · 1 warning with MalformedConfig | 
+Invalid JSON, or a typed field with the wrong type ("timeout": "10", "async": "yes"). | 
+Fix the field; the whole file is skipped until you do. | 
+UnsupportedHandler: unknown handler field | 
+A key outside the handler field table, often a typo such as timeOut or a field from another tool’s hook format. | 
+Remove or rename the key. | 
+UnsupportedHandler: hook handler must declare a `type`  | 
+The handler has no "type": "command". | 
+Add it. | 
+InvalidMatcher: ... is unmatchable | 
+A matcher on UserPromptSubmit or Stop. | 
+Remove the matcher; those events have nothing to match against. | 
+A tool hook never fires | 
+The matcher names a tool that does not exist, has stray whitespace, or is a regex that matches nothing. | 
+Use the tool name or one of the alias names in the matcher table (not Glob, which matches no built-in tool), without spaces; test with * first. | 
+A JSON answer is ignored | 
+A misspelled or snake_case key, a wrong hookEventName, or a field the event does not accept. The hook was recorded as failed. | 
+Compare against the output schema. | 
+Exit 2 did not block | 
+The event cannot block (for example SessionStart, SessionEnd, Notification), or stderr was empty. | 
+Check the event’s row in the reference; write the reason to stderr. | 
+muse does not start and prints malformed settings file | 
+The settings file is invalid, for example missing schema_version. | 
+Fix the settings file. | 
+A command that works in your terminal fails in the hook | 
+The hook’s environment is cleared, so shell functions, aliases, proxy variables and tool-specific variables are gone. | 
+Use absolute paths or PATH entries; pass what you need through managed_hooks_env_vars for managed hooks, or read it from a file. | 
+The hook is killed after ten minutes | 
+The default timeout is 600 seconds. | 
+Set a shorter timeout so a stuck hook does not hold the turn, or make it async. | 
+## Next stepsSection titled “Next steps”
+Hook events and payloads: every
+event, stdin key, output field and cap.
+Hooks in plugins: the same hooks packaged
+and reviewed as part of a plugin.
+A guard hook that blocks risky tool calls:
+a complete PreToolUse guard you can adapt into a settings-level hook.
+Extending Muse Code: the other ways to extend a session.
+The user manual covers installing
+Muse Code and day-to-day use in the terminal.

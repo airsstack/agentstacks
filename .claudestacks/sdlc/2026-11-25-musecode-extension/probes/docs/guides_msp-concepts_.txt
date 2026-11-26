@@ -1,0 +1,72 @@
+MSP concepts | Muse Code Developer DocsSkip to content
+## 
+# MSP concepts
+The Muse Session Protocol (MSP) is how a client program — an editor, a desktop
+app, a script — drives a Muse Code agent session over a wire. The client spawns a
+host process (muse serve), speaks JSON-RPC 2.0 over stdio, and works with
+three kinds of traffic: commands it sends (start a session, start a turn,
+decide an approval), events the server streams back (the session view), and a
+small set of server-initiated requests (approvals and user-input prompts).
+This guide explains the concepts. It is written for a client implementer who
+is building from the wire alone.
+## How these pages relate to the referenceSection titled “How these pages relate to the reference”
+These pages explain the model. Every method, notification, error and type they
+name has its own page in the generated
+Wire protocol reference, rendered from the schema bundle
+the server binary ships: that is where the exact parameters, fields, stability
+markers and raw schema live. Read a concept here, then open the reference page
+for the surface you are about to implement.
+## One mental modelSection titled “One mental model”
+Three ideas carry most of the protocol:
+The log is the session. Everything a client can know folds from the
+session’s durable event log; the wire streams that fold as cursor-bearing
+view events. Client state must always equal a function of the events since
+its cursor.
+An ack is not an outcome. A command’s response tells you only what the
+runtime decided at admission; everything that actually happened arrives as
+view events, and a response payload is never the only place a fact lives.
+Requests carry no authority. A server-initiated approval request is a
+presentation; the decision travels as an ordinary idempotent command,
+approval/decide.
+## The pagesSection titled “The pages”
+Sessions and turns — the process model, the
+connection lifecycle, the Session
+object, and what a turn is.
+Commands and idempotency — the command
+model, commandId dedupe including across host restarts, and how turn ids
+are minted.
+Approvals — the record-flow model, subjects, the
+request/decide/resolved cycle, modes and ceilings, expiry posture, and crash
+recovery.
+Resume — cursors, anchors, and boundaries; suffix versus
+inline versus snapshot history; and the gap-contract errors.
+Exit classification — the host’s exit-code
+contract and the stderr rule.
+Durability profiles — sessionDurability at
+the handshake and the ephemeral profile.
+The item-revision fold model — how streamed item events
+fold into client state.
+Plugins in SDK sessions — what plugins
+installed on the host expose to a client: plugin skills in skill/list,
+the skill input part, and plugin MCP tools as ordinary tool calls.
+## Boundaries of this guideSection titled “Boundaries of this guide”
+Versioning. The protocol is pre-1.0 and may change non-additively until
+v1 is declared; no protocol changelog is published yet, so the schema
+fingerprint is the change detector. Pin the fingerprint your client was
+built against and compare it against the one the server reports in the
+initialize result.
+Host operations. Spawning, restarting and supervising hosts in
+production is out of scope; this guide keeps only the conceptual
+exit-classification model.
+## Reading the wire examplesSection titled “Reading the wire examples”
+A few pages embed short excerpts from the conformance transcript corpus.
+Each excerpt is copied verbatim from a scenario’s
+recorded NDJSON; the frames are real recorded traffic, with direction marked
+per line. The conformance page explains the
+transcript format and how to replay a scenario against your own client.
+## Where the protocol livesSection titled “Where the protocol lives”
+The stdio wire is the only public protocol surface. The first-party terminal
+UI runs the session server inside its own process over an in-process
+transport, which produces the same item stream but exchanges no frames. If you
+are implementing a client, the wire — these pages, the schema bundle, and the
+transcripts — is your contract surface.

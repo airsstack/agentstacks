@@ -15,8 +15,9 @@
 # file follows. The `lua` step is the project's own addition: it compiles and tests
 # the Lua under extensions/, packs/ and the conformance pack asset with `airsl check` and
 # `airsl test`, runs the sdlc pack's fingerprint shell script against fixed cases, greps
-# the pack sources for leftover plugin syntax and unprefixed names, then fails on `api = 0`
-# text in any file outside a fixed allowlist. CI is meant to run
+# the pack sources for leftover plugin syntax and unprefixed names, fails on `api = 0`
+# text in any file outside a fixed allowlist, then fails when the airsl pins of the
+# ci.yml jobs differ. CI is meant to run
 # `cargo make dod`, so the pipeline and a local run are the same command.
 #
 # Install: cargo install --locked cargo-make cargo-deny
@@ -100,7 +101,7 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua: airsl check and airsl test over extensions/, packs/ and the conformance pack asset, the fingerprint gate, the pack text gates, then the api-0 gate"
+description = "Lua: airsl check and airsl test over extensions/, packs/ and the conformance pack asset (airsl check also over the opencode-check and musecode-check packs), the fingerprint gate, the pack text gates, the api-0 gate, then the airsl pin gate"
 # A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
 # needs shell expansion. `set -e` stops the run at the first failing step. The text
 # gates at the end fail on any line their grep prints: the `if` form is needed
@@ -111,6 +112,8 @@ set -e
 airsl check extensions
 airsl check packs
 airsl check crates/agentstacks/assets/conformance
+airsl check crates/agentstacks-cli/tests/opencode-check/pack
+airsl check crates/agentstacks-cli/tests/musecode-check/pack
 airsl test extensions
 airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git packs
 airsl test crates/agentstacks/assets/conformance
@@ -276,6 +279,25 @@ if [ -n "$left" ]; then
   exit 1
 fi
 echo "api-0 gate: passed"
+
+# The airsl pin gate. Each ci.yml job that installs the airsl binary holds its own copy of
+# the pinned version and hash, so the copies must name one AIRSL_VERSION and one
+# AIRSL_SHA256. It reads grep's status before filtering, as the gates above do.
+rc=0
+pins=$(grep -E '^ *AIRSL_(VERSION|SHA256): ' .github/workflows/ci.yml) || rc=$?
+if [ "$rc" -gt 1 ]; then
+  echo "airsl pin gate: grep failed over .github/workflows/ci.yml (exit $rc)" >&2
+  exit 1
+fi
+distinct=$(printf '%s\n' "$pins" | sed -E 's/^ +//; s/ +$//' | grep -v '^$' | sort -u)
+versions=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_VERSION: ' || true)
+hashes=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_SHA256: ' || true)
+if [ "$versions" != 1 ] || [ "$hashes" != 1 ]; then
+  printf '%s\n' "$distinct"
+  echo "airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins in .github/workflows/ci.yml differ or are missing; give every job the same version and hash" >&2
+  exit 1
+fi
+echo "airsl pin gate: passed ($(printf '%s\n' "$pins" | grep -c '^ *AIRSL_VERSION: ') jobs)"
 '''
 
 # ---------------------------------------------------------------------------
@@ -578,6 +600,97 @@ fi
 
 cargo build -p agentstacks-cli
 node crates/agentstacks-cli/tests/opencode-check/check.mjs "$dir/bin/opencode" target/debug/agentstacks
+'''
+
+# ---------------------------------------------------------------------------
+# Muse Code
+# ---------------------------------------------------------------------------
+
+[tasks.musecode-check]
+category = "Muse Code"
+description = "Run the musecode extension inside the pinned real Muse Code (downloads it into target/)"
+# Not a dependency of `dod`, like `opencode-check`: it needs Node and a download,
+# and CI runs it as its own job. The mock model and the scenarios are under
+# crates/agentstacks-cli/tests/musecode-check/.
+#
+# The Muse Code build is pinned by version and by the SHA256 of each platform's
+# raw binary, which is verified on every run. Bumping Muse Code changes the
+# version (VERSION, the download URL and the directory under target/) and both
+# hashes together, plus the cache path and key of the `musecode-check` job in
+# .github/workflows/ci.yml.
+script_runner = "@shell"
+script = '''
+set -e
+VERSION=1.4.25-R9361.1
+os=$(uname -s)
+arch=$(uname -m)
+case "$os $arch" in
+  "Linux x86_64")
+    file=muse-x86-linux
+    sha=c1b728fb9732503c5e1869e3ad2f2c9bdb5b2638fb4cf398d6e2c46aa6d8f94a
+    ;;
+  "Darwin arm64")
+    file=muse-aarch64-macos
+    sha=d8faeec8b3a2507125d97f1a79ae18781d254e8cd376f26531587fb6e043c27d
+    ;;
+  *)
+    echo "musecode-check: no pinned Muse Code build for $os $arch" >&2
+    exit 1
+    ;;
+esac
+
+dir="target/musecode-check/$VERSION"
+muse="$dir/muse"
+mkdir -p "$dir"
+
+# verify <path>: the binary is checked on every run, so a partial download or a
+# kept file that changed is refused too. A mismatch removes the file, prints
+# the refusal and returns 1.
+verify() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    got=$(sha256sum "$1" | cut -d ' ' -f 1)
+  else
+    got=$(shasum -a 256 "$1" | cut -d ' ' -f 1)
+  fi
+  if [ "$got" != "$sha" ]; then
+    rm -f "$1"
+    echo "musecode-check: $file: checksum mismatch" >&2
+    return 1
+  fi
+}
+
+# The verify self-test, offline and before the real run: a truncated copy of
+# the binary (a stub when none is kept yet) must be refused with the mismatch
+# message and exit 1, and must be removed.
+probe=$(mktemp "${TMPDIR:-/tmp}/musecode-check.XXXXXX")
+trap 'rm -f "$probe"' EXIT
+if [ -f "$muse" ]; then
+  head -c 4096 "$muse" > "$probe"
+else
+  printf 'partial' > "$probe"
+fi
+# Tracing is switched off silently inside the capture: when the runner traces the
+# script (as CI's does), the trace lines would land in $msg.
+msg=$({ set +x; } 2>/dev/null; verify "$probe" 2>&1) && code=0 || code=$?
+if [ "$code" != 1 ] || [ "$msg" != "musecode-check: $file: checksum mismatch" ] || [ -e "$probe" ]; then
+  echo "musecode-check: verify self-test failed: want exit 1, the mismatch message and the file removed; got exit $code, '$msg'" >&2
+  exit 1
+fi
+echo "musecode-check: verify self-test passed"
+
+if [ ! -f "$muse" ]; then
+  if ! curl -fsSL -o "$muse" \
+    "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=$VERSION&file=$file"; then
+    rm -f "$muse"
+    echo "musecode-check: $file: download failed" >&2
+    exit 1
+  fi
+fi
+verify "$muse" || exit 1
+chmod +x "$muse"
+
+cargo build -p agentstacks-cli
+node crates/agentstacks-cli/tests/musecode-check/check.mjs "$muse" target/debug/agentstacks
 '''
 
 # ---------------------------------------------------------------------------

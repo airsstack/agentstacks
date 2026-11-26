@@ -12,10 +12,12 @@ In the project directory:
 agentstacks init --tool claude --pack core --pack sdlc --pack guideline-rust
 ```
 
-`--tool opencode` sets up OpenCode the same way, and both flags may be given. To use an extension
-from a checkout of this repository instead of a release, copy it into your project, for example
-`extensions/opencode` to `ext/opencode`, and pass `--tool ext/opencode` (a tool path must stay
-inside the project).
+`--tool opencode` sets up OpenCode the same way, `--tool musecode` sets up Muse Code, and the flags
+may be given together. To use an extension from a checkout of this repository instead of a release,
+copy it into your project, for example `extensions/opencode` to `ext/opencode`, and pass
+`--tool ext/opencode` (a tool path must stay inside the project). The Muse Code extension is built
+and ships with the next `packs-v*` release (`packs-v1.0.0` does not include it); until then copy
+`extensions/musecode` to `ext/musecode` the same way and pass `--tool ext/musecode`.
 
 `init` writes `agentstacks.toml`, prints the plan, one line per file, and asks before applying. The
 plan ends:

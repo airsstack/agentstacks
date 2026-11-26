@@ -1,0 +1,4 @@
+full/agent/odd: native.musecode key "bad key" cannot be written as frontmatter
+full/hook/1: musecode shows no hook output to the model at session end
+full/hook/5: musecode gives hooks no agent name at agent stop, so it cannot run this hook for only the listed agents
+full/skill/odd: native.musecode key "bad key" cannot be written as frontmatter

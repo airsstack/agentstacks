@@ -1,0 +1,416 @@
+Manifest | Muse Code Developer DocsSkip to content
+## 
+# Manifest
+Use this page to look up any field of a native plugin manifest: what it
+must contain, what each capability entry accepts, and which limits the
+validator enforces. For the model behind the fields read
+Packages and capabilities; for
+the diagnostics a wrong value produces read
+Validation diagnostics. Every rule below was checked
+against Muse Code 1.3.0 with muse plugins validate. The plugin surface is
+part of the Developer Preview and may change.
+## A complete native manifestSection titled “A complete native manifest”
+This is the manifest of the weather example. It
+declares one skill, one command and one hook and validates without
+diagnostics.
+.muse-plugin/plugin.json
+{
+  "schemaVersion": 1,
+  "name": "weather",
+  "displayName": "Weather",
+  "version": "0.1.0",
+  "description": "Example plugin: a forecast skill, a forecast-brief command, and a hook that logs tool use.",
+  "compat": {
+    "source": "native",
+    "manifestDir": ".muse-plugin"
+  },
+  "capabilities": {
+    "skills": [
+      {
+        "id": "forecast",
+        "path": "skills/forecast/SKILL.md",
+        "enabledDefault": true
+      }
+    ],
+    "commands": [
+      {
+        "id": "forecast-brief",
+        "path": "commands/forecast-brief.md",
+        "enabledDefault": true
+      }
+    ],
+    "hooks": [
+      {
+        "id": "log-tool-use",
+        "event": "PostToolUse",
+        "command": ["sh", "hooks/log-tool-use.sh"],
+        "timeoutMs": 5000,
+        "statusMessage": "Logging tool use"
+      }
+    ],
+    "mcpServers": [],
+    "reminders": []
+  }
+}
+Terminal window
+muse plugins validate weather
+valid  weather  native  skills=1 commands=1 hooks=1 mcp=0 reminders=0 diagnostics=0
+## Where the manifest livesSection titled “Where the manifest lives”
+A native manifest is the file .muse-plugin/plugin.json at the root of the
+plugin directory. The manifest is UTF-8 JSON with an object at the root and
+may be at most 256 KiB (262,144 bytes). Muse Code also recognises three
+other marker files for plugins written for other tools; see
+Other manifest formats at the end of this page.
+## Top-level fieldsSection titled “Top-level fields”
+Field | 
+Type | 
+Required | 
+Rules | 
+Default | 
+schemaVersion | 
+integer | 
+yes | 
+Must be exactly 1. | 
+none | 
+name | 
+string | 
+yes | 
+The plugin id. Must match the identifier grammar and must not be a reserved id. | 
+none | 
+displayName | 
+string | 
+no | 
+Human-readable name shown in listings. Read from displayName, or from interface.displayName when displayName is absent. | 
+none (display_name is null in --json output) | 
+version | 
+string | 
+yes | 
+Any non-blank string. Not parsed as semver; it is shown in listings and recorded at install. | 
+none | 
+description | 
+string | 
+yes | 
+Non-empty. | 
+none | 
+compat | 
+object | 
+yes | 
+Must contain manifestDir. | 
+none | 
+compat.manifestDir | 
+string | 
+yes | 
+Must equal the directory the manifest sits in, so .muse-plugin for a native plugin. A different value is manifest-family-mismatch. | 
+none | 
+compat.source | 
+string | 
+no | 
+Informational. Write native; the value is not checked. | 
+none | 
+capabilities | 
+object | 
+yes | 
+Present even when empty. Keys are the capability families below; each value is an array (a missing family means no entries). | 
+none | 
+when | 
+object | 
+no | 
+Activation condition, exactly {"env": {"VAR": "value"}} with at least one variable and string values. The plugin loads only when every listed variable is set and equal to its value byte for byte. Any other shape is invalid-manifest-schema and the plugin never loads. | 
+always active | 
+meta | 
+object | 
+no | 
+Reserved. Accepted and ignored without a diagnostic. | 
+none | 
+Any other top-level key except meta is a warning (unsupported-field, “is
+not used by this runtime”) and is ignored, with one exception: the keys tools,
+agents, outputStyles, settings, apps and developerPrompts at the
+top level are reported as unsupported-capability. See
+Unsupported families and unknown keys.
+## Identifier grammarSection titled “Identifier grammar”
+Plugin ids and every capability id share one grammar:
+^[a-z0-9][a-z0-9._-]{0,79}$
+Lowercase ASCII letters, digits, ., _ and - only.
+The first character is a letter or a digit.
+At most 80 characters.
+A command imported from a Claude plugin’s command Markdown files (the
+commands/ folder or command paths its manifest declares) is the one
+exception: its name, the file name or its frontmatter name, may also use
+upper-case ASCII letters.
+Ids are unique within a family. Across families, a command id may not
+repeat a skill id, and a reminder id may not repeat a skill or a command
+id, because skills, commands and reminders share the /<plugin-id>:<id>
+namespace. Hook and MCP server ids are checked only within their own
+family.
+Do not use loop, muse-core or any other id that the /plugins panel
+lists as a built-in plugin. An installed plugin with a reserved id
+validates, but the built-in plugin wins and the installed one contributes
+nothing; muse plugins list shows the warning.
+## Path rulesSection titled “Path rules”
+Every path value, and every argv element that looks like a path, follows
+the same rules:
+Rule | 
+Diagnostic when broken | 
+Relative to the plugin root, written with / separators. A \ is not a separator; such a path is looked up literally and fails as a missing file. | 
+missing-capability-path | 
+Not absolute; no .., no root or drive prefix; the resolved file stays inside the plugin root, including through symlinks. | 
+unsafe-path | 
+Points at an existing regular file (not a directory). | 
+missing-capability-path | 
+UTF-8. | 
+unsafe-path | 
+Muse Code refuses to install a package that contains any symlink entry,
+even one that stays inside the package. Replace symlinks with regular
+files.
+The validator checks that a skill or command file exists; it does not parse
+it. Run muse skills validate <skill-dir> to check SKILL.md frontmatter.
+## Capability familiesSection titled “Capability families”
+capabilities accepts five families. Each is an array of objects.
+Family key | 
+Entry shape | 
+Needs review before it runs | 
+skills | 
+{id, path, enabledDefault?} | 
+no | 
+commands | 
+{id, path, enabledDefault?} | 
+no | 
+hooks | 
+{id, event, command, ...} | 
+yes | 
+mcpServers | 
+{id, transport?, command? or url} | 
+yes | 
+reminders | 
+{id, path, decision, ...} | 
+yes | 
+Skills and commands work as soon as the plugin is installed and enabled.
+Hooks, MCP servers and reminders stay inactive until you run
+muse plugins approve; see
+Trust, review and scopes.
+### SkillsSection titled “Skills”
+Field | 
+Type | 
+Required | 
+Rules | 
+Default | 
+id | 
+string | 
+yes | 
+Identifier grammar; unique among skills. Invoked as /<id> or /<plugin-id>:<id>. | 
+none | 
+path | 
+string | 
+yes | 
+Path to a SKILL.md file. | 
+none | 
+enabledDefault | 
+boolean | 
+no | 
+Whether the skill is enabled when nobody has toggled it. | 
+true | 
+Other keys on a skill entry are ignored without a diagnostic.
+### CommandsSection titled “Commands”
+Field | 
+Type | 
+Required | 
+Rules | 
+Default | 
+id | 
+string | 
+yes | 
+Identifier grammar; unique among commands and distinct from every skill id. Invoked as /<id> unless a built-in command or another plugin owns that name, and always as /<plugin-id>:<id>. | 
+none | 
+path | 
+string | 
+yes | 
+Path to a Markdown template. | 
+none | 
+enabledDefault | 
+boolean | 
+no | 
+Whether the command is enabled when nobody has toggled it. | 
+true | 
+The template is Markdown with optional YAML frontmatter. Only two
+frontmatter keys are read: description (shown in the command list) and
+argument-hint (shown after the command name). The body is the prompt;
+$ARGUMENTS is replaced by whatever the user typed after the command.
+Other keys on a command entry are ignored without a diagnostic.
+### HooksSection titled “Hooks”
+A hook entry accepts exactly the eight fields below. Any other key is an
+error (unsupported-field), including matcher, which belongs to other
+plugin formats. Native hooks are selected by event alone.
+Field | 
+Type | 
+Required | 
+Rules | 
+Default | 
+id | 
+string | 
+yes | 
+Identifier grammar; unique among hooks. | 
+none | 
+event | 
+string | 
+yes | 
+One of the event names in Hook events and payloads, spelled exactly (PreToolUse, PostToolUse, Stop, …). Unknown names are unsupported-hook-event. | 
+none | 
+command | 
+array of strings | 
+yes | 
+The argv Muse Code executes, without a shell. Non-empty; every element a string. | 
+none | 
+timeoutMs | 
+unsigned integer | 
+no | 
+Wall-clock limit for one run, in milliseconds. Values below 1000 are raised to one second. | 
+600000 (10 minutes) | 
+statusMessage | 
+string | 
+no | 
+Short text shown while the hook runs. | 
+none | 
+async | 
+boolean | 
+no | 
+true makes the hook observation-only: it runs in the background, its output is not applied and it cannot block. | 
+false | 
+compatibilityName | 
+string | 
+no | 
+Only on PreToolUse, PermissionRequest, PostToolUse and PostToolUseFailure. 1 to 80 ASCII letters, digits or underscores. Acts as the hook’s tool matcher name, so the hook runs for tool calls matching that name. It may not equal a built-in tool matcher name, the id of another hook in the same manifest, or the compatibilityName of another hook in the same manifest (all three are invalid-manifest-schema), and an install is refused when it collides with an alias declared by another installed plugin. | 
+none (the hook runs for every tool) | 
+outputCapabilities | 
+array | 
+no | 
+Must be exactly ["skills.v1"] and is allowed only on a foreground (async false) UserPromptSubmit or PostToolUse hook. Declares that the hook may return selectedSkills in its JSON output. | 
+[] | 
+How command is resolved:
+If any argv element looks like a relative path (it contains / or \,
+or it is the first element and starts with ., and it does not start
+with -), that file must exist inside the package. The first such
+element is the hook’s source file.
+Two hooks may not name the same source file (duplicate-hook-source).
+Native hook commands get no placeholder substitution: Muse Code rewrites
+exactly one argv element, the one that spells the relative path declared
+in the manifest, to the installed copy of that file, and leaves every
+other element untouched. Read MUSE_PLUGIN_ROOT inside your script to
+reach other files in the package.
+The MUSE_PLUGIN_DATA_DIR directory may not exist yet; create it before
+writing to it.
+### MCP serversSection titled “MCP servers”
+Field | 
+Type | 
+Required | 
+Rules | 
+Default | 
+id | 
+string | 
+yes | 
+Identifier grammar; unique among MCP servers. | 
+none | 
+transport | 
+string | 
+no | 
+stdio or http. Any other value is invalid-manifest-schema. | 
+stdio | 
+command | 
+array of strings | 
+required for stdio | 
+The argv that starts the server, without a shell. Non-empty. A relative-path element must exist inside the package and is rewritten to the installed copy exactly like a hook command. | 
+none | 
+url | 
+string | 
+required for http | 
+Non-blank. The server’s HTTP endpoint. | 
+none | 
+Plugin MCP server entries have no env, headers or credential fields; a
+server that needs configuration must read it from its own environment or
+from files under MUSE_PLUGIN_DATA_DIR. Native MCP commands get no
+placeholder substitution beyond the single relative-path rewrite described
+for hooks. Keys other than the four above are ignored without a diagnostic.
+Two MCP entries
+"mcpServers": [
+  { "id": "forecast-tools", "transport": "stdio", "command": ["python3", "mcp/server.py"] },
+  { "id": "remote-index", "transport": "http", "url": "https://mcp.example.com/index" }
+]
+### Reminders (advanced)Section titled “Reminders (advanced)”
+Reminders are an advanced capability used mainly by Muse Code’s built-in
+plugins. The validator accepts exactly these keys: id, path,
+decision, enabledDefault, enabledDefaultByModel, tools,
+blocking, defaultPriority, maxPriority, maxChildSteps,
+maxInstallsPerRun, reasoningEffort, intervalSteps and context. Any
+other key is unsupported-field. id, path and decision are required;
+path follows the path rules above and decision is a large, mandatory
+declaration. Priorities are low, normal or high;
+maxInstallsPerRun is 1 to 1024; reasoningEffort is one of none,
+minimal, low, medium, high, xhigh, max or ultra. A reminder id
+may not repeat a skill or command id. This page does not document the
+decision and context schemas.
+## Unsupported families and unknown keysSection titled “Unsupported families and unknown keys”
+Key | 
+Where | 
+What happens | 
+tools, agents, outputStyles, settings, apps, developerPrompts | 
+under capabilities | 
+Each entry must still be an object with a valid id (and a contained path if it has one). Entries are inventoried as unsupported-capability with ids like tool:lookup; they never run. The diagnostic is a warning when the manifest also declares at least one supported capability and an error when it declares nothing else. | 
+The same six keys | 
+top level | 
+unsupported-capability, as an error. | 
+Any other key | 
+under capabilities | 
+Warning unsupported-field (“is not used by this runtime”); ignored. | 
+Any other key except meta | 
+top level | 
+Warning unsupported-field; ignored. meta is accepted silently. | 
+Custom model tools are provided through MCP servers; there is no tools
+family.
+## Package limitsSection titled “Package limits”
+Limit | 
+Value | 
+Enforced by | 
+Manifest size | 
+256 KiB (262,144 bytes) | 
+muse plugins validate and install | 
+Entries in the package (files and directories, excluding VCS metadata directories) | 
+4,096 | 
+install, marketplace add | 
+Directory nesting below the package root | 
+16 levels | 
+install, marketplace add | 
+Symlink entries | 
+none allowed | 
+install | 
+SKILL.md size | 
+256 KiB; a larger file is not loaded by the skill catalog | 
+session load, muse skills validate | 
+Compatibility declarations (all capability entries and unsupported declarations together) | 
+8,192 | 
+muse plugins validate and install | 
+Keep node_modules, virtual environments and build output out of the
+plugin directory.
+## Other manifest formatsSection titled “Other manifest formats”
+Muse Code chooses one manifest per package and never falls back to another
+when the chosen one is invalid:
+Marker file | 
+Format | 
+plugin.json at the package root whose $schema is exactly https://agent-plugins.org/schemas/1.0.0/plugin.schema.json | 
+Agent Plugins 1.0.0 (authoritative when present) | 
+.muse-plugin/plugin.json | 
+native (this page) | 
+.claude-plugin/plugin.json | 
+Claude Code plugin | 
+.codex-plugin/plugin.json | 
+Codex plugin | 
+When several nested markers exist, precedence is .muse-plugin, then
+.claude-plugin, then .codex-plugin, with a multiple-manifests
+warning naming the ignored files. A manifest under .claude-plugin or
+.codex-plugin that carries schemaVersion, compat or capabilities
+is parsed as a native manifest whose compat.manifestDir must name that
+directory. What Muse Code imports from each foreign format is described in
+Compatibility with other plugin formats.
+## Next stepsSection titled “Next steps”
+Validation diagnostics: every code the validator emits and what to change.
+Hook events and payloads: the event names accepted in event and what a hook receives.
+The muse plugins command: install, approve and inspect the plugin you just described.
+Quickstart: your first plugin: build the weather plugin from scratch.

@@ -1,0 +1,60 @@
+[pack]
+name = "full"
+version = "0.1.0"
+api = 1
+description = "A pack with every kind of file item"
+
+[requires]
+airsl = ">=0.1.4"
+
+# 0: a message on session start, with a quote and a newline in the text
+[[hooks]]
+kind = "message"
+event = "session.start"
+match = ["startup", "resume"]
+text = "It's a \"test\"\nline two"
+
+# 1: a message on session end, which Muse Code shows to nobody
+[[hooks]]
+kind = "message"
+event = "session.end"
+text = "Bye"
+
+# 2: a lua hook that may block, with grants and a rendered argument
+[[hooks]]
+kind = "lua"
+event = "tool.before"
+match = ["read", "edit"]
+run = "hooks/enforce.lua"
+args = ["--out", "{{var tmpdir}}/out"]
+may_block = true
+[hooks.grants]
+policy = "confined"
+read = ["{{root}}"]
+write = ["{{var tmpdir}}"]
+env = ["HOME"]
+
+# 3: a lua hook on prompt submit
+[[hooks]]
+kind = "lua"
+event = "prompt.submit"
+run = "hooks/enforce.lua"
+
+# 4: a lua hook on tool.after with no match
+[[hooks]]
+kind = "lua"
+event = "tool.after"
+run = "hooks/enforce.lua"
+
+# 5: a lua hook on agent stop that lists an agent, which Muse Code cannot filter on
+[[hooks]]
+kind = "lua"
+event = "agent.stop"
+agents = ["coder"]
+run = "hooks/enforce.lua"
+
+# 6: a lua hook on agent stop for every agent
+[[hooks]]
+kind = "lua"
+event = "agent.stop"
+run = "hooks/enforce.lua"

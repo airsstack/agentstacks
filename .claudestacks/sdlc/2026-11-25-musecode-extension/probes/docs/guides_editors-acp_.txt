@@ -1,0 +1,319 @@
+Editors over ACP | Muse Code Developer DocsSkip to content
+## 
+# Editors over ACP
+After this page you can use Muse Code as the coding agent inside your editor.
+You add the experimental muse acp command to Zed or a JetBrains IDE, and log
+in. The page also lists what works today, the known limits, and how to fix
+common problems.
+## What muse acp isSection titled “What muse acp is”
+The Agent Client Protocol (ACP) lets an
+editor use an external coding agent. Zed and the JetBrains IDEs speak it, and
+so do other editors. muse acp makes Muse Code such an agent.
+Your editor starts muse acp as a child process. The two exchange ACP
+version 1 messages over the process’s stdin and stdout. Inside that process,
+muse acp runs the same Muse Code host as
+muse serve, and it translates between ACP and the
+host. The host reads your Muse Code settings, as muse serve does.
+Each thread you open in the editor is a Muse Code session in your project
+folder. In that session the agent reads and edits files and runs commands,
+under the approval mode you pick in the editor.
+Caution
+muse acp is experimental. It has no compatibility promise: its behavior
+can change, or the command can go away, in any release.
+## Check your buildSection titled “Check your build”
+muse acp is on by default. You do not need an environment variable, and
+muse --help lists acp in its commands. To check your build, run this in a
+terminal. It prints the options of muse acp:
+Terminal window
+muse acp --help
+### Turn it offSection titled “Turn it off”
+The acp gate controls muse acp, and the gate is open by default. Each of
+these closes the gate:
+MUSE_EXPERIMENTAL_ACP with a value that is not an on value, an empty value
+included. The on values are on, true and 1, in any letter case.
+Remote configuration that turns the gate off. MUSE_EXPERIMENTAL_ACP=on
+opens the gate again over remote configuration.
+MUSE_EXPERIMENTAL_SDK_ENABLED=off. It also turns off muse serve and
+muse schema.
+The enterprise configuration of your organization, when it turns
+muse acp off.
+While the gate is closed, every muse acp command, --help included, prints
+muse acp is not available in this build to stderr and exits with code 5.
+muse --help lists acp only while the gate is open.
+## Set up your editorSection titled “Set up your editor”
+Every editor needs the same two values:
+Field | 
+Value | 
+Command | 
+muse, or the full path that command -v muse prints | 
+Arguments | 
+acp, then any options | 
+An editor that you start from your desktop may not get the PATH of your
+shell. If the editor cannot start muse, give the full path as the command.
+Zed
+Cursor
+JetBrains IDEs
+Other editors
+Run agent: open settings from the command palette. Go to the
+External Agents page, click Add Agent and choose
+Add Custom Agent. Zed opens its settings file with an agent_servers
+entry. On macOS and Linux the file is ~/.config/zed/settings.json.
+Make the entry look like this:
+{
+  "agent_servers": {
+    "Muse Code": {
+      "type": "custom",
+      "command": "muse",
+      "args": ["acp"]
+    }
+  }
+}
+Save the file. Zed reads the change without a restart. In the Agent Panel,
+pick Muse Code from the new-thread menu.
+Zed’s external agents page is the
+reference for these menus.
+Cursor does not document a way to add an external ACP agent to its editor, so
+this guide has no Cursor setup. Cursor’s
+ACP page covers the other direction: the
+Cursor CLI agent (agent acp) running inside other editors. To use Muse Code
+as an ACP agent, use Zed, a JetBrains IDE or another editor that runs external
+ACP agents.
+Open the AI Chat tool window. Click More in its upper-right corner
+and select Add Custom Agent. The IDE creates ~/.jetbrains/acp.json
+and opens it.
+Add Muse Code under agent_servers. JetBrains recommends a full path as
+the command:
+{
+  "default_mcp_settings": {},
+  "agent_servers": {
+    "Muse Code": {
+      "command": "/full/path/to/muse",
+      "args": ["acp"]
+    }
+  }
+}
+Save the file. In AI Chat, select Muse Code in the agent list, type a
+prompt and send it. If the agent is not in the list, make sure that the
+JSON is valid, and restart the IDE.
+JetBrains IDEs do not run ACP agents under WSL. The JetBrains
+ACP page is the
+reference for these menus.
+Any editor that speaks ACP version 1 can run Muse Code with the same command
+and arguments. Your editor’s documentation tells you where to add an agent.
+### OptionsSection titled “Options”
+Options go in the arguments list, after acp. They set up the Muse Code host
+inside muse acp, so they apply to every session that the editor opens
+through that process. Run muse acp --help for the full list. These are the
+ones you are most likely to want:
+Option | 
+What it does | 
+--model <MODEL> | 
+Sets the start-up model, for this process only. | 
+--trust-workspace | 
+Loads each project’s own skills and rules. Without it, muse acp does not load them. | 
+--no-session-log | 
+Keeps sessions in memory only. Nothing is saved, and the editor cannot list, load or resume sessions. | 
+--disable-request-user-input | 
+Stops the agent from asking you questions in the main conversation. | 
+-c <KEY=VALUE> | 
+Sets one setting for this process. | 
+For example, these arguments load the project’s skills and rules:
+"args": ["acp", "--trust-workspace"]
+The sandbox options work as they do for muse serve. The
+security model section of Host
+operations describes them.
+muse acp refuses these arguments. It writes a muse acp: error line to
+stderr and exits with code 2:
+--listen, --join and the other socket-daemon options, because ACP runs
+over stdio only.
+Any extra word, login included.
+Approval flags such as --yolo and --approval-mode. Pick the approval
+mode in the editor instead.
+-c keys under permissions, and unknown -c keys.
+## Log inSection titled “Log in”
+muse acp supports one way to log in: your Muse Code account. API keys of
+other providers are not supported.
+It uses the same login as the muse command line. If you logged in with
+muse login or in the Muse Code terminal UI, the editor uses that login, and
+you have nothing more to do. Muse Code saves a login that you make from
+the editor in the same place, so the command line uses it too.
+### Log in from a terminalSection titled “Log in from a terminal”
+This way works with every editor:
+Terminal window
+muse login
+The command prints a page to open and a code. Press Enter to open the page in
+your browser, or open it yourself. Enter the code if the page asks for it, or
+check that the code on the page matches. Then approve. When the login
+finishes, open a new thread in the editor.
+### Log in from the editorSection titled “Log in from the editor”
+When you are not logged in, the editor cannot open a thread. It gets the error
+log in to Muse before opening a session, and it offers the one login method
+of the agent:
+Name: Log in to Muse
+Description: Sign in with a device code shown in your browser.
+Choose it. What happens next depends on your editor:
+Your editor can show a link from the agent (ACP calls this URL
+elicitation). The editor shows the login link with this message:
+Open the link to log in to Muse, and enter the code <code> there. Open the
+link, enter the code and approve. When the login finishes, the thread can
+open.
+Your editor cannot show a link from the agent. The login fails at once,
+and the error message holds the link and the code:
+This editor cannot show the Muse login link: open <link> and enter the code <code> there.
+The login keeps running in the background. Open the link, enter the code
+and approve, then open a new thread.
+To log out, run muse logout in a terminal. The editor cannot log you out.
+## What worksSection titled “What works”
+Threads. Each new thread starts a Muse Code session in the project
+folder of the editor. If the editor sends more folders, they become more
+workspace roots of the session.
+History. If your editor supports it, it can list your earlier sessions
+for the project folder. It can load one, which replays the transcript into
+the thread, or resume one. History needs saved sessions, so it is not
+available with --no-session-log.
+Modes. The mode selector sets the approval mode of the session (see the
+table below).
+Model and reasoning effort. The Model selector lists the models
+that Muse Code offers you. A Reasoning effort selector appears when the
+selected model has effort levels.
+Permissions. When an action needs your approval, the editor shows a
+permission dialog. Its choices are the ones Muse Code offers for that
+action, for example allow once or allow always.
+Questions. When the agent asks you something, the editor shows a form,
+if it can show forms.
+Prompt content. You can send text and images. A file that you attach
+becomes an @path reference, relative when the file is in the project. File
+text that the editor embeds becomes a fenced block that names the file.
+Slash commands. /compact compacts the context of the conversation.
+Each of your skills is a command too: /<skill> <arguments>.
+Live updates. Replies and reasoning stream as the model writes them.
+Tool calls show as rows, with a diff for each edit. The plan of the agent, a
+usage meter (context use, and cost when it is known) and the session title
+update as they change.
+Queue and cancel. A prompt that you send while a turn runs waits until
+that turn ends. Cancel stops the running turn and the prompts already
+waiting behind it. You can send a new prompt after the cancel.
+If you cancel /compact, its request gets a cancelled reply at once,
+but compaction continues in Muse Code. A prompt sent before compaction
+finishes can fail with an error that says that the session is busy.
+If that happens, wait for compaction to finish. Then send that prompt again.
+MCP servers from your editor. When the editor passes its MCP servers to
+the agent, Muse Code starts the stdio and HTTP servers for the session. If
+one of them fails to start, the session still opens.
+The mode selector offers the four approval modes of Muse Code:
+Mode | 
+What it does | 
+Allow all | 
+Run every action without asking for approval. | 
+Ask before unmatched actions | 
+Ask for approval when no permission rule covers the action. | 
+Ask on request | 
+Ask for approval only when the action requires it. | 
+Deny unmatched actions | 
+Refuse any action that no permission rule covers. | 
+## Known limitsSection titled “Known limits”
+### Not supportedSection titled “Not supported”
+Closing or deleting a session from the editor. This is not supported yet,
+and support is planned.
+Logging out from the editor. Run muse logout in a terminal to log out.
+Audio in prompts.
+MCP servers that use SSE. Only stdio and HTTP servers start.
+The file and terminal access of the editor. The agent reads and writes
+files on disk and runs commands in its own shell. It does not see changes
+that you did not save, so save your files before you send a prompt.
+Read-only and plan modes. These are not supported yet, and support is
+planned. The mode selector offers only the four approval modes.
+ACP versions other than version 1.
+One session open at the same time in the editor and in another Muse Code
+process, such as the terminal UI.
+History (list, load and resume) with --no-session-log.
+Other providers and their API keys. Only Muse Code login is supported.
+### Open issuesSection titled “Open issues”
+These are known problems in the current version:
+Some error messages still name internal protocol methods, for example
+the error when one of the more folders that the editor sends does not
+exist.
+A prompt can be too large for the context window of the model, together
+with the tools and instructions. The automatic retry can then cut the
+longest text in the prompt to its first half. The model answers without the
+rest, and you see no error. If the shorter prompt still does not fit, the
+turn fails with a model error. A turn that goes over the context window can
+also fail when the agent runs a tool in it. Open a new thread if this
+happens.
+If you reopen a compacted thread and send a prompt with an image, you
+cannot yet rewind to that turn or fork from it.
+A reply can take a few seconds to start, and a few seconds to end after the
+last text.
+/compact reports Manual context compaction is not available. when
+Muse Code could not read the model catalog when it started and has none
+cached. Restart the agent when you are online.
+An idle muse acp process still uses some memory and processor time.
+## TroubleshootingSection titled “Troubleshooting”
+What you see | 
+Why | 
+What to do | 
+The agent stops at once, and its log says muse acp is not available in this build. The exit code is 5. | 
+The gate is closed by one of the settings in Turn it off, or your Muse Code release is older than the release that turned muse acp on. | 
+Set "MUSE_EXPERIMENTAL_ACP": "on" in the env of the agent, and remove MUSE_EXPERIMENTAL_SDK_ENABLED=off. On an older release, update Muse Code or set the same value. If your organization turned muse acp off, ask your administrator. | 
+The editor cannot start the agent. | 
+The editor does not find muse on its PATH. | 
+Set the command to the full path that command -v muse prints. | 
+The agent stops at once with exit code 2, and its log has a muse acp: line about an argument. | 
+muse acp refuses that argument. See Options. | 
+Remove the argument. Pick the approval mode in the editor. | 
+The agent stops at once with exit code 3. | 
+Your configuration, profile or credentials did not load. | 
+Run the command in a terminal (see Read the logs) to read the error, then fix what it names. | 
+A new thread fails with log in to Muse before opening a session. | 
+You are not logged in. | 
+Choose Log in to Muse in the editor, or run muse login in a terminal. | 
+The login fails with This editor cannot show the Muse login link: … | 
+Your editor cannot show a link from the agent. | 
+Open the link in the message, enter the code and approve. Then open a new thread. | 
+The login fails with a Muse login is already in progress. | 
+A login that you started earlier from the editor still runs. | 
+Finish that login first. | 
+The login fails with The Muse login did not finish (…). | 
+The login was declined, was cancelled or expired. | 
+Choose Log in to Muse again to get a new link and code, or run muse login in a terminal. | 
+Earlier sessions are not in the list. | 
+--no-session-log is in the arguments, the sessions belong to a different project folder, or your editor does not list sessions. | 
+Remove --no-session-log, or open the other folder. | 
+Loading or resuming a session fails with session … is already in use. | 
+Another Muse Code process, such as the terminal UI, has that session open. | 
+Close the session there, then try again. | 
+A message says Muse did not start the editor's MCP servers …: session MCP servers are turned off on this machine. | 
+MUSE_ENABLE_SESSION_MCP is set to 0, false, off, no, or a value that Muse Code does not recognize. | 
+Remove the variable, or set it to on. The MCP servers from your Muse Code settings still start. | 
+An MCP server from the editor never starts. | 
+The server uses SSE. | 
+Use a stdio or HTTP server. | 
+A message says Muse asked a question, but this editor cannot show forms, so the question was cancelled and the turn goes on. | 
+Your editor cannot show forms. | 
+Give the answer in your next prompt. | 
+A prompt fails with Invalid params: the prompt does not fit the host's …-byte frame limit. | 
+The prompt, with its images and files, is too large to send to the host. | 
+Send fewer or smaller images and files. | 
+The Model selector shows only one model. | 
+The model catalog could not be read. The log of the agent says why. | 
+Make sure that you are logged in and online, then open a new thread. | 
+The agent does not see your latest changes. | 
+The agent reads files from disk, and your changes are not saved. | 
+Save your files before you send a prompt. | 
+The skills or rules of your project are missing. | 
+muse acp loads them only when you trust the workspace. | 
+Add --trust-workspace to the arguments. | 
+### Read the logsSection titled “Read the logs”
+muse acp writes its diagnostics to stderr. Its own lines start with
+muse acp:. The gate refusal and the lines of the Muse Code host inside it
+look different. To read them:
+Zed: run dev: open acp logs from the command palette. The view shows
+the messages between Zed and the agent, and the stderr lines of the agent.
+JetBrains IDEs: in AI Chat, click More and select Get ACP Logs.
+The IDE downloads an archive of the agent logs.
+To see a start-up error directly, run the same command in a terminal, with the
+options from your editor configuration:
+Terminal window
+muse acp
+A start-up error prints and the command exits. If muse acp starts without an
+error, it waits for ACP messages on stdin. Press Ctrl+D to end it.

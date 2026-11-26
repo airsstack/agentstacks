@@ -1,0 +1,75 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"0\" \"neutral\"' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit|Write"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \"--allow-read\" \".muse/agentstacks/full\" \"--allow-write\" \"${TMPDIR:-/tmp}\" \"--allow-env\" \"HOME\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"1\" \"neutral\" \"--out\" \"${TMPDIR:-/tmp}/out\"' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Edit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"0\" \"native\"' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"additionalContext\":\"It'\"'\"'s a \\\"test\\\"\\nline two\",\"hookEventName\":\"SessionStart\"}}' # agentstacks",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup|resume"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"1\" \"native\"' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"0\" \"neutral\"' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '\"airsl\" \"run\" \"--fail-open\" \"--policy\" \"confined\" \".muse/agentstacks/runtime.lua\" \"full.hooks.enforce\" \"0\" \"neutral\"' # agentstacks",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

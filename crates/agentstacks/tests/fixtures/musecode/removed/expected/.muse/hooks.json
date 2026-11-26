@@ -1,0 +1,20 @@
+{
+  "editor": {
+    "keep": [
+      "user-value"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "echo user",
+            "timeout": 3,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

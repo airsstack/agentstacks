@@ -1029,7 +1029,7 @@ fn every_official_pack_and_extension_is_at_version_one_or_later() -> TestResult 
             checked += 1;
         }
     }
-    assert_eq!(checked, 7, "five packs and two extensions");
+    assert_eq!(checked, 8, "five packs and three extensions");
     Ok(())
 }
 

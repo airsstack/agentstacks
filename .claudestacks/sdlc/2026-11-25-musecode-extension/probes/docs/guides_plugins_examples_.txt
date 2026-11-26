@@ -1,0 +1,90 @@
+Plugin examples | Muse Code Developer DocsSkip to content
+## 
+# Plugin examples
+This section gives you five complete plugins, on four pages, to copy and
+run. Each example
+page shows every file in full, the commands that validated, installed and
+exercised it, and the real output those commands printed. Use them as
+starting points for your own plugins, or read them to see how a particular
+capability behaves before you write one.
+## The examplesSection titled “The examples”
+Example | 
+What it demonstrates | 
+Capabilities used | 
+The weather plugin | 
+The smallest useful native plugin: a skill the model reads on demand, a command that expands $ARGUMENTS, and a hook that writes to the plugin data directory. This is the directory that Quickstart: your first plugin builds. | 
+One skill, one command, one PostToolUse hook | 
+A guard hook that blocks risky tool calls | 
+A PreToolUse hook that reads the tool payload, blocks a shell command by exiting 2 with a reason on stderr, and is tested offline with fixtures. | 
+One PreToolUse hook | 
+An MCP server in a plugin | 
+A stdio MCP server declared in a plugin, the approval it needs, and the tool names it produces in a session. | 
+One stdio MCP server | 
+Importing a Claude Code or Codex plugin | 
+A .claude-plugin package and a .codex-plugin package as Muse Code sees them: what muse plugins validate reports for each format, which of their skills, commands and hooks run, and how to convert either to native later. | 
+Skills and a hook from both manifests, plus a command from the Claude Code one | 
+Every example was exercised with the installed Muse Code 1.3.0 binary. Each
+output block on an example page was produced by the command above it. The
+edits are: trimming, replacing the plugin store path with <data dir> (which
+is ~/.local/share/muse unless you set XDG_DATA_HOME), shortening absolute
+paths and 64-character digests with …, and, where noted, extracting one
+object from a larger JSON record. Digests and definition hashes on your
+machine will differ if any file differs, and native definition hashes also
+differ with the store location.
+## How to try oneSection titled “How to try one”
+Every example is a plain directory. The steps are the same for all of them.
+Create the directory from the files on the example page. Each page shows
+every file in full with its path in the code block title, so make the
+directory and type or paste the files in:
+Terminal window
+mkdir -p ~/plugins/weather/.muse-plugin ~/plugins/weather/skills/forecast ~/plugins/weather/commands ~/plugins/weather/hooks
+cd ~/plugins
+The name of the top-level directory does not matter; the plugin id comes
+from the manifest.
+Validate it. Validation reads the package and reports problems; it never
+runs anything.
+Terminal window
+muse plugins validate weather
+Install it from the local path. This copies the directory into your plugin
+cache and records it in your own user store.
+Terminal window
+muse plugins install weather
+Approve what needs review. Skills and commands work as soon as the plugin
+is installed and enabled. Hooks and MCP servers stay inactive until you
+approve them. Run muse plugins inspect <plugin-id> to see which
+capabilities show status=review_needed, read the files they point at,
+then approve the whole plugin or one capability:
+Terminal window
+muse plugins inspect weather
+muse plugins approve weather
+Start a new session. A running terminal session picks up new skills and
+commands on your next prompt, but hooks and MCP servers are wired at
+session start, so open a new session to see them work.
+To take an example out again, run muse plugins remove <plugin-id>. Add
+--delete-data to remove the plugin data directory as well. Each example
+page ends with the exact command for that plugin.
+Caution
+muse plugins hook test runs the hook command on your machine whether or not
+you have approved the hook. The examples here are short enough to read in
+full; do the same with any third-party plugin before you test or approve its
+hooks.
+## What the examples do not coverSection titled “What the examples do not cover”
+Plugin MCP server entries have no env, headers or credentials. An MCP
+server that needs a key belongs in settings.json, as described in
+MCP servers.
+Reminders and agent definitions are advanced capability kinds; no example
+declares one.
+Marketplaces are covered in
+Marketplaces and updates rather
+than by an example, because every example installs from a local path.
+## Next stepsSection titled “Next steps”
+Quickstart: your first plugin builds the weather
+plugin step by step and explains each decision.
+Packages and capabilities
+explains the directory layout and capability kinds the examples use.
+Trust, review and scopes explains
+what an approval binds to and why an edited package returns to review.
+Manifest lists every field the example manifests
+set, with types, defaults and limits.
+The muse plugins command documents every command the
+example pages run.

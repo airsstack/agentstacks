@@ -6,7 +6,7 @@ No Rust toolchain is needed:
 
 ```sh
 curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh
-curl -LsSf https://airsstack.github.io/agentstacks/install.sh | AGENTSTACKS_VERSION=0.1.0 sh
+curl -LsSf https://airsstack.github.io/agentstacks/install.sh | AGENTSTACKS_VERSION=1.0.0 sh
 ```
 
 The first line installs the latest release. The second installs the version you name.
@@ -48,7 +48,7 @@ curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
 agentstacks --version
 ```
 
-prints `agentstacks 0.1.0`. `airsl --version` reports 0.1.5 or newer.
+prints `agentstacks 1.0.0`. `airsl --version` reports 0.1.5 or newer.
 
 Next, set up [a first project](ch01-02-first-project.md).
 

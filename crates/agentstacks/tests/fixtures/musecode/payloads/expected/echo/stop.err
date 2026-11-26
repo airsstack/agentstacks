@@ -1,0 +1,1 @@
+event=agent.stop source=nil prompt=nil tool=nil path=nil last_message=echo: You are a reminder observer for the main agent. agent=nil session_id=01a211ff-04a3-7bd1-a3fb-97652156ca4a cwd=/p agent_id=nil

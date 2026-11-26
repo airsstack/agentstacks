@@ -1,0 +1,7 @@
+[extension]
+name        = "musecode"
+version     = "1.0.0"
+api         = 1
+description = "Renders packs into Muse Code project config"
+entry       = "adapter.lua"
+reads       = [".muse/hooks.json"]

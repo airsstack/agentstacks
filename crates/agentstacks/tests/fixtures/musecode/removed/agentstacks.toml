@@ -1,0 +1,7 @@
+api = 1
+
+[tools.other]
+path = "extensions/other"
+
+[packs.team]
+path = "packs/team"

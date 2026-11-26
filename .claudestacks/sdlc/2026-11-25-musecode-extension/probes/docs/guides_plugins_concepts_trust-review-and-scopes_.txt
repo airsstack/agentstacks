@@ -1,0 +1,287 @@
+Trust, review and scopes | Muse Code Developer DocsSkip to content
+## 
+# Trust, review and scopes
+After reading this page you can tell which parts of an installed plugin run
+without your review and which wait for it, read the status of each reviewable
+capability, approve or reject it with the right selector, and choose an install
+scope on purpose. Every output below was produced by Muse Code 1.3.0 against
+the weather plugin. The plugin surface is part of the
+Developer Preview and may change.
+## Two tiersSection titled “Two tiers”
+An installed plugin has two kinds of capability. The difference is what each
+kind can do on your machine.
+Tier | 
+Capabilities | 
+What they can do | 
+When they work | 
+Content | 
+Skills, commands | 
+Add text to a prompt. They run no code. | 
+As soon as the plugin is installed and enabled. A running terminal session picks them up on your next prompt. | 
+Runtime | 
+Hooks, MCP servers, reminders, agent definitions | 
+Run a program, open a connection, or steer the model on their own. | 
+After you approve them with muse plugins approve. They load in a new session. | 
+Installing never runs plugin code, so the first tier is safe to install and
+try. The second tier is what this page is about: Muse Code calls its members
+runtime capabilities, lists each one with a status, and does nothing with any
+of them until you say so.
+Every install, list and inspect of a plugin that declares runtime capabilities
+prints the same reminder:
+warning  third-party plugin: hooks require review before activation; skills and commands are active without review while the plugin is enabled
+The line names the kinds the plugin declares. It is printed whether or not you
+have already reviewed them, so read the runtime-capability rows below it to
+see the real state.
+## The six review statusesSection titled “The six review statuses”
+muse plugins inspect <plugin-id> prints one runtime-capability row per
+reviewable capability, with its stable id and its status.
+Terminal window
+muse plugins inspect weather
+weather  0.1.0  enabled=true active=true trust=user-local valid=true skills=1 commands=1 hooks=1 mcp=0 reminders=0 cache=<data dir>/plugins/cache/local/weather/bacc26ed…/package
+warning  third-party plugin: hooks require review before activation; skills and commands are active without review while the plugin is enabled
+runtime-capability  plugin:weather:hook:log-tool-use  status=review_needed
+Status | 
+Meaning | 
+Active? | 
+How you get here | 
+review_needed | 
+You have not decided yet. | 
+No | 
+A fresh install, a reinstall after remove, or a saved decision with no hash. | 
+trusted_enabled | 
+You approved this exact definition. | 
+Yes, in new sessions | 
+muse plugins approve. | 
+trusted_disabled | 
+You rejected this exact definition. | 
+No | 
+muse plugins reject. | 
+modified | 
+You decided on a different definition than the one installed now. | 
+No | 
+Any change to the capability or to the package after your decision. | 
+invalid | 
+Muse Code cannot review this entry: it has no usable id or hash, or a reminder declaration is malformed. | 
+No | 
+A broken package; the capability-diagnostic row says what to fix. | 
+blocked | 
+An approved reminder is held back by a rule that needs a separate decision. | 
+No | 
+Reminders only; the diagnostic names the rule. muse plugins approve refuses it; a blocking reminder can be approved in the /plugins panel, and reject is still accepted. | 
+The only status that runs anything is trusted_enabled. The active=true on
+the first line means the plugin package is enabled and valid; it says nothing
+about its runtime capabilities.
+What moves a capability between statuses:
+approve moves review_needed, trusted_disabled and modified to
+trusted_enabled.
+reject moves review_needed, trusted_enabled and modified to
+trusted_disabled. You can also reject a blocked reminder.
+A package change moves trusted_enabled and trusted_disabled to
+modified.
+muse plugins remove forgets every decision for the plugin; a later
+reinstall starts at review_needed.
+muse plugins disable keeps your decisions. After enable the capability is
+trusted_enabled again, with no new review.
+## Approve and rejectSection titled “Approve and reject”
+Both commands take one selector and record one decision for every capability
+it matches. The shortest form is the plugin id, weather, which selects every
+reviewable capability of the plugin. weather:log-tool-use selects one
+capability when its id is unique across kinds, weather:hook:log-tool-use
+names the kind as well, and the stable id plugin:weather:hook:log-tool-use
+is the form inspect prints. The kinds you will meet are hook,
+mcp_server, reminder and agent_definition; agent definitions are
+addressed by the ordinal inspect shows,
+<plugin-id>:agent_definition:<ordinal>.
+The muse plugins command has the grammar as a
+table. A two-part selector that matches more than one kind fails and asks
+you to add the kind; a selector that matches nothing fails with
+no runtime capabilities match, and nothing is written in either case.
+One exception: approving the id of an installed plugin that loaded cleanly
+and has no review-gated capabilities, such as one whose skills and commands
+declare no allowed-tools, succeeds with nothing to review and writes
+nothing.
+Terminal window
+muse plugins approve weather:hook:log-tool-use --json
+{
+  "decision": "approve",
+  "runtime_capabilities": [
+    {
+      "stable_id": "plugin:weather:hook:log-tool-use",
+      "trusted_definition_hash": "sha256:a3a09309…",
+      "enabled": true
+    }
+  ]
+}
+Without --json the command prints one approve\t<stable-id> line per
+capability. reject produces the same shape with "decision": "reject" and
+"enabled": false. Rejecting is an explicit no: the capability shows
+trusted_disabled, and Muse Code stops asking about that definition.
+Before either command writes anything it re-reads the package and checks that
+the capability you selected still has the definition you saw. If the package
+changed in between, the command fails and you inspect again.
+## What an approval binds toSection titled “What an approval binds to”
+Your decision is stored with trusted_definition_hash, a SHA-256 over the
+capability’s definition and the digest of the installed package it came from.
+For a hook that covers the event, the command, the timeout and the other
+declared fields; for an MCP server, its transport and command or URL; for a
+reminder or agent definition, its declaration and the package contents. The
+value differs from machine to machine because it also covers the installed
+copy, so do not expect two machines to print the same hash.
+The consequence is the modified rule: any change to the package returns your
+reviewed capabilities to modified, even a change that does not touch the
+capability itself. Below, one line was appended to the plugin’s SKILL.md and
+the installed copy refreshed:
+Terminal window
+muse plugins update weather
+muse plugins inspect weather
+updated  weather  sha256:b0cf4aec…  trust=user-local  previous=sha256:b0cf4aec…
+warning  third-party plugin: hooks require review before activation; skills and commands are active without review while the plugin is enabled
+runtime-capability  plugin:weather:hook:log-tool-use  status=modified
+The digest that update prints is the manifest’s, which did not change. The
+package digest did, so the hook went back to modified and stays inactive
+until you approve it again. An update that finds nothing changed keeps the
+approval.
+This is deliberate. Reviewing a hook means reading the script it runs, and that
+script is part of the package. If the package could change under an approval,
+the approval would mean nothing.
+## The security model in plain wordsSection titled “The security model in plain words”
+Nothing runs at install. validate, install, list and inspect read
+the package; they never execute it. Skills and commands are text.
+Approved hooks and MCP servers run as you. They are ordinary processes
+started with your user account and your permissions. There is no sandbox
+around them. A hook can read and write anything you can.
+The environment is cleared. A plugin process starts with an empty
+environment plus a short allowlist (HOME, PATH and a handful of user,
+locale and temporary-directory variables, listed in
+Hook events and payloads) and the plugin
+variables MUSE_PLUGIN_ID, MUSE_PLUGIN_ROOT and MUSE_PLUGIN_DATA_DIR.
+API keys,
+proxy settings and toolchain variables from your shell do not reach it, and
+neither do the model provider credentials Muse Code itself holds.
+Commands run as declared. A native hook or MCP command is an argv array
+started without a shell, and Muse Code performs no placeholder or variable
+substitution on it. It rewrites exactly one argv element, the one that spells
+a relative path declared in the manifest, to the installed copy; a script
+that needs other files reads MUSE_PLUGIN_ROOT. Plugin MCP server entries
+have no env, headers or credentials.
+The package is frozen. Install copies the directory into a
+content-addressed cache and rejects symlinks; enable re-checks the cached
+copy against its recorded digest before it loads anything. Your approval
+refers to that frozen copy.
+Read before you approve. muse plugins inspect <plugin-id> --json prints
+each hook’s command and each MCP server’s command or url. Open the
+scripts under the plugin’s cache path and read them. If you would not run
+the script by hand, do not approve it.
+Read-only MCP tools skip the prompt. Under the default approval mode, a
+tool from an approved plugin MCP server that declares readOnlyHint runs
+without an approval prompt. The server declares that hint about itself, so
+approving a server means trusting its read-only claims too. Explicit deny and
+prompt rules still win.
+Caution
+muse plugins hook test runs a hook’s command on your machine whether or not
+you have approved it; it refuses only when the plugin is not installed or is
+disabled. Treat it as running the script by hand.
+## Install scope is not reviewSection titled “Install scope is not review”
+muse plugins install <path> accepts --scope user or --scope project. The
+scope decides what label the record carries and which sources may carry it.
+It never approves a runtime capability, and no scope, provenance or
+marketplace does; only your approve does.
+Scope | 
+Accepted source | 
+Record label | 
+Requires | 
+Default or --scope user | 
+Any local path, or <plugin>@<marketplace> | 
+trust=user-local | 
+Nothing | 
+--scope project | 
+A local path; only a path inside the trusted workspace is recorded as project-trusted | 
+trust=project-trusted | 
+You trusted that workspace when Muse Code asked | 
+If the path is outside the trusted workspace, --scope project does not fail;
+the record is written as trust=user-local. Read the trust= field of the
+install receipt to confirm which label you got.
+Both scopes install into your own user store. Nothing is written into the
+repository, and a project-scoped plugin is not visible to teammates; each
+person installs for themselves. Project scope exists so a plugin that lives in
+a repository can be installed from there without moving it, and so Muse Code
+can refuse to load it again if the workspace stops being trusted.
+Outside a trusted workspace the project scope fails before it reads the
+manifest:
+Terminal window
+muse plugins install weather --scope project
+project-local plugin source is blocked because the workspace is untrusted
+A <plugin>@<marketplace> target with --scope project is refused with
+plugins install --scope project requires a local plugin path. To point an
+already installed plugin id at a different source directory, pass
+--scope user explicitly; a plain reinstall from a different path is refused.
+The workspace trust decision is the one the terminal UI asks for when you open
+a directory for the first time (“Do you trust this workspace?”). Muse Code
+keeps it in trust.json next to your settings.
+## Where decisions are storedSection titled “Where decisions are stored”
+Approvals and rejections live in your user settings file,
+~/.config/muse/settings.json (or $XDG_CONFIG_HOME/muse/settings.json),
+under runtime_capabilities, keyed by stable id. After the approve above
+and a later reject, the file held:
+{
+  "schema_version": 1,
+  "runtime_capabilities": {
+    "plugin:weather:hook:log-tool-use": {
+      "enabled": false,
+      "trusted_definition_hash": "sha256:a3a09309…"
+    }
+  }
+}
+enabled is your decision and trusted_definition_hash is what it applies
+to. muse plugins remove deletes the plugin’s entries; after removing
+weather the file held only schema_version. Decisions are per user and per
+machine, and the installed packages live in your data directory, described
+under “Where plugins are stored” on the overview. Treat both files
+as informational and use the commands to change them.
+## Reviewing in the /plugins panelSection titled “Reviewing in the /plugins panel”
+Type /plugins, with nothing after it, in a terminal session to open the
+panel. It has four tabs,
+Discover, Installed, Marketplaces and Errors; Tab switches between them,
+typing filters the list, and Esc closes the panel. On the Installed tab a
+plugin with undecided capabilities shows needs review, Space enables or
+disables the selected plugin, and Enter opens its details. The details view
+lists the plugin’s status, its source and cache paths, and one row per
+capability: a skill row offers to apply plugin skills to the current
+session, while hook and MCP server rows say restart required. Press Tab
+there to reach the Runtime tab, where each hook, MCP server, reminder or
+agent definition is one row; Enter approves the selected row and Space
+rejects it. The panel writes the same settings.json entries as the
+commands, and the same rules apply: nothing runs until approved, and
+approvals take effect in a new session. Built-in plugins appear on the
+Installed tab as built-in and cannot be disabled or removed.
+The muse plugins command maps
+every verb to the tab and key that does the same thing in the panel.
+## When changes take effectSection titled “When changes take effect”
+Change | 
+Terminal session already running | 
+New session or muse serve | 
+Install, update or remove a plugin | 
+Skills and commands refresh on your next prompt | 
+Loaded at start | 
+Enable or disable a plugin | 
+Skills and commands refresh on your next prompt; hooks and MCP servers change at the next start | 
+Loaded at start | 
+Approve or reject a capability | 
+No effect until restart | 
+Loaded at start | 
+A session keeps the hooks and MCP servers it started with. muse serve reads
+the plugin store when it starts, so for served sessions the order is install,
+approve, then start the host; restart a host that is already running after
+any of these changes. Plugins in SDK sessions
+covers what a client sees.
+## Next stepsSection titled “Next steps”
+Hooks explains what a hook receives and how it blocks or allows
+an action, which is what you are approving.
+MCP servers explains stdio and HTTP entries and the tool
+names an approved server produces.
+Marketplaces and updates explains how
+update and marketplace refreshes interact with your approvals.
+The muse plugins command lists every flag and the
+--json shape of approve, reject and inspect.
+Approvals covers the per-call approval
+requests that plugin MCP tools raise in a served session.

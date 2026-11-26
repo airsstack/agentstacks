@@ -2,12 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 1.0, `api = 1` frozen; core, CLI, both extensions, packs and claudevs built
+## Status: 1.0, `api = 1` frozen; core, CLI, the three extensions, packs and claudevs built
 
 The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
 hook runtime, the CLI commands (`init`, `plan`, `apply`, `doctor`, `update`, `ext add`,
-`ext test`), the claude and opencode extensions, the five official packs and the claudevs crates
-are built and tested.
+`ext test`), the claude, musecode and opencode extensions, the five official packs and the claudevs
+crates are built and tested. The musecode extension ships with the next `packs-v*` release
+(`packs-v1.0.0` does not include it).
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built
@@ -15,6 +16,7 @@ crates/agentstacks-cli/   the `agentstacks` binary; init · plan · apply · doc
 crates/claudevs/          deterministic Claude Code setup test engine, moved from claudestacks
 crates/claudevs-cli/      the claudevs binary
 extensions/claude/        the official claude tool extension (adapter.lua under airsl)
+extensions/musecode/      the official musecode tool extension (adapter.lua under airsl)
 extensions/opencode/      the official opencode tool extension (adapter.lua under airsl; JS shim)
 packs/                    the five official packs: core, sdlc, journal, guideline-rust, guideline-python
 book/                     the agentstacks book (mdBook); book/src/ch07-00-architecture.md is the layering contract
@@ -22,7 +24,7 @@ dist-workspace.toml       the dist release config (binaries for agentstacks and 
 install/                  the install.sh and claudevs.sh installer scripts, served from Pages
 RELEASING.md              the maintainer's release runbook
 Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
-.github/workflows/ci.yml  CI: dod, claudevs-check, cargo deny, and the installers, book and opencode-check jobs
+.github/workflows/ci.yml  CI: dod, claudevs-check, cargo deny, and the installers, book, opencode-check and musecode-check jobs
 ```
 
 Everything below the Status section except Commands describes the agreed design: the contract to
@@ -69,8 +71,8 @@ project config.
   language (OpenCode hooks are JavaScript plugins), generate a thin shim that only forwards events
   to airsl.
 - **The official extensions use the public API** that community extensions use, with no private
-  hooks. Both Claude and OpenCode run on it; it is frozen as `api = 1`, and 1.x changes
-  are additive only (book ch06-06).
+  hooks. Claude, Muse Code and OpenCode all run on it; it is frozen as `api = 1`, and 1.x
+  changes are additive only (book ch06-06).
 - `airsl` comes from crates.io, never as a path dependency. Never use the `aisdk-*` crate names,
   because that family belongs to another project.
 
@@ -114,7 +116,7 @@ with the API: when `book/src/ch06-01-extensions.md` or `book/src/ch06-02-hooks.m
 crates/agentstacks/      types · port · app · fs · process · host (see book/src/ch07-00-architecture.md)
 crates/agentstacks-cli/  init · plan · apply · doctor · update · ext add · ext test
 crates/claudevs{,-cli}/  deterministic Claude Code setup test engine, moved from claudestacks (built; same crate names)
-extensions/{claude,opencode}/   official tool extensions (Lua); both are built
+extensions/{claude,musecode,opencode}/   official tool extensions (Lua); all three are built
 packs/                   official packs: core, sdlc, journal, guideline-rust, guideline-python (built)
 book/                    mdBook, published to airsstack.github.io/agentstacks/ (built)
 ```
@@ -143,14 +145,16 @@ cargo make fmt                 # rewrite formatting (clippy-fix is the other tas
 cargo make deny                # cargo-deny; deliberately not part of dod
 cargo make claudevs-check      # claudevs fixture corpus; deliberately not part of dod
 cargo make opencode-check      # real OpenCode + a mock model; deliberately not part of dod
+cargo make musecode-check      # real Muse Code + a mock model; deliberately not part of dod
 cargo make book                # serve the book at http://localhost:3000
 cargo make book-build          # build the book once into book/book/ (CI also fails on [ERROR] lines)
-cargo make lua                 # airsl check + airsl test over extensions/ and packs/, the fingerprint gate, the pack text gates and the api-0 gate (part of dod)
+cargo make lua                 # airsl check + airsl test over extensions/ and packs/ (check also over the conformance, opencode-check and musecode-check packs), the fingerprint gate, the pack text gates and the api-0 gate (part of dod)
 cargo test -p <crate> <path::to::test> [-- --exact]   # one test
 ```
 
 CI runs `cargo make dod`, `cargo make claudevs-check`, `cargo deny check`, and the `installers`,
-`book` and `opencode-check` jobs on push to `main`, on pull requests and on manual dispatch.
+`book`, `opencode-check` and `musecode-check` jobs on push to `main`, on pull requests and on manual
+dispatch.
 
 A run short of `cargo make dod` counts as iteration, not a green result. The source of truth for the
 gate is the `claudestacks-guideline-rust:rust-guidelines` skill. Workspace lints: `unsafe_code =

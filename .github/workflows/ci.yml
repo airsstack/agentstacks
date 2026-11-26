@@ -56,8 +56,9 @@ jobs:
       # a hash pinned here, not one fetched from the same place. Pinned to the
       # version the runtime was proven on, the same as the airsl library in
       # Cargo.toml; bump the version, the hash and the library together. The
-      # `opencode-check` job carries a second copy of the version and hash:
-      # bump both jobs.
+      # `opencode-check` and `musecode-check` jobs each carry a further copy of
+      # the version and hash: bump all three jobs. The airsl pin gate in
+      # `cargo make lua` fails when the copies differ.
       - name: Install the airsl binary
         env:
           AIRSL_VERSION: 0.1.5
@@ -137,7 +138,7 @@ jobs:
 
       # Same step as in the `dod` job: the pinned airsl binary, which the hooks
       # the check drives run under. This copy of the version and hash is bumped
-      # together with the one in the `dod` job.
+      # together with the ones in the `dod` and `musecode-check` jobs.
       - name: Install the airsl binary
         env:
           AIRSL_VERSION: 0.1.5
@@ -162,6 +163,68 @@ jobs:
       # scenarios against the built agentstacks binary.
       - name: cargo make opencode-check
         run: cargo make opencode-check
+
+  musecode-check:
+    name: Muse Code check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same step as in the `dod` job: the pinned toolchain from rust-toolchain.toml.
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install
+          rustup show
+          cargo --version
+          cargo clippy --version
+          cargo fmt --version
+
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # Same step as in the `dod` job: the pinned airsl binary, which the hooks
+      # the check drives run under. This copy of the version and hash is bumped
+      # together with the ones in the `dod` and `opencode-check` jobs.
+      - name: Install the airsl binary
+        env:
+          AIRSL_VERSION: 0.1.5
+          AIRSL_SHA256: a8a8f9e527c20fc6bd61fcdb07cc7ce6eb1a9ea0100c1a1706b60a87aab83006
+        run: |
+          target=airsl-cli-x86_64-unknown-linux-gnu
+          curl -sSfL -o "$RUNNER_TEMP/airsl.tar.xz" \
+            "https://github.com/airsstack/airsl/releases/download/airsl-cli-v${AIRSL_VERSION}/${target}.tar.xz"
+          echo "${AIRSL_SHA256}  $RUNNER_TEMP/airsl.tar.xz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xJf "$RUNNER_TEMP/airsl.tar.xz" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/${target}/airsl" "$HOME/.local/bin/airsl"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/airsl" --version
+
+      # The mock model and the scenarios are Node scripts.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The pinned Muse Code binary is 468724056 bytes; the task re-checks its
+      # hash after a restore, so a stale or partial cache entry cannot pass. The
+      # path and key name the version and platform: bump both here together
+      # with VERSION in `[tasks.musecode-check]` (Makefile.toml).
+      - name: Cache the Muse Code binary
+        uses: actions/cache@v4
+        with:
+          path: target/musecode-check/1.4.25-R9361.1
+          key: musecode-1.4.25-R9361.1-linux-x64
+
+      # Downloads the pinned Muse Code build, checks its hash, then runs the
+      # scenarios against the built agentstacks binary.
+      - name: cargo make musecode-check
+        run: cargo make musecode-check
 
   deny:
     name: Supply chain
