@@ -181,8 +181,8 @@ Two reviewer passes: Tasks 1-2 (compliant-with-amendments; `blocking:` V1, the r
   jobs' `AIRSL_VERSION`/`AIRSL_SHA256` lines are not one version and one hash. Proof: `cargo make dod`
   → `airsl pin gate: passed (3 jobs)`, rc 0; on a copy of ci.yml with one job at `0.1.6`, and with one
   hash changed → that message after the distinct pins, exit 1.
-- ❓ open — K1: the job's Linux run is pending the first push (no push in this run); it waits for the
-  author's push.
+- ❓ fixed — K1: the job's Linux run on PR #15, run 45758427157 (`96041b8`, `ubuntu-latest`) →
+  `musecode-check: verify self-test passed`, `ok S1` … `ok S6`, job `success`.
 - 🔴 fixed (CI, first Linux run, PR #15) — the verify self-test failed on `ubuntu-latest`: the CI
   runner traces the task script, so `msg=$(verify "$probe" 2>&1)` captured the `+ …` trace lines
   and `got exit 1, '+ command -v sha256sum …'` did not equal the mismatch message. The capture now
