@@ -183,6 +183,13 @@ Two reviewer passes: Tasks 1-2 (compliant-with-amendments; `blocking:` V1, the r
   hash changed → that message after the distinct pins, exit 1.
 - ❓ open — K1: the job's Linux run is pending the first push (no push in this run); it waits for the
   author's push.
+- 🔴 fixed (CI, first Linux run, PR #15) — the verify self-test failed on `ubuntu-latest`: the CI
+  runner traces the task script, so `msg=$(verify "$probe" 2>&1)` captured the `+ …` trace lines
+  and `got exit 1, '+ command -v sha256sum …'` did not equal the mismatch message. The capture now
+  starts with `{ set +x; } 2>/dev/null`. Reproduced and checked with `bash -x`, `dash -x`, `sh -x`
+  on the extracted script: old → exit 1 (self-test failed), new → exit 0; a `verify` without its
+  `rm -f` still fails the self-test under xtrace. `cargo make musecode-check` (macOS arm64) →
+  `verify self-test passed`, `ok S1` … `ok S6`.
 - Verified: `cargo make musecode-check` (macOS arm64) → `ok S1`, `ok S2`, `ok S3`, `ok S4`, `ok S5`,
   `ok S6`; truncated binary → `musecode-check: muse-aarch64-macos: checksum mismatch`, exit 1, file
   removed; next run re-downloaded (sha256 `d8faeec8…c27d`) and passed; `cargo make lua` → `651 passed,

@@ -669,7 +669,9 @@ if [ -f "$muse" ]; then
 else
   printf 'partial' > "$probe"
 fi
-msg=$(verify "$probe" 2>&1) && code=0 || code=$?
+# Tracing is switched off silently inside the capture: when the runner traces the
+# script (as CI's does), the trace lines would land in $msg.
+msg=$({ set +x; } 2>/dev/null; verify "$probe" 2>&1) && code=0 || code=$?
 if [ "$code" != 1 ] || [ "$msg" != "musecode-check: $file: checksum mismatch" ] || [ -e "$probe" ]; then
   echo "musecode-check: verify self-test failed: want exit 1, the mismatch message and the file removed; got exit $code, '$msg'" >&2
   exit 1
