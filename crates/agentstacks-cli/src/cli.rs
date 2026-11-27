@@ -40,7 +40,14 @@ pub(crate) enum Command {
         yes: bool,
     },
     /// Show what apply would do, and write nothing.
-    Plan,
+    Plan {
+        /// Show counts per owner (the default).
+        #[arg(long, conflicts_with = "verbose")]
+        summary: bool,
+        /// Show every file.
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Show the plan, ask, then write the files and the lock.
     Apply {
         /// Apply without asking.
@@ -171,6 +178,19 @@ mod tests {
                 .contains("unrecognized subcommand 'frobnicate'"),
             "{error}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn plan_summary_and_verbose_conflict() -> TestResult {
+        assert!(Cli::try_parse_from(["agentstacks", "plan", "--summary"]).is_ok());
+        assert!(Cli::try_parse_from(["agentstacks", "plan", "--verbose"]).is_ok());
+        assert!(Cli::try_parse_from(["agentstacks", "plan"]).is_ok());
+        let Err(error) = Cli::try_parse_from(["agentstacks", "plan", "--summary", "--verbose"])
+        else {
+            return Err("--summary with --verbose must fail".into());
+        };
+        assert_eq!(error.exit_code(), 2);
         Ok(())
     }
 

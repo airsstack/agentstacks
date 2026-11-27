@@ -26,7 +26,7 @@ use agentstacks::types::{Diagnostic, Location};
 
 use super::Console;
 use crate::prompt::{Answer, ask};
-use crate::show::{nothing_to_change, plan_text, written_and_deleted};
+use crate::show::{PlanView, nothing_to_change, plan_text, written_and_deleted};
 
 /// The lock's name in the project, the file a read failure is located at.
 const LOCK_FILE: &str = "agentstacks.lock";
@@ -75,7 +75,7 @@ where
     O: Write,
     E: Write,
 {
-    console.out_line(plan_text(plan));
+    console.out_line(plan_text(plan, PlanView::Summary));
 
     let lock = match workspace.lock_text() {
         Ok(lock) => lock,

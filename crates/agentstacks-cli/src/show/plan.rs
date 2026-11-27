@@ -25,14 +25,27 @@ use super::diff_lines;
 /// The width the action column is padded to.
 const ACTION_WIDTH: usize = 8;
 
-/// The text of `plan`, lines joined by `\n` with no trailing newline.
+/// How a plan is shown: per-owner counts, or every step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PlanView {
+    /// Counts per owner, plus skips, the airsl row, notes and the final count line.
+    Summary,
+    /// One row per listed step, with shared-file diffs.
+    Full,
+}
+
+/// The text of `plan` in `view`, lines joined by `\n` with no trailing newline.
 ///
-/// The layout is the header, then steps and skips, then the airsl row and notes, then the summary.
-/// A section with no rows is left out together with the blank line before it.
-pub(crate) fn plan_text(plan: &Plan) -> String {
+/// The layout is the header, then steps (or owner counts) and skips, then the airsl row and
+/// notes, then the summary. A section with no rows is left out together with the blank line
+/// before it.
+pub(crate) fn plan_text(plan: &Plan, view: PlanView) -> String {
     let mut out = vec!["agentstacks plan".to_owned()];
 
-    let mut changes = step_rows(plan.steps());
+    let mut changes = match view {
+        PlanView::Full => step_rows(plan.steps()),
+        PlanView::Summary => owner_rows(plan.steps()),
+    };
     changes.extend(plan.skips().iter().map(skip_row));
     push_section(&mut out, changes);
 
@@ -46,6 +59,48 @@ pub(crate) fn plan_text(plan: &Plan) -> String {
 
     push_section(&mut out, vec![summary(plan)]);
     out.join("\n")
+}
+
+/// One count row per owner, `shared` last, owners in byte order otherwise.
+fn owner_rows(steps: &[Step]) -> Vec<String> {
+    use std::collections::BTreeMap;
+    let mut counts: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
+    for step in steps {
+        let owner = step
+            .owner
+            .as_ref()
+            .map_or_else(|| "shared".to_owned(), ToString::to_string);
+        if matches!(step.action, Action::Forget) {
+            continue;
+        }
+        let entry = counts.entry(owner).or_default();
+        match step.action {
+            Action::Create | Action::Update | Action::Restore => entry.0 += 1,
+            Action::Delete => entry.1 += 1,
+            Action::Unchanged => entry.2 += 1,
+            Action::Forget => {}
+        }
+    }
+    let shared = counts.remove("shared");
+    let width = counts
+        .keys()
+        .map(String::len)
+        .chain(shared.as_ref().map(|_| "shared".len()))
+        .max()
+        .unwrap_or(0);
+    let mut rows: Vec<String> = counts
+        .iter()
+        .map(|(name, (w, d, u))| {
+            format!("  {name:<width$}  {w} to write, {d} to delete, {u} unchanged")
+        })
+        .collect();
+    if let Some((w, d, u)) = shared {
+        rows.push(format!(
+            "  {:<width$}  {w} to write, {d} to delete, {u} unchanged",
+            "shared"
+        ));
+    }
+    rows
 }
 
 /// Whether applying `plan` would change nothing: no listed step, and a lock that already holds
@@ -290,7 +345,7 @@ agentstacks plan
   note     native/cluade: not for claude
 
 3 to write, 1 to delete, 12 unchanged, 1 skipped";
-        assert_eq!(plan_text(&plan), expected);
+        assert_eq!(plan_text(&plan, PlanView::Full), expected);
         Ok(())
     }
 
@@ -312,9 +367,9 @@ agentstacks plan
         ));
         let plan = plan_of(Vec::new(), vec![core], Vec::new(), None)?;
         assert!(
-            plan_text(&plan).contains("\n  skip     core/hooks/enforce.lua: why\n"),
+            plan_text(&plan, PlanView::Full).contains("\n  skip     core/hooks/enforce.lua: why\n"),
             "{}",
-            plan_text(&plan)
+            plan_text(&plan, PlanView::Full)
         );
         Ok(())
     }
@@ -330,7 +385,7 @@ agentstacks plan
             },
         };
         let plan = plan_of(Vec::new(), vec![skip], Vec::new(), None)?;
-        assert!(plan_text(&plan).contains("  skip     core/skill/status: no\n"));
+        assert!(plan_text(&plan, PlanView::Full).contains("  skip     core/skill/status: no\n"));
         Ok(())
     }
 
@@ -342,7 +397,7 @@ agentstacks plan
             Vec::new(),
             None,
         )?;
-        let text = plan_text(&plan);
+        let text = plan_text(&plan, PlanView::Full);
         assert!(!text.contains("  a "), "{text}");
         assert!(text.ends_with("0 to write, 0 to delete, 1 unchanged, 0 skipped"));
         Ok(())
@@ -360,7 +415,7 @@ agentstacks plan
             Vec::new(),
             None,
         )?;
-        let text = plan_text(&plan);
+        let text = plan_text(&plan, PlanView::Full);
         assert!(text.contains("\n  create   a          core\n"), "{text}");
         assert!(text.contains("\n  restore  long/path  core\n"), "{text}");
         Ok(())
@@ -374,7 +429,7 @@ agentstacks plan
             Vec::new(),
             None,
         )?;
-        assert!(plan_text(&plan).contains("  create   s.json  shared\n"));
+        assert!(plan_text(&plan, PlanView::Full).contains("  create   s.json  shared\n"));
         Ok(())
     }
 
@@ -386,7 +441,7 @@ agentstacks plan
             Vec::new(),
             Some(pin(Some("0.1.4"), "0.1.5")?),
         )?;
-        assert!(plan_text(&plan).contains("\n  airsl    0.1.4 \u{2192} 0.1.5\n"));
+        assert!(plan_text(&plan, PlanView::Full).contains("\n  airsl    0.1.4 \u{2192} 0.1.5\n"));
         Ok(())
     }
 
@@ -398,21 +453,21 @@ agentstacks plan
             Vec::new(),
             Some(pin(None, "0.1.5")?),
         )?;
-        assert!(plan_text(&plan).contains("\n  airsl    0.1.5 (new pin)\n"));
+        assert!(plan_text(&plan, PlanView::Full).contains("\n  airsl    0.1.5 (new pin)\n"));
         Ok(())
     }
 
     #[test]
     fn forget_count_appears_only_when_positive() -> TestResult {
         let without = plan_of(Vec::new(), Vec::new(), Vec::new(), None)?;
-        assert!(!plan_text(&without).contains("forgotten"));
+        assert!(!plan_text(&without, PlanView::Full).contains("forgotten"));
         let with = plan_of(
             vec![step("gone", Action::Forget, Some("core"))?],
             Vec::new(),
             Vec::new(),
             None,
         )?;
-        let text = plan_text(&with);
+        let text = plan_text(&with, PlanView::Full);
         assert!(text.contains("\n  forget   gone  core\n"), "{text}");
         assert!(text.ends_with("0 to write, 0 to delete, 0 unchanged, 0 skipped, 1 forgotten"));
         Ok(())
@@ -427,7 +482,7 @@ agentstacks plan
             None,
         )?;
         assert_eq!(
-            plan_text(&plan),
+            plan_text(&plan, PlanView::Full),
             "agentstacks plan\n\n0 to write, 0 to delete, 1 unchanged, 0 skipped"
         );
         Ok(())
@@ -483,6 +538,75 @@ agentstacks plan
             None,
         )?;
         assert_eq!(written_and_deleted(&plan), (3, 1));
+        Ok(())
+    }
+
+    #[test]
+    fn summary_renders_per_owner_counts() -> TestResult {
+        let mut steps = vec![
+            step(
+                ".claude/skills/status/SKILL.md",
+                Action::Create,
+                Some("core"),
+            )?,
+            step(
+                ".claude/agentstacks/runtime.lua",
+                Action::Update,
+                Some("claude"),
+            )?,
+            step(".claude/agents/old.md", Action::Delete, Some("team-lint"))?,
+        ];
+        let mut settings = step(".claude/settings.json", Action::Update, None)?;
+        settings.old = Some(b"{\n  \"a\": 1\n}\n".to_vec());
+        settings.new = Some(b"{\n  \"a\": 2\n}\n".to_vec());
+        steps.push(settings);
+        for n in 0..12 {
+            steps.push(step(&format!("x/{n}"), Action::Unchanged, Some("core"))?);
+        }
+        let plan = plan_of(steps, vec![item_skip("why")?], Vec::new(), None)?;
+        let text = plan_text(&plan, PlanView::Summary);
+        assert!(
+            text.contains("  claude     1 to write, 0 to delete, 0 unchanged\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("  core       1 to write, 0 to delete, 12 unchanged\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("  team-lint  0 to write, 1 to delete, 0 unchanged\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("  shared     1 to write, 0 to delete, 0 unchanged\n"),
+            "{text}"
+        );
+        assert!(
+            text.ends_with("3 to write, 1 to delete, 12 unchanged, 1 skipped"),
+            "{text}"
+        );
+        assert!(!text.contains("--- .claude/settings.json"), "{text}");
+        // shared row is last among owner rows
+        let shared_at = text.find("  shared").ok_or("shared row")?;
+        let team_at = text.find("  team-lint").ok_or("team row")?;
+        assert!(team_at < shared_at, "{text}");
+        Ok(())
+    }
+
+    #[test]
+    fn summary_excludes_forget_from_per_owner_delete() -> TestResult {
+        let plan = plan_of(
+            vec![step("gone", Action::Forget, Some("core"))?],
+            Vec::new(),
+            Vec::new(),
+            None,
+        )?;
+        let text = plan_text(&plan, PlanView::Summary);
+        assert!(!text.contains("core"), "{text}");
+        assert!(
+            text.ends_with("0 to write, 0 to delete, 0 unchanged, 0 skipped, 1 forgotten"),
+            "{text}"
+        );
         Ok(())
     }
 }

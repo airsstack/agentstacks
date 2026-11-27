@@ -28,5 +28,5 @@ mod update;
 pub(crate) use check::check_text;
 pub(crate) use diff::diff_lines;
 pub(crate) use doctor::doctor_text;
-pub(crate) use plan::{nothing_to_change, plan_text, written_and_deleted};
+pub(crate) use plan::{PlanView, nothing_to_change, plan_text, written_and_deleted};
 pub(crate) use update::{has_newer, update_text};
