@@ -1,0 +1,12 @@
+   Compiling clap v4.6.9
+   Compiling devex-probe2 v0.0.0 (/tmp/devex-probe2)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.50s
+     Running `/tmp/devex-probe2/target/debug/devex-probe2`
+=== ["agentstacks", "init", "--dry-run", "--yes"]
+kind=ArgumentConflict exit_code=2 rendered="error: the argument '--dry-run' cannot be used with '--yes'\n\nUsage: agentstacks init --dry-run\n\nFor more information, try '--help'.\n"
+=== ["agentstacks", "init", "--dry-run"]
+Ok(Cli { command: Init { dry_run: true, yes: false } })
+-- R6 frontmatter first-line check --
+original starts_with --- = true
+prepend-stamped starts_with --- = false
+after-frontmatter starts_with --- = true
