@@ -27,6 +27,35 @@ local function base_with(names)
   return base
 end
 
+local function legacy_base(root)
+  return path.join(root, handoff.LEGACY_HANDOFF_REL)
+end
+
+local function parent_dir(dir)
+  return dir:match("^(.*)/[^/]*$")
+end
+
+local function legacy_dir(root)
+  return parent_dir(legacy_base(root))
+end
+
+local function legacy_plugins_dir(root)
+  return parent_dir(legacy_dir(root))
+end
+
+local function legacy_cc_dir(root)
+  return parent_dir(legacy_plugins_dir(root))
+end
+
+local function legacy_session(root, name, leased)
+  local base = legacy_base(root)
+  fs.mkdir(path.join(base, name))
+  if leased then
+    fs.write(path.join(base, name, handoff.LEASE), "")
+  end
+  return base
+end
+
 return {
   a_session_id_carries_a_sortable_timestamp_and_a_suffix = function()
     local id = handoff.session_id("20260101-120000")
@@ -260,6 +289,73 @@ return {
     local directory = handoff.init(subdir, "20260101-120000", 10, NOW, 120, root)
     local expected = path.join(root, handoff.HANDOFF_REL)
     assert(directory:sub(1, #expected) == expected, directory .. " should sit under " .. expected)
+  end,
+
+  init_prunes_every_stale_legacy_session = function()
+    local root = fs.tempdir()
+    for index = 1, 12 do
+      legacy_session(root, string.format("202601%02d-000000-%02d", index, index), false)
+    end
+    handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(#handoff.sessions(legacy_base(root)) == 0, "every stale legacy session must be pruned")
+  end,
+
+  a_live_legacy_lease_survives_init = function()
+    local root = fs.tempdir()
+    local base = legacy_session(root, "20260101-000000-a", true)
+    handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(fs.is_dir(path.join(base, "20260101-000000-a")), "the live legacy session must survive")
+    assert(fs.is_dir(base), "the legacy base must survive")
+    assert(fs.is_dir(legacy_dir(root)), "the parent chain must survive")
+    assert(fs.is_dir(legacy_plugins_dir(root)), "the parent chain must survive")
+    assert(fs.is_dir(legacy_cc_dir(root)), "the parent chain must survive")
+  end,
+
+  init_removes_the_empty_legacy_parents = function()
+    local root = fs.tempdir()
+    legacy_session(root, "20260101-000000-a", false)
+    handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(not fs.exists(legacy_base(root)), "the legacy base must be removed")
+    assert(not fs.exists(legacy_dir(root)), "claudestacks must be removed")
+    assert(not fs.exists(legacy_plugins_dir(root)), "plugins must be removed")
+    assert(not fs.exists(legacy_cc_dir(root)), "cc must be removed")
+    assert(fs.is_dir(path.join(root, ".airsstack")), ".airsstack must remain")
+  end,
+
+  init_leaves_a_nonempty_legacy_parent = function()
+    local root = fs.tempdir()
+    legacy_session(root, "20260101-000000-a", false)
+    fs.write(path.join(legacy_plugins_dir(root), "keep.txt"), "x")
+    handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(not fs.exists(legacy_base(root)), "the emptied legacy base must be removed")
+    assert(not fs.exists(legacy_dir(root)), "the emptied claudestacks must be removed")
+    assert(fs.is_dir(legacy_plugins_dir(root)), "the nonempty plugins must remain")
+    assert(fs.is_dir(legacy_cc_dir(root)), "cc above the nonempty level must remain")
+    assert(fs.exists(path.join(legacy_plugins_dir(root), "keep.txt")), "the file must remain")
+  end,
+
+  a_legacy_base_that_is_a_file_is_left_untouched = function()
+    local root = fs.tempdir()
+    fs.mkdir(legacy_dir(root))
+    fs.write(legacy_base(root), "x")
+    local directory = handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(fs.is_dir(directory), directory)
+    local expected = path.join(root, handoff.HANDOFF_REL)
+    assert(directory:sub(1, #expected) == expected, directory .. " should sit under " .. expected)
+    assert(fs.is_file(legacy_base(root)), "the legacy file must be untouched")
+    assert(fs.read_lines(legacy_base(root))[1] == "x", "the legacy file content must be untouched")
+  end,
+
+  init_with_no_legacy_tree_mints_as_before = function()
+    local root = fs.tempdir()
+    local directory, id = handoff.init(root, "20260101-120000", 10, NOW, 120, root)
+    assert(fs.is_dir(directory), directory)
+    assert(fs.exists(path.join(directory, handoff.LEASE)), "a new session holds its lease")
+    assert(directory:sub(-#id) == id, directory .. " should end in " .. id)
+    local expected = path.join(root, handoff.HANDOFF_REL)
+    assert(directory:sub(1, #expected) == expected, directory .. " should sit under " .. expected)
+    local lines = fs.read_lines(path.join(root, ".gitignore"))
+    assert(lines[1] == handoff.IGNORE_LINE, tostring(lines[1]))
   end,
 
   without_a_root_a_subdirectory_mints_its_own_tree = function()
