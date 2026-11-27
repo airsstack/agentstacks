@@ -77,7 +77,21 @@ pub fn init<W: Workspace, G: Git>(
         Err(error) if error.kind() == ErrorKind::NotFound => {}
         Err(error) => return Err(at_project(error)),
     }
+    let text = render(workspace, git, tools, packs)?;
+    workspace.write_project(&text).map_err(at_project)
+}
 
+/// Resolves `tools` and `packs` and renders the `agentstacks.toml` text, writing nothing.
+///
+/// # Errors
+///
+/// Every refusal of resolving the arguments, as [`init`] returns them before its write.
+pub fn render<W: Workspace, G: Git>(
+    workspace: &W,
+    git: &G,
+    tools: &[String],
+    packs: &[String],
+) -> Result<String, Diagnostics> {
     let mut refusals = Diagnostics::new();
     let mut without_git = Vec::new();
     let tools = collect(
@@ -107,9 +121,7 @@ pub fn init<W: Workspace, G: Git>(
     if !refusals.is_empty() {
         return Err(refusals);
     }
-    workspace
-        .write_project(&render_project(&tools, &packs))
-        .map_err(at_project)
+    Ok(render_project(&tools, &packs))
 }
 
 /// Resolves the arguments of one option, in the order given, each repeated argument once.
@@ -360,6 +372,22 @@ mod tests {
             refused(result)?,
             [format!("agentstacks.toml: {}", FakeWorkspace::denied())]
         );
+        assert_eq!(workspace.project_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn render_returns_text_without_writing() -> TestResult {
+        let workspace = FakeWorkspace::new();
+        let text = render(
+            &workspace,
+            &git()?,
+            &strings(&["claude"]),
+            &strings(&["core"]),
+        )
+        .map_err(|refusals| format!("{refusals:?}"))?;
+        assert!(text.contains("[tools.claude]"), "{text}");
+        assert!(text.contains("[packs.core]"), "{text}");
         assert_eq!(workspace.project_written(), None);
         Ok(())
     }

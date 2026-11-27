@@ -18,15 +18,18 @@ use std::path::Path;
 
 use crate::app::plan::binaries::{Binaries, check_binaries};
 use crate::app::plan::load::{Loaded, load_set};
-use crate::app::plan::read::{Inputs, LOCK_FILE, read_inputs};
+use crate::app::plan::read::{Inputs, LOCK_FILE, read_inputs, read_inputs_text};
 use crate::app::plan::sources::fetch_sources;
 use crate::app::plan::steps::decide_steps;
 use crate::app::plan::tools::run_tools;
 use crate::port::{Adapter, Binary, FileTree, Git, Workspace};
 use crate::types::lock::{LockedEntry, Lockfile, check_airsl_presence};
 use crate::types::manifest::PackManifest;
-use crate::types::plan::{Landed, Plan, Skipped, Step, airsl_pin, lock_contents};
-use crate::types::project::SourceError;
+use crate::types::op::OpPath;
+use crate::types::plan::{
+    DiskState, Landed, Link, Plan, Resolution, Skipped, Step, airsl_pin, lock_contents,
+};
+use crate::types::project::{LocalPath, SourceError};
 use crate::types::report::{Diagnostic, Diagnostics, Location};
 use crate::types::resolve::SourceKey;
 use crate::types::tree::tree_hash;
@@ -63,10 +66,92 @@ pub fn plan<W: Workspace, G: Git, B: Binary, A: Adapter>(
     adapter: &A,
 ) -> Result<Plan, Diagnostics> {
     let inputs = read_inputs(workspace)?;
-    let fetched = fetch_sources(&inputs, workspace, git);
-    let loaded = load_set(&inputs, fetched)?;
+    build(workspace, git, binary, adapter, &inputs)
+}
+
+/// Builds the plan for `project_text` instead of the project's own file.
+///
+/// Path sources resolve against `workspace` and its lock is the base. Nothing is written.
+/// This is what an `init --dry-run` previews.
+///
+/// # Errors
+///
+/// The refusals of parsing `project_text` (including a legacy `api`), of reading the lock,
+/// and of every later plan step, as [`plan`] returns them.
+pub fn plan_rendered<W: Workspace, G: Git, B: Binary, A: Adapter>(
+    workspace: &W,
+    git: &G,
+    binary: &B,
+    adapter: &A,
+    project_text: &str,
+) -> Result<Plan, Diagnostics> {
+    let inputs = read_inputs_text(project_text)?;
+    build(&Fresh(workspace), git, binary, adapter, &inputs)
+}
+
+/// A workspace that reads sources from the real project but sees no lock and no file at
+/// any target path, so a preview plans a fresh project while path sources still resolve.
+struct Fresh<'a, W>(&'a W);
+
+impl<W: Workspace> Workspace for Fresh<'_, W> {
+    type Tree = W::Tree;
+
+    fn project_text(&self) -> std::io::Result<String> {
+        self.0.project_text()
+    }
+
+    fn lock_text(&self) -> std::io::Result<Option<String>> {
+        Ok(None)
+    }
+
+    fn resolve(&self, _path: &OpPath) -> std::io::Result<Resolution> {
+        Ok(Resolution::Inside {
+            link: Link::Direct,
+            state: DiskState::Absent,
+        })
+    }
+
+    fn source_tree(&self, dir: &LocalPath) -> std::io::Result<Option<Self::Tree>> {
+        self.0.source_tree(dir)
+    }
+
+    fn stage(&self, path: &OpPath, bytes: &[u8]) -> std::io::Result<()> {
+        self.0.stage(path, bytes)
+    }
+
+    fn discard(&self, path: &OpPath) -> std::io::Result<()> {
+        self.0.discard(path)
+    }
+
+    fn swap(&self, path: &OpPath) -> std::io::Result<()> {
+        self.0.swap(path)
+    }
+
+    fn delete(&self, path: &OpPath) -> std::io::Result<()> {
+        self.0.delete(path)
+    }
+
+    fn write_project(&self, text: &str) -> std::io::Result<()> {
+        self.0.write_project(text)
+    }
+
+    fn write_lock(&self, text: &str) -> std::io::Result<()> {
+        self.0.write_lock(text)
+    }
+}
+
+/// Steps 2 to 10 of the flow, over inputs read by the caller.
+fn build<W: Workspace, G: Git, B: Binary, A: Adapter>(
+    workspace: &W,
+    git: &G,
+    binary: &B,
+    adapter: &A,
+    inputs: &Inputs,
+) -> Result<Plan, Diagnostics> {
+    let fetched = fetch_sources(inputs, workspace, git);
+    let loaded = load_set(inputs, fetched)?;
     let mut ran = run_tools(&loaded, workspace, adapter);
-    let mut binaries = check_binaries(&inputs, &loaded, &ran, binary);
+    let mut binaries = check_binaries(inputs, &loaded, &ran, binary);
 
     let mut refusals = std::mem::take(&mut ran.refusals);
     refusals.extend(std::mem::take(&mut binaries.refusals));
@@ -74,7 +159,7 @@ pub fn plan<W: Workspace, G: Git, B: Binary, A: Adapter>(
         return Err(refusals);
     }
 
-    let decided = decide_steps(&inputs, &ran, workspace);
+    let decided = decide_steps(inputs, &ran, workspace);
     if !decided.refusals.is_empty() {
         return Err(decided.refusals);
     }
@@ -88,7 +173,7 @@ pub fn plan<W: Workspace, G: Git, B: Binary, A: Adapter>(
         loaded.notes,
         binaries.pin,
         lock,
-        old_files(&inputs),
+        old_files(inputs),
     ))
 }
 

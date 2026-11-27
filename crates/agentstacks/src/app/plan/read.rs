@@ -74,6 +74,36 @@ pub(super) fn read_inputs<W: Workspace>(workspace: &W) -> Result<Inputs, Diagnos
     }
 }
 
+/// Parses `project_text` as the project for a preview that starts from no lock, as
+/// [`read_inputs`] parses the project's own file. The workspace is not read: a dry-run
+/// preview sees a fresh project, while its path sources resolve against the real one.
+///
+/// # Errors
+///
+/// The refusals of parsing the text, including a legacy `api`.
+pub(super) fn read_inputs_text(project_text: &str) -> Result<Inputs, Diagnostics> {
+    let mut refusals = Diagnostics::new();
+    let project = ProjectFile::parse(Path::new(PROJECT_FILE), project_text)
+        .map_err(|found| refusals.extend(found))
+        .ok()
+        .filter(|project| match project.refuse_legacy() {
+            Ok(()) => true,
+            Err(error) => {
+                refusals.push(Diagnostic::new(Location::file(PROJECT_FILE), error));
+                false
+            }
+        });
+    project.map_or_else(
+        || Err(refusals),
+        |project| {
+            Ok(Inputs {
+                project,
+                lock: None,
+            })
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

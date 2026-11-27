@@ -38,7 +38,7 @@ mod update;
 pub(crate) use apply::run as apply;
 pub(crate) use console::Console;
 pub(crate) use doctor::run as doctor;
-pub(crate) use init::run as init;
+pub(crate) use init::{InitMode, run as init};
 pub(crate) use plan::run as plan;
 pub(crate) use ports::Ports;
 pub(crate) use update::run as update;

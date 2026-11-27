@@ -18,12 +18,25 @@
 
 use std::io::{BufRead, Write};
 
-use agentstacks::app::init::init;
+use agentstacks::app::init::{init, render};
+use agentstacks::app::plan::plan_rendered;
 use agentstacks::port::{Adapter, Binary, Git, Workspace};
 
 use super::followup::{Rewrite, plan_then_apply};
 use super::{Console, Ports};
 use crate::exit::Outcome;
+use crate::show::{PlanView, plan_text};
+
+/// How `init` ends: ask, apply at once, or only preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InitMode {
+    /// Ask before applying.
+    Ask,
+    /// Apply without asking.
+    Yes,
+    /// Print the rendered file and its plan, and write nothing.
+    DryRun,
+}
 
 /// Writes `agentstacks.toml` for `tools` and `packs`, then plans and applies it.
 ///
@@ -33,7 +46,7 @@ pub(crate) fn run<W, G, B, A, I, O, E>(
     ports: &Ports<W, G, B, A>,
     tools: &[String],
     packs: &[String],
-    yes: bool,
+    mode: InitMode,
     console: &mut Console<I, O, E>,
 ) -> Outcome
 where
@@ -45,11 +58,57 @@ where
     O: Write,
     E: Write,
 {
+    if mode == InitMode::DryRun {
+        return dry(ports, tools, packs, console);
+    }
     if let Err(refusals) = init(&ports.workspace, &ports.git, tools, packs) {
         console.refuse(refusals);
         return Outcome::Refused;
     }
-    plan_then_apply(ports, yes, Rewrite::Written, console)
+    plan_then_apply(ports, mode == InitMode::Yes, Rewrite::Written, console)
+}
+
+/// Renders the project, plans it as written, and prints both. Nothing is written.
+fn dry<W, G, B, A, I, O, E>(
+    ports: &Ports<W, G, B, A>,
+    tools: &[String],
+    packs: &[String],
+    console: &mut Console<I, O, E>,
+) -> Outcome
+where
+    W: Workspace,
+    G: Git,
+    B: Binary,
+    A: Adapter,
+    I: BufRead,
+    O: Write,
+    E: Write,
+{
+    let text = match render(&ports.workspace, &ports.git, tools, packs) {
+        Ok(text) => text,
+        Err(refusals) => {
+            console.refuse(refusals);
+            return Outcome::Refused;
+        }
+    };
+    match plan_rendered(
+        &ports.workspace,
+        &ports.git,
+        &ports.binary,
+        &ports.adapter,
+        &text,
+    ) {
+        Ok(plan) => {
+            console.out_line("agentstacks.toml (dry run — not written)");
+            console.out_line(text.as_str());
+            console.out_line(plan_text(&plan, PlanView::Summary));
+            Outcome::Success
+        }
+        Err(refusals) => {
+            console.refuse(refusals);
+            Outcome::Refused
+        }
+    }
 }
 
 #[cfg(test)]
@@ -74,14 +133,80 @@ mod tests {
     }
 
     #[test]
+    fn dry_run_prints_toml_and_plan_and_writes_nothing() -> TestResult {
+        let world = World::empty()?;
+        let (tools, packs) = args();
+        let mut console = console(false, "");
+        let got = run(&world.ports, &tools, &packs, InitMode::DryRun, &mut console);
+        assert_eq!(got, Outcome::Success, "{}", err_of(&console));
+        let out = out_of(&console);
+        assert!(
+            out.starts_with("agentstacks.toml (dry run — not written)\n"),
+            "{out}"
+        );
+        assert!(out.contains("path = \"./packs/core\""), "{out}");
+        assert!(out.contains("agentstacks plan\n"), "{out}");
+        assert_eq!(world.ports.workspace.project_written(), None);
+        assert_eq!(
+            world.ports.workspace.file_bytes(&OpPath::new(AGENT_FILE)?),
+            None
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dry_run_succeeds_when_the_project_file_exists() -> TestResult {
+        let world = World::paths()?;
+        let (tools, packs) = args();
+        let mut console = console(false, "");
+        let got = run(&world.ports, &tools, &packs, InitMode::DryRun, &mut console);
+        assert_eq!(got, Outcome::Success, "{}", err_of(&console));
+        assert_eq!(world.ports.workspace.project_written(), None);
+        assert_eq!(world.ports.workspace.lock_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn dry_run_refusal_writes_nothing() -> TestResult {
+        let world = World::empty()?;
+        let tools = vec!["./extensions/claude".to_owned()];
+        let packs = vec!["nope".to_owned()];
+        let mut console = console(false, "");
+        let got = run(&world.ports, &tools, &packs, InitMode::DryRun, &mut console);
+        assert_eq!(got, Outcome::Refused);
+        assert!(!err_of(&console).is_empty());
+        assert_eq!(world.ports.workspace.project_written(), None);
+        assert_eq!(world.ports.workspace.lock_written(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn dry_run_output_layout_is_header_toml_blank_plan() -> TestResult {
+        let world = World::empty()?;
+        let (tools, packs) = args();
+        let mut console = console(false, "");
+        let got = run(&world.ports, &tools, &packs, InitMode::DryRun, &mut console);
+        assert_eq!(got, Outcome::Success, "{}", err_of(&console));
+        let out = out_of(&console);
+        assert!(
+            out.starts_with("agentstacks.toml (dry run — not written)\napi = 1\n"),
+            "{out}"
+        );
+        assert!(out.contains("\n\nagentstacks plan\n"), "{out}");
+        assert!(out.ends_with("skipped\n"), "{out}");
+        assert_eq!(world.ports.workspace.lock_written(), None);
+        Ok(())
+    }
+
+    #[test]
     fn init_with_yes_applies() -> TestResult {
         let world = World::empty()?;
         let (tools, packs) = args();
         let mut console = console(false, "");
-        let got = run(&world.ports, &tools, &packs, true, &mut console);
+        let got = run(&world.ports, &tools, &packs, InitMode::Yes, &mut console);
         assert_eq!(got, Outcome::Success, "{}", err_of(&console));
         assert_eq!(err_of(&console), "");
-        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\n"));
+        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"));
         let workspace = &world.ports.workspace;
         let written = workspace.project_written().ok_or("a project file")?;
         assert!(written.contains("path = \"./packs/core\""), "{written}");
@@ -97,7 +222,7 @@ mod tests {
         let world = World::paths()?;
         let (tools, packs) = args();
         let mut console = console(false, "");
-        let got = run(&world.ports, &tools, &packs, true, &mut console);
+        let got = run(&world.ports, &tools, &packs, InitMode::Yes, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(
             err_of(&console),
@@ -120,7 +245,7 @@ mod tests {
         };
         let (tools, packs) = args();
         let mut console = console(false, "");
-        let got = run(&ports, &tools, &packs, true, &mut console);
+        let got = run(&ports, &tools, &packs, InitMode::Yes, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(
             err_of(&console),
@@ -141,7 +266,7 @@ mod tests {
         };
         let (tools, packs) = args();
         let mut console = console(true, "y\n");
-        let got = run(&ports, &tools, &packs, true, &mut console);
+        let got = run(&ports, &tools, &packs, InitMode::Yes, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(
             err_of(&console),
@@ -155,7 +280,7 @@ mod tests {
         let world = World::empty()?;
         let (tools, packs) = args();
         let mut console = console(true, "n\n");
-        let got = run(&world.ports, &tools, &packs, false, &mut console);
+        let got = run(&world.ports, &tools, &packs, InitMode::Ask, &mut console);
         assert_eq!(got, Outcome::Success);
         assert_eq!(err_of(&console), format!("Apply? [y/N] {KEPT}"));
         assert!(world.ports.workspace.project_written().is_some());
@@ -171,7 +296,7 @@ mod tests {
         let world = World::empty()?;
         let (tools, packs) = args();
         let mut console = console(false, "");
-        let got = run(&world.ports, &tools, &packs, false, &mut console);
+        let got = run(&world.ports, &tools, &packs, InitMode::Ask, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(
             err_of(&console),

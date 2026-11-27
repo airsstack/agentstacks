@@ -40,4 +40,4 @@ mod testing;
 mod tools;
 
 #[doc(inline)]
-pub use flow::plan;
+pub use flow::{plan, plan_rendered};
