@@ -3,9 +3,9 @@
 **Set up any agentic coding tool from one CLI: write the content once, and agentstacks renders it in
 each tool's own format.**
 
-> **Status: 1.0.** The CLI, the Claude Code and OpenCode extensions and the five official packs are
-> released. The Muse Code extension is built and ships with the next `packs-v*` release
-> (`packs-v1.0.0` does not include it). The extension API is `api = 1` and frozen: 1.x changes are
+> **Status: 1.1.** The CLI, the Claude Code, Muse Code and OpenCode extensions and the five
+> official packs are released. The Muse Code extension is released in `packs-v1.1.0`.
+> The extension API is `api = 1` and frozen: 1.x changes are
 > additive only
 > ([the stability promise](https://airsstack.github.io/agentstacks/ch06-06-stability.html)). Coming from the claudestacks
 > plugins? See
@@ -81,22 +81,22 @@ api = 1
 
 [tools.claude]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "extensions/claude"
 
 [packs.core]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/core"
 
 [packs.guideline-rust]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/guideline-rust"
 
 [packs.sdlc]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/sdlc"
 ```
 
@@ -106,9 +106,9 @@ A teammate runs `agentstacks apply` and gets the same packs in whichever support
 
 | Tool | Status |
 |---|---|
-| Claude Code | Released (`extensions/claude`, `packs-v1.0.0`) |
-| Muse Code | Built (`extensions/musecode`), ships with the next `packs-v*` release |
-| OpenCode | Released (`extensions/opencode`, `packs-v1.0.0`) |
+| Claude Code | Released (`extensions/claude`, `packs-v1.1.0`) |
+| Muse Code | Released (`extensions/musecode`, `packs-v1.1.0`) |
+| OpenCode | Released (`extensions/opencode`, `packs-v1.1.0`) |
 | Your own | Write a tool extension against the public API: [Writing a Tool Extension](https://airsstack.github.io/agentstacks/ch06-00-authoring.html) |
 
 There is no plugin marketplace. Every tool is set up through the CLI, in that tool's native
@@ -116,7 +116,7 @@ project configuration.
 
 ## Packs
 
-The five packs come from the claudestacks plugins and are released as `packs-v1.0.0`:
+The five packs come from the claudestacks plugins and are released as `packs-v1.1.0`:
 
 | Pack | Contents |
 |---|---|

@@ -6,9 +6,7 @@ hooks reach Muse Code, what it skips, and what it cannot do. It is checked again
 [the extension API](ch06-01-extensions.md) and [hooks](ch06-02-hooks.md).
 
 Use it with `agentstacks init --tool musecode --pack <p>`, or add it to a project with
-`agentstacks ext add musecode`. The extension ships with the next `packs-v*` release
-(`packs-v1.0.0` does not include it); until then copy `extensions/musecode` from a checkout of this
-repository into the project, for example to `ext/musecode`, and pass `--tool ext/musecode`.
+`agentstacks ext add musecode`. The extension is released in `packs-v1.1.0`.
 
 Start Muse Code in the project root and trust the workspace: project config loads only from a
 trusted workspace. After `apply`, start a new session, because Muse Code reads its hooks, skills and
