@@ -5,6 +5,15 @@ together under `packs-v*` tags, which `agentstacks init` and `agentstacks update
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each pack and extension
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [packs-v1.1.1] - 2026-11-27
+
+### Fixed
+
+- The `core` pack (1.0.1): handoff sessions are now minted under `.airsstack/handoff/`
+  instead of the legacy `.airsstack/cc/plugins/claudestacks/handoff/`. The first session
+  after updating prunes the legacy tree (live leases are respected) and removes its empty
+  parent directories; reports written under the legacy path remain recognised.
+
 ## [packs-v1.1.0] - 2026-11-27
 
 ### Added
