@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-27
 built-on: 3c4a4baa5fd8
 ---
@@ -218,3 +218,27 @@ otherwise no commit.
 - `cargo make dod`, `cargo make claudevs-check`, `cargo make opencode-check`,
   `cargo make musecode-check`, `cargo make deny` and `cargo make book-build` all exit 0 on the
   finished branch (Task 5).
+
+## Review findings
+
+- Reviewer verdict: Approve; `blocking: none` (one reviewer round over commits
+  `07439d1`–`15e3c9d` against this plan).
+- Non-blocking, recorded as Deviations below: the `<previous-packs-version>` placeholder in
+  `RELEASING.md` instead of the literal `packs-v1.0.0`, and the `--yes` flags on the new
+  verification runs.
+
+## Deviations
+
+- 2026-11-27, Task 4: the update verification pins to a `<previous-packs-version>` placeholder
+  (defined in step 4's text) instead of the literal `packs-v1.0.0` the plan named. Equivalent
+  for this release (the previous packs release is 1.0.0) and keeps the runbook reusable.
+- 2026-11-27, Task 4: the new `ext add` and `update` verification runs carry `--yes`, which
+  the plan's command text did not name. It is required for the non-interactive subshell; the
+  CLI accepts it for both commands (`agentstacks ext add --help` verified in this run).
+- 2026-11-27, Task 1: `cargo metadata --no-deps` did not refresh `Cargo.lock`, so the lock was
+  regenerated with `cargo update -w`, which updated exactly the two bumped crates and no
+  dependency.
+- 2026-11-27, Task 1/5 environment: `cargo make test` inside the managed sandbox failed
+  `fs::disk::tests::a_unix_socket_is_other` with `PermissionDenied` on binding a Unix socket.
+  The same test passes unsandboxed (`1 passed`), and the full `cargo make dod` gate was run
+  unsandboxed for Task 5 and exited 0; the failure is the sandbox, not the change.
