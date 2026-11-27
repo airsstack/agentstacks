@@ -47,6 +47,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use agentstacks::port::FakeBinary;
     use agentstacks::types::op::OpPath;
 
     use super::*;
@@ -63,8 +64,9 @@ mod tests {
     #[test]
     fn doctor_healthy_is_success() -> TestResult {
         let world = applied()?;
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let mut console = console(false, "");
-        let got = run(&world.ports.workspace, &world.ports.binary, &mut console);
+        let got = run(&world.ports.workspace, &binary, &mut console);
         assert_eq!(got, Outcome::Success, "{}", out_of(&console));
         assert_eq!(out_of(&console), "healthy\n");
         assert_eq!(err_of(&console), "");
@@ -78,8 +80,9 @@ mod tests {
             .ports
             .workspace
             .set_file(&OpPath::new(AGENT_FILE)?, b"edited");
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let mut console = console(false, "");
-        let got = run(&world.ports.workspace, &world.ports.binary, &mut console);
+        let got = run(&world.ports.workspace, &binary, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(out_of(&console), format!("changed: {AGENT_FILE}\n"));
         Ok(())
