@@ -548,7 +548,7 @@ fn compaction_rearms_the_read_hook() -> TestResult {
 /// communication report breaking its protocol; returns the directory they sit in, relative to
 /// `root`.
 fn write_reports(root: &Path) -> Result<&'static str, Box<dyn Error>> {
-    let rel = ".airsstack/cc/plugins/claudestacks/handoff/s";
+    let rel = ".airsstack/handoff/s";
     fs::create_dir_all(root.join(rel))?;
     fs::write(
         root.join(rel).join("01-coder-bad.md"),

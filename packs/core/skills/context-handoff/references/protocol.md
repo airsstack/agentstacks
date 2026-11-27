@@ -15,12 +15,14 @@ path and rules; change one, change the other.
 Project-local, git-ignored, rooted at the **worktree root**:
 
 ```
-<worktree-root>/.airsstack/cc/plugins/claudestacks/handoff/<session-id>/<NN>-<agent>-<slug>.md
+<worktree-root>/.airsstack/handoff/<session-id>/<NN>-<agent>-<slug>.md
 ```
 
 - `<session-id>` = `<YYYYMMDD-HHMMSS>-<rand4>`, minted by `handoff.lua init`.
 - `<NN>` = zero-padded spawn sequence within the session, assigned by the orchestrator.
 - `<agent>` = agent role; `<slug>` = short kebab task slug, assigned by the orchestrator.
+
+Reports under the pre-rename `.airsstack/cc/plugins/claudestacks/handoff` tree remain recognised as session-tier.
 
 Rooting at the worktree root isolates parallel worktrees — each gets its own physical
 handoff tree, no shared state, no cross-worktree prune race. (This differs from the
@@ -55,7 +57,7 @@ protocol has three tiers:
 
 | Tier | Path | `session:` / `seq:` |
 |---|---|---|
-| session tree | `<root>/.airsstack/cc/plugins/claudestacks/handoff/<sid>/` | present |
+| session tree | `<root>/.airsstack/handoff/<sid>/` | present |
 | single-subagent exception (below) | a literal temp path | absent |
 | `init`-refused fallback (below) | `<session-scratch>/handoff/` | absent |
 
