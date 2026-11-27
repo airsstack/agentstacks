@@ -240,10 +240,13 @@ Prints each finding on stdout, one per line, in the order returned, for example
 `changed: .claude/agents/core-coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`. With no findings it
 prints `healthy` and exits 0. Any finding exits 1.
 
-`doctor` reads the lock and the files it names, never `agentstacks.toml`, and always checks the
-`airsl` runtime: missing airsl is reported with the install command, with or without a lock pin
+`doctor` reads the lock and the files it names, never `agentstacks.toml`, and checks the
+`airsl` runtime when the project needs it: the lock pins airsl, a locked file is a hook
+runtime (`runtime.lua`), or there is no usable lock to tell from. Missing airsl is reported
+with the install command, with or without a lock pin
 (`airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)`, `airsl: not found on PATH (lock pins <v>) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)`);
-a parseable installed version is healthy without a pin, and an exact match is required with one.
+a parseable installed version is healthy without a pin, an exact match is required with
+one, and a project with neither a pin nor a hook runtime is healthy without airsl.
 A lock written by a 0.x release is read like a current one: its api is not a finding.
 
 ## 9. `ext add`
