@@ -2,13 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 1.0, `api = 1` frozen; core, CLI, the three extensions, packs and claudevs built
+## Status: 1.1, `api = 1` frozen; core, CLI, the three extensions, packs and claudevs built
 
 The pack, extension, project and lock formats, plan, apply, doctor, update, the extension host, the
 hook runtime, the CLI commands (`init`, `plan`, `apply`, `doctor`, `update`, `ext add`,
 `ext test`), the claude, musecode and opencode extensions, the five official packs and the claudevs
-crates are built and tested. The musecode extension ships with the next `packs-v*` release
-(`packs-v1.0.0` does not include it).
+crates are built and tested. The musecode extension is released in `packs-v1.1.0`.
 
 ```text
 crates/agentstacks/       library; types · port · app · fs · process · host, all built

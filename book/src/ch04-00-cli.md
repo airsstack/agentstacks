@@ -64,9 +64,7 @@ Refusals are printed one `Diagnostic` per line, sorted.
 - Official packs: `core`, `sdlc`, `journal`, `guideline-rust`, `guideline-python`. Official tools:
   `claude`, `musecode`, `opencode`. To use an extension from a checkout instead of a release, copy
   its directory (for example `extensions/opencode`) into the project and pass that path, such as
-  `--tool ext/opencode`. The Muse Code extension is built and ships with the next `packs-v*` release
-  (`packs-v1.0.0` does not include it); until then copy `extensions/musecode` into the project and
-  pass `--tool ext/musecode`.
+  `--tool ext/opencode`.
 - An official name expands to `git = "https://github.com/airsstack/agentstacks"`, the latest
   `packs-v<api>.*` tag (the newest release whose major version is the `api` this agentstacks speaks, so `packs-v1.*` for `api = 1`), and `subdir = "packs/<name>"` (a tool: `extensions/<name>`).
 - A path's table key is the `name` in that directory's `pack.toml` or `extension.toml`.

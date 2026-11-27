@@ -54,8 +54,9 @@ its own `claudevs-v*` and `claudevs-cli-v*` tags.
    `packs/` or `extensions/`, also delete `packs-v<packs-version>` the same way and push it again
    on the new merged commit, because step 2 tagged the old one.
 4. Verify in one subshell with a throwaway home, as step 5 of the 0.1.0 record does. The installer
-   also installs airsl. `<cli-version>` is the version of the newest binary release, and
-   `<packs-version>` is the packs tag the project must resolve.
+   also installs airsl. `<cli-version>` is the version of the newest binary release,
+   `<packs-version>` is the packs tag the project must resolve, and
+   `<previous-packs-version>` is the packs release before it.
 
    ```sh
    (
@@ -66,8 +67,20 @@ its own `claudevs-v*` and `claudevs-cli-v*` tags.
      src="$(mktemp -d)" && git clone -q --depth 1 --branch packs-v<packs-version> https://github.com/airsstack/agentstacks "$src"
      agentstacks ext test "$src/extensions/claude"     # passed
      agentstacks ext test "$src/extensions/opencode"   # passed
+     agentstacks ext test "$src/extensions/musecode"   # passed
      cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
        && grep 'tag = "packs-v<packs-version>"' agentstacks.toml && agentstacks doctor    # healthy
+     cd "$(mktemp -d)" && agentstacks init --tool musecode --pack core --yes \
+       && grep 'tag = "packs-v<packs-version>"' agentstacks.toml && agentstacks doctor    # healthy
+     cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
+       && agentstacks ext add musecode --yes && agentstacks doctor    # healthy
+     cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
+       && agentstacks ext add https://github.com/airsstack/agentstacks --subdir extensions/musecode --tag packs-v<packs-version> --yes \
+       && agentstacks doctor    # healthy
+     cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
+       && sed -i.bak 's/tag = "packs-v<packs-version>"/tag = "packs-v<previous-packs-version>"/' agentstacks.toml \
+       && agentstacks update --yes && grep 'tag = "packs-v<packs-version>"' agentstacks.toml \
+       && agentstacks doctor    # healthy
    )
    ```
 

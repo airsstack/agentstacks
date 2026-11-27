@@ -2,7 +2,7 @@
 
 This chapter sets up Claude Code in a project with three official packs: `core`, `sdlc` and
 `guideline-rust`. (`sdlc` requires `core`, so the two always come together.) The counts and
-files shown are those of `packs-v1.0.0`.
+files shown are those of `packs-v1.1.0`.
 
 ## Init
 
@@ -15,9 +15,7 @@ agentstacks init --tool claude --pack core --pack sdlc --pack guideline-rust
 `--tool opencode` sets up OpenCode the same way, `--tool musecode` sets up Muse Code, and the flags
 may be given together. To use an extension from a checkout of this repository instead of a release,
 copy it into your project, for example `extensions/opencode` to `ext/opencode`, and pass
-`--tool ext/opencode` (a tool path must stay inside the project). The Muse Code extension is built
-and ships with the next `packs-v*` release (`packs-v1.0.0` does not include it); until then copy
-`extensions/musecode` to `ext/musecode` the same way and pass `--tool ext/musecode`.
+`--tool ext/opencode` (a tool path must stay inside the project).
 
 `init` writes `agentstacks.toml`, prints the plan, one line per file, and asks before applying. The
 plan ends:
@@ -52,22 +50,22 @@ api = 1
 
 [tools.claude]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "extensions/claude"
 
 [packs.core]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/core"
 
 [packs.guideline-rust]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/guideline-rust"
 
 [packs.sdlc]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.0.0"
+tag = "packs-v1.1.0"
 subdir = "packs/sdlc"
 ```
 
@@ -95,7 +93,7 @@ An item a tool cannot express is shown as a skip with its reason, never dropped.
 healthy
 ```
 
-`agentstacks update` looks for a newer `packs-v1.*` tag. While `packs-v1.0.0` is the newest, it
+`agentstacks update` looks for a newer `packs-v1.*` tag. While `packs-v1.1.0` is the newest, it
 ends with:
 
 ```text

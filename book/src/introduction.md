@@ -15,10 +15,10 @@ you use. Before anything is written, you see exactly what will change.
 
 ## Status
 
-agentstacks is at 1.0. It ships official extensions for Claude Code and OpenCode and five official
-packs: `core`, `sdlc`, `journal`, `guideline-rust` and `guideline-python`. The Muse Code
-(`musecode`) extension is built and ships with the next `packs-v*` release (`packs-v1.0.0` does not
-include it). The pack format and the extension API are frozen as `api = 1`;
+agentstacks is at 1.1. It ships official extensions for Claude Code, Muse Code and OpenCode and
+five official packs: `core`, `sdlc`, `journal`, `guideline-rust` and `guideline-python`. The
+Muse Code (`musecode`) extension is released in `packs-v1.1.0`. The pack format and the
+extension API are frozen as `api = 1`;
 [the stability page](ch06-06-stability.md) says what that promises. A project written for the 0.x
 releases moves with `agentstacks update`, see [Moving a Project from 0.x](ch03-01-from-0x.md). You
 can also add your own tool with `agentstacks ext add` and check it with `agentstacks ext test`; see
