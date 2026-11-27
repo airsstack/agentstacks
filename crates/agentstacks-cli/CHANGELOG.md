@@ -4,6 +4,25 @@ All notable changes to `agentstacks-cli` (the `agentstacks` binary) are recorded
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-27
+
+### Added
+
+- `plan --summary` and `plan --verbose`: the plan shows counts per owner by default, the
+  full one-line-per-file list with `--verbose`. The plan `apply`, `init`, `update` and
+  `ext add` show is the summary.
+- `init --dry-run`: prints the rendered `agentstacks.toml` and its plan (planned as a fresh
+  project) and writes nothing; it conflicts with `--yes`.
+
+### Changed
+
+- A successful apply that wrote or deleted a file now ends with
+  `note: start a new session — hooks, skills and agents load at session start`.
+- `doctor` always checks the `airsl` runtime, with or without a lock pin; a missing
+  `airsl` is reported with the install command.
+- Cache refusals when neither `AIRSSTACK_HOME` nor `HOME` is set now name both variables,
+  and a failed cache write names the `AIRSSTACK_HOME` remedy (see the library changelog).
+
 ## [1.1.0] - 2026-11-27
 
 ### Added

@@ -4,6 +4,25 @@ All notable changes to `agentstacks` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-27
+
+### Added
+
+- `app::plan::plan_rendered`, which plans a given project text as a fresh project (no
+  lock, no target files) while resolving its path sources against a real workspace, and
+  `app::init::render`, the resolve-and-render half of `init` that writes nothing.
+
+### Changed
+
+- The git cache root is `AIRSSTACK_HOME` when it is set and non-empty, otherwise
+  `$HOME/.airsstack`; `cache_home` takes both values and returns the root, and `url_dir`
+  composes from the root. `GitCli::new` takes the `AIRSSTACK_HOME` value beside `HOME`.
+- `types::plan::airsl_finding` takes an optional pin and reports a missing `airsl` with
+  the install command, with or without a pin (`Finding::AirslMissing` without one);
+  `doctor` asks for the `airsl` version on every lock path.
+- A failed cache operation's refusal now ends with
+  `(set AIRSSTACK_HOME to a writable directory to move the cache)`.
+
 ## [1.1.0] - 2026-11-27
 
 ### Added
