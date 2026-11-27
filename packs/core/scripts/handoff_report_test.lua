@@ -58,6 +58,17 @@ return {
     assert(found:find("seq%-missing"), found)
   end,
 
+  a_legacy_session_tier_report_needs_session_and_seq = function()
+    local handoff = require("lib.handoff")
+    local dir = path.join(fs.tempdir(), handoff.LEGACY_HANDOFF_REL, "20260101-000000-ab")
+    fs.mkdir(dir)
+    local file = path.join(dir, "01-coder-thing.md")
+    fs.write(file, "---\nagent: coder\ntask: t\n---\n<summary>\nx\n</summary>\n")
+    local found = ids(file)
+    assert(found:find("session%-missing"), found)
+    assert(found:find("seq%-missing"), found)
+  end,
+
   a_temp_path_report_must_not_carry_session_or_seq = function()
     local file = written(
       "---\nagent: chain-reader\ntask: t\nsession: 20260101-000000-ab\nseq: 01\n---\n<summary>\nx\n</summary>\n"
@@ -205,8 +216,8 @@ return {
   end,
 
   a_session_tier_path_is_found = function()
-    assert(report.path_in("blocking: none\n.airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md")
-      == ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md")
+    assert(report.path_in("blocking: none\n.airsstack/handoff/s/03-reviewer-diff.md")
+      == ".airsstack/handoff/s/03-reviewer-diff.md")
   end,
 
   a_trailing_period_is_not_part_of_the_path = function()
@@ -255,6 +266,11 @@ return {
 
   a_session_tree_absolute_path_is_under_the_root = function()
     assert(report.under_handoff_root(
+      "/repo/.airsstack/handoff/s/01-coder-x.md", nil) == true)
+  end,
+
+  a_legacy_session_tree_path_is_under_the_root = function()
+    assert(report.under_handoff_root(
       "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md", nil) == true)
   end,
 
@@ -289,14 +305,14 @@ return {
   end,
 
   a_relative_session_path_resolves_against_cwd_and_qualifies = function()
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     assert(report.under_handoff_root(relative, "/repo") == true)
   end,
 
   a_relative_path_with_no_cwd_does_not_qualify = function()
     -- There is nothing to resolve it against; guessing the process's own working directory
     -- would validate the same text differently from one directory to the next.
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     assert(report.under_handoff_root(relative, nil) == false)
   end,
 
@@ -313,21 +329,21 @@ return {
     -- then cites `file:line` evidence, as CLAUDE.md's "Never assert what you have not checked"
     -- requires. The citation is not under any handoff root, so it must not override the real
     -- path.
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local text = "wrote the report at " .. real .. ". The decision table sits at hooks.md:1011"
     assert(report.path_in_root(text, nil) == real, tostring(report.path_in_root(text, nil)))
   end,
 
   a_trailing_doc_url_does_not_become_the_path = function()
     -- URL form of the same rule.
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local text = "wrote the report at " .. real
       .. ". See https://code.claude.com/docs/en/hooks.md for the table."
     assert(report.path_in_root(text, nil) == real, tostring(report.path_in_root(text, nil)))
   end,
 
   a_trailing_absolute_claude_md_reference_does_not_become_the_path = function()
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local text = "wrote the report at " .. real .. ". Per /repo/CLAUDE.md this is mandatory."
     assert(report.path_in_root(text, nil) == real, tostring(report.path_in_root(text, nil)))
   end,
@@ -350,7 +366,7 @@ return {
   end,
 
   a_relative_path_resolves_against_the_supplied_cwd_through_path_in_root = function()
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     assert(report.path_in_root("report at " .. relative, "/repo")
       == "/repo/" .. relative)
   end,
@@ -359,7 +375,7 @@ return {
     -- Resolution depends on `cwd`, not on the hook process's own working directory: the same
     -- text against two different directories must name two different absolute files, not
     -- collapse to one.
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     local text = "report at " .. relative
     local first = report.path_in_root(text, "/repo-a")
     local second = report.path_in_root(text, "/repo-b")
@@ -372,7 +388,7 @@ return {
   -- through the hook module.
 
   report_path_reads_tool_after_from_path = function()
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local event = { event = "tool.after", tool = "write", path = real }
     assert(report.report_path(event) == real)
   end,
@@ -388,7 +404,7 @@ return {
   end,
 
   report_path_reads_a_native_event_from_the_handback_message = function()
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local event = {
       payload = { tool_input = { message = "report at " .. real .. ". See hooks.md:1011." } },
     }
@@ -396,13 +412,13 @@ return {
   end,
 
   report_path_reads_agent_stop_from_last_message = function()
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local event = { event = "agent.stop", last_message = "report at " .. real }
     assert(report.report_path(event) == real)
   end,
 
   report_path_resolves_a_relative_path_against_event_cwd = function()
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     local event = {
       event = "agent.stop",
       last_message = "report at " .. relative,
@@ -412,7 +428,7 @@ return {
   end,
 
   report_path_resolves_a_native_relative_path_against_the_payload_cwd = function()
-    local relative = ".airsstack/cc/plugins/claudestacks/handoff/s/03-reviewer-diff.md"
+    local relative = ".airsstack/handoff/s/03-reviewer-diff.md"
     local event = {
       payload = { tool_input = { message = "report at " .. relative }, cwd = "/repo" },
     }
@@ -439,7 +455,7 @@ return {
   end,
 
   report_path_is_nil_on_an_unknown_event = function()
-    local real = "/repo/.airsstack/cc/plugins/claudestacks/handoff/s/01-coder-x.md"
+    local real = "/repo/.airsstack/handoff/s/01-coder-x.md"
     local event = {
       event = "tool.before",
       path = real,

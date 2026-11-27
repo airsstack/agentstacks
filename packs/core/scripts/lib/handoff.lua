@@ -14,7 +14,9 @@ local proc = airsstack.proc
 
 local M = {}
 
-M.HANDOFF_REL = ".airsstack/cc/plugins/claudestacks/handoff"
+M.HANDOFF_REL = ".airsstack/handoff"
+-- Pre-rename location, pruned and removed when empty at init.
+M.LEGACY_HANDOFF_REL = ".airsstack/cc/plugins/claudestacks/handoff"
 M.DEFAULT_KEEP = 10
 
 -- Minutes. A lease older than this no longer protects its session from pruning.
@@ -191,6 +193,33 @@ function M.init(cwd, stamp, keep, now, grace_minutes, given_root)
   M.touch(path.join(directory, M.LEASE))
 
   M.prune(base, keep, now, grace_minutes)
+
+  local legacy_base = path.join(root, M.LEGACY_HANDOFF_REL)
+  pcall(M.prune, legacy_base, 0, now, grace_minutes)
+  local stop = path.join(root, ".airsstack")
+  local levels = {}
+  local level = legacy_base
+  while level ~= stop do
+    levels[#levels + 1] = level
+    local parent = level:match("^(.*)/[^/]*$")
+    if not parent or parent == "" or parent == level then
+      break
+    end
+    level = parent
+  end
+  for _, level in ipairs(levels) do
+    local is_dir_ok, is_dir = pcall(fs.is_dir, level)
+    if not is_dir_ok or not is_dir then
+      break
+    end
+    local list_ok, entries = pcall(fs.list, level)
+    if not list_ok or #entries > 0 then
+      break
+    end
+    if not pcall(fs.remove_dir, level) then
+      break
+    end
+  end
   return directory, id, source
 end
 
