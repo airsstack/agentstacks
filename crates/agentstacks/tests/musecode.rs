@@ -182,7 +182,7 @@ fn musecode_manifest_loads() -> TestResult {
     let extension = Extension::load(&tree).map_err(|found| format!("{found:?}"))?;
     assert_eq!(extension.manifest().name().as_str(), "musecode");
     assert_eq!(extension.manifest().entry().as_str(), "adapter.lua");
-    assert_eq!(extension.manifest().version().to_string(), "1.0.0");
+    assert_eq!(extension.manifest().version().to_string(), "1.1.0");
     let reads: Vec<&str> = extension.reads().iter().map(SubPath::as_str).collect();
     assert_eq!(reads, [HOOKS]);
     Ok(())

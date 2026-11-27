@@ -1,6 +1,6 @@
 [extension]
 name        = "claude"
-version     = "1.0.0"
+version     = "1.1.0"
 api         = 1
 description = "Renders packs into Claude Code project config"
 entry       = "adapter.lua"
