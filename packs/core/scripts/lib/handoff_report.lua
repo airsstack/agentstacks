@@ -118,6 +118,9 @@ function M.under_handoff_root(file, cwd)
   if resolved:find(handoff.HANDOFF_REL, 1, true) then
     return true
   end
+  if resolved:find(handoff.LEGACY_HANDOFF_REL, 1, true) then
+    return true
+  end
 
   -- `init`-refused fallback: `<session-scratch>/handoff/<NN>-<agent>-<slug>.md`. The segment is
   -- what distinguishes it from the rest of a session scratchpad, which is not reports.
@@ -202,6 +205,7 @@ end
 -- makes `session:`/`seq:` forbidden in each.
 function M.session_tier(file)
   return file:find(handoff.HANDOFF_REL, 1, true) ~= nil
+    or file:find(handoff.LEGACY_HANDOFF_REL, 1, true) ~= nil
 end
 
 -- Counts opening and closing tag lines for `name`, and whether any enclosed line has content.
