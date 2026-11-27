@@ -33,21 +33,29 @@ pub fn file_finding(entry: &FileEntry, resolution: &Resolution) -> Option<Findin
     }
 }
 
-/// The finding for the airsl binary, given the version the lock pins; `None` when the installed
-/// version is the pinned one.
+/// The finding for the airsl binary, given the version the lock pins (or `None` when it pins
+/// none); `None` when the installed version is acceptable.
 #[must_use]
-pub fn airsl_finding(pin: &PackVersion, answer: AirslAnswer) -> Option<Finding> {
+pub fn airsl_finding(pin: Option<&PackVersion>, answer: AirslAnswer) -> Option<Finding> {
     let text = match answer {
-        AirslAnswer::NotFound => return Some(Finding::AirslNotFound { pin: pin.clone() }),
+        AirslAnswer::NotFound => {
+            return Some(pin.map_or_else(
+                || Finding::AirslMissing,
+                |pin| Finding::AirslNotFound { pin: pin.clone() },
+            ));
+        }
         AirslAnswer::SpawnFailed(error) => return Some(Finding::AirslSpawn(error)),
         AirslAnswer::Failed(text) => text,
         AirslAnswer::Printed(text) => match parse_airsl_version(&text) {
-            Some(installed) if &installed == pin => return None,
             Some(installed) => {
-                return Some(Finding::AirslMismatch {
-                    installed,
-                    pin: pin.clone(),
-                });
+                return match pin {
+                    Some(pin) if &installed == pin => None,
+                    Some(pin) => Some(Finding::AirslMismatch {
+                        installed,
+                        pin: pin.clone(),
+                    }),
+                    None => None,
+                };
             }
             None => text,
         },
@@ -144,14 +152,16 @@ mod tests {
     }
 
     fn airsl(answer: AirslAnswer) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        Ok(airsl_finding(&pin()?, answer).map(|finding| finding.to_string()))
+        Ok(airsl_finding(Some(&pin()?), answer).map(|finding| finding.to_string()))
     }
 
     #[test]
     fn airsl_not_found_on_path() -> TestResult {
         assert_eq!(
             airsl(AirslAnswer::NotFound)?.as_deref(),
-            Some("airsl: not found on PATH (lock pins 0.1.4)")
+            Some(
+                "airsl: not found on PATH (lock pins 0.1.4) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            )
         );
         Ok(())
     }
@@ -179,6 +189,23 @@ mod tests {
     }
 
     #[test]
+    fn airsl_missing_without_pin() {
+        assert_eq!(
+            airsl_finding(None, AirslAnswer::NotFound)
+                .map(|f| f.to_string())
+                .as_deref(),
+            Some(
+                "airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            )
+        );
+    }
+
+    #[test]
+    fn airsl_parseable_without_pin_is_healthy() {
+        assert!(airsl_finding(None, AirslAnswer::Printed("airsl 0.1.5".to_owned())).is_none());
+    }
+
+    #[test]
     fn airsl_version_match_is_healthy() -> TestResult {
         assert_eq!(airsl(AirslAnswer::Printed("airsl 0.1.4".to_owned()))?, None);
         Ok(())
@@ -189,7 +216,7 @@ mod tests {
         let denied = || Error::new(ErrorKind::PermissionDenied, "permission denied");
         let answer = AirslAnswer::SpawnFailed(denied());
         let refusal = answer.spawn_refusal().map(|d| d.to_string());
-        let finding = airsl_finding(&pin()?, answer);
+        let finding = airsl_finding(Some(&pin()?), answer);
         assert!(matches!(finding, Some(Finding::AirslSpawn(_))));
         let expected = "agentstacks.toml: airsl: permission denied";
         assert_eq!(finding.map(|f| f.to_string()).as_deref(), Some(expected));

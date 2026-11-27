@@ -26,7 +26,7 @@ use agentstacks::types::{Diagnostic, Location};
 
 use super::Console;
 use crate::prompt::{Answer, ask};
-use crate::show::{nothing_to_change, plan_text, written_and_deleted};
+use crate::show::{PlanView, nothing_to_change, plan_text, written_and_deleted};
 
 /// The lock's name in the project, the file a read failure is located at.
 const LOCK_FILE: &str = "agentstacks.lock";
@@ -75,7 +75,7 @@ where
     O: Write,
     E: Write,
 {
-    console.out_line(plan_text(plan));
+    console.out_line(plan_text(plan, PlanView::Summary));
 
     let lock = match workspace.lock_text() {
         Ok(lock) => lock,
@@ -116,6 +116,11 @@ where
         Ok(()) => {
             let (written, deleted) = written_and_deleted(plan);
             console.out_line(format!("applied: {written} written, {deleted} deleted"));
+            if written + deleted > 0 {
+                console.out_line(
+                    "note: start a new session — hooks, skills and agents load at session start",
+                );
+            }
             Confirmed::Applied { written, deleted }
         }
         Err(refusals) => {
@@ -208,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn accepted_applies_and_prints_counts() -> TestResult {
+    fn accepted_applies_and_prints_hint() -> TestResult {
         let plan = plan_of(vec![create_step(PATH)?])?;
         let workspace = FakeWorkspace::new();
         let mut console = console(true, " Yes \n");
@@ -220,7 +225,7 @@ mod tests {
                 deleted: 0
             }
         );
-        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\n"));
+        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"));
         assert_eq!(err_of(&console), "Apply? [y/N] ");
         assert_eq!(workspace.lock_written(), Some(write_lock(plan.lock())));
         Ok(())
@@ -239,6 +244,24 @@ mod tests {
             format!("{PATH}: changed after plan; run plan again\n")
         );
         assert!(!out_of(&console).contains("applied:"));
+        Ok(())
+    }
+
+    #[test]
+    fn zero_write_apply_prints_no_hint() -> TestResult {
+        let plan = plan_of(vec![step_of("x", Action::Unchanged)?])?;
+        let workspace = FakeWorkspace::new().lock("# a different lock\n");
+        let mut console = console(true, "y\n");
+        let got = confirm(&plan, &workspace, false, NOTHING_APPLIED, &mut console);
+        assert_eq!(
+            got,
+            Confirmed::Applied {
+                written: 0,
+                deleted: 0
+            }
+        );
+        assert!(out_of(&console).ends_with("applied: 0 written, 0 deleted\n"));
+        assert!(!out_of(&console).contains("start a new session"));
         Ok(())
     }
 

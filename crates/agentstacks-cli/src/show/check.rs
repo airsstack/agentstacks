@@ -18,7 +18,7 @@
 
 use agentstacks::app::ext::{CheckReport, LuaOutcome};
 
-use super::{plan_text, written_and_deleted};
+use super::{PlanView, plan_text, written_and_deleted};
 
 /// The two texts of a report, lines joined by `\n` with no trailing newline; a stream with
 /// nothing to say is empty.
@@ -68,7 +68,7 @@ pub(crate) fn check_text(report: CheckReport) -> CheckText {
         }
     }
     if let Some(first) = &plan {
-        out.push(plan_text(first.plan()));
+        out.push(plan_text(first.plan(), PlanView::Full));
         if first.applied() {
             let (written, deleted) = written_and_deleted(first.plan());
             out.push(format!("applied: {written} written, {deleted} deleted"));
@@ -79,7 +79,7 @@ pub(crate) fn check_text(report: CheckReport) -> CheckText {
         (second, Some(refusal)) => {
             out.push(refusal.to_string());
             if let Some(second) = &second {
-                out.push(plan_text(second));
+                out.push(plan_text(second, PlanView::Full));
             }
         }
         (None, None) => {}

@@ -23,7 +23,7 @@ use agentstacks::types::plan::Plan;
 
 use super::{Console, Ports};
 use crate::exit::Outcome;
-use crate::show::plan_text;
+use crate::show::{PlanView, plan_text};
 
 /// Plans the project, or prints the sorted refusals to stderr and returns `None`.
 pub(super) fn make<W, G, B, A, I, O, E>(
@@ -52,6 +52,7 @@ where
 /// stderr. Nothing is written to the project.
 pub(crate) fn run<W, G, B, A, I, O, E>(
     ports: &Ports<W, G, B, A>,
+    view: PlanView,
     console: &mut Console<I, O, E>,
 ) -> Outcome
 where
@@ -64,7 +65,7 @@ where
     E: Write,
 {
     make(ports, console).map_or(Outcome::Refused, |plan| {
-        console.out_line(plan_text(&plan));
+        console.out_line(plan_text(&plan, view));
         Outcome::Success
     })
 }
@@ -82,7 +83,7 @@ mod tests {
     fn plan_prints_and_writes_nothing() -> TestResult {
         let world = World::paths()?;
         let mut console = console(false, "");
-        let got = run(&world.ports, &mut console);
+        let got = run(&world.ports, PlanView::Full, &mut console);
         assert_eq!(got, Outcome::Success);
         let out = out_of(&console);
         assert!(out.starts_with("agentstacks plan\n"), "{out}");
@@ -108,7 +109,7 @@ mod tests {
         };
         let missing = ports.workspace.project_text().err().ok_or("a project")?;
         let mut console = console(false, "");
-        let got = run(&ports, &mut console);
+        let got = run(&ports, PlanView::Summary, &mut console);
         assert_eq!(got, Outcome::Refused);
         assert_eq!(err_of(&console), format!("agentstacks.toml: {missing}\n"));
         assert_eq!(out_of(&console), "");

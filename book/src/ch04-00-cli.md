@@ -9,8 +9,8 @@ binary is a composition root and a presentation layer: every rule and flow lives
 
 ```text
 agentstacks [-C <DIR>] <COMMAND>
-  init   --tool <TOOL>... --pack <PACK>... [--yes]
-  plan
+  init   --tool <TOOL>... --pack <PACK>... [--yes | --dry-run]
+  plan   [--summary | --verbose]
   apply  [--yes]
   doctor
   update [--yes]
@@ -20,7 +20,8 @@ agentstacks [-C <DIR>] <COMMAND>
 
 | Command | Does |
 |---|---|
-| `init` | Writes `agentstacks.toml`, then plans, shows the plan and applies it. Refuses when `agentstacks.toml` exists. |
+| `init` | Writes `agentstacks.toml`, then plans, shows the plan and applies it. Refuses when `agentstacks.toml` exists, except with `--dry-run`, which proceeds and writes nothing: it prints `agentstacks.toml (dry run — not written)`, the rendered file and its plan (planned as a fresh project, against no lock). |
+| `plan --verbose` | The full one-line-per-file plan; without it (or with `--summary`) the plan shows counts per owner. |
 | `plan` | Prints the plan. Writes nothing. |
 | `apply` | Prints the plan, asks, then applies the same plan it showed. It never plans twice. |
 | `doctor` | Reports drift against the lock. |
@@ -126,6 +127,12 @@ nothing written: `agentstacks.toml: api 0 is from agentstacks 0.x (run agentstac
 
 ### Plan text
 
+By default the plan is a summary: one `  <owner>  <w> to write, <d> to delete, <u> unchanged`
+row per owner (`shared` last), then the skip rows, the airsl row and notes, and the final
+count line. `--verbose` shows the full text below: one row per file, with diffs. The
+commands that show a plan before applying (`apply`, `init`, `update`, `ext add`) show the
+summary; `ext test` shows the full text.
+
 ```text
 agentstacks plan
 
@@ -190,7 +197,7 @@ nothing applied (run apply)`).
 
 | Result | Output | Exit |
 |---|---|---|
-| applied | stdout `applied: <w> written, <d> deleted` | 0 |
+| applied | stdout `applied: <w> written, <d> deleted`, then, when anything changed, `note: start a new session — hooks, skills and agents load at session start` | 0 |
 | failed | the diagnostics, e.g. `<path>: changed after plan; run plan again` | 1 |
 
 ## 7. `update`
@@ -233,8 +240,11 @@ Prints each finding on stdout, one per line, in the order returned, for example
 `changed: .claude/agents/core-coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`. With no findings it
 prints `healthy` and exits 0. Any finding exits 1.
 
-`doctor` reads only the lock and the files it names, never `agentstacks.toml`. A lock written by a
-0.x release is read like a current one: its api is not a finding.
+`doctor` reads the lock and the files it names, never `agentstacks.toml`, and always checks the
+`airsl` runtime: missing airsl is reported with the install command, with or without a lock pin
+(`airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)`, `airsl: not found on PATH (lock pins <v>) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)`);
+a parseable installed version is healthy without a pin, and an exact match is required with one.
+A lock written by a 0.x release is read like a current one: its api is not a finding.
 
 ## 9. `ext add`
 

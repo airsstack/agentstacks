@@ -246,7 +246,7 @@ mod tests {
     fn fetch_error_converts_and_displays_unchanged() {
         assert_eq!(
             FormatError::from(FetchError::HomeUnset).to_string(),
-            "HOME is not set, so the cache (~/.airsstack/cache) has no home"
+            "AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
         );
     }
 

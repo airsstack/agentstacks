@@ -95,7 +95,7 @@ mod tests {
             out.starts_with("agentstacks.toml: added tools.opencode\nagentstacks plan\n"),
             "{out}"
         );
-        assert!(out.ends_with("applied: 2 written, 0 deleted\n"), "{out}");
+        assert!(out.ends_with("applied: 2 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"), "{out}");
         assert_eq!(err_of(&console), "");
         let written = world.ports.workspace.project_written().ok_or("a project")?;
         assert!(written.contains("[tools.opencode]"), "{written}");

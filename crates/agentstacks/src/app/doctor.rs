@@ -37,19 +37,30 @@ const LOCK_FILE: &str = "agentstacks.lock";
 /// each locked path and the binary port only when the lock pins airsl.
 #[must_use]
 pub fn doctor<W: Workspace, B: Binary>(workspace: &W, binary: &B) -> Vec<Finding> {
+    let answer = binary.airsl_version();
     let text = match workspace.lock_text() {
         Ok(Some(text)) => text,
-        Ok(None) => return vec![Finding::LockMissing],
-        Err(error) => return vec![Finding::LockIo(error)],
+        Ok(None) => {
+            let mut findings = vec![Finding::LockMissing];
+            findings.extend(airsl_finding(None, answer));
+            return findings;
+        }
+        Err(error) => {
+            let mut findings = vec![Finding::LockIo(error)];
+            findings.extend(airsl_finding(None, answer));
+            return findings;
+        }
     };
     let lock = match Lockfile::parse(Path::new(LOCK_FILE), &text) {
         Ok(lock) => lock,
         Err(refusals) => {
-            return refusals
+            let mut findings: Vec<Finding> = refusals
                 .into_sorted()
                 .into_iter()
                 .map(Finding::Lock)
                 .collect();
+            findings.extend(airsl_finding(None, answer));
+            return findings;
         }
     };
     let mut findings: Vec<Finding> = lock
@@ -57,9 +68,7 @@ pub fn doctor<W: Workspace, B: Binary>(workspace: &W, binary: &B) -> Vec<Finding
         .iter()
         .filter_map(|entry| file_check(workspace, entry))
         .collect();
-    if let Some(pin) = lock.airsl() {
-        findings.extend(airsl_finding(pin, binary.airsl_version()));
-    }
+    findings.extend(airsl_finding(lock.airsl(), answer));
     findings
 }
 
@@ -134,23 +143,47 @@ mod tests {
 
     #[test]
     fn doctor_reports_a_missing_lock_alone() {
-        let binary = FakeBinary::new();
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let found = run(&FakeWorkspace::new(), &binary);
         assert_eq!(found, ["agentstacks.lock: not found (run apply)"]);
-        assert!(binary.asked().is_empty());
+        assert_eq!(binary.asked(), [BinaryCall::AirslVersion]);
+    }
+
+    #[test]
+    fn doctor_reports_airsl_with_missing_lock() {
+        let found = run(&FakeWorkspace::new(), &FakeBinary::new());
+        assert_eq!(
+            found,
+            [
+                "agentstacks.lock: not found (run apply)",
+                "airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            ]
+        );
+    }
+
+    #[test]
+    fn doctor_reports_airsl_with_refused_lock() {
+        let workspace = FakeWorkspace::new().lock("api = 1\n[[merge]]\nx = 1\n");
+        let found = run(&workspace, &FakeBinary::new());
+        assert_eq!(
+            found.last().map(String::as_str),
+            Some(
+                "airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            )
+        );
     }
 
     #[test]
     fn doctor_reports_an_unreadable_lock_alone() {
         let workspace = FakeWorkspace::new().fail(WorkspaceCall::LockText);
-        let found = run(&workspace, &FakeBinary::new());
+        let found = run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5"));
         assert_eq!(found, [format!("agentstacks.lock: {}", denied())]);
     }
 
     #[test]
     fn doctor_reports_the_lock_refusals() {
         let workspace = FakeWorkspace::new().lock("api = 1\n[[merge]]\nx = 1\n");
-        let found = run(&workspace, &FakeBinary::new());
+        let found = run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5"));
         assert!(
             found.contains(&"agentstacks.lock: merge: unknown key".to_owned()),
             "{found:?}"
@@ -161,7 +194,7 @@ mod tests {
     #[test]
     fn doctor_reports_a_backslash_lock_path() {
         let workspace = FakeWorkspace::new().lock(&lock_text(None, &[("a\\\\b", LOCKED)]));
-        let found = run(&workspace, &FakeBinary::new());
+        let found = run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5"));
         assert_eq!(
             found,
             ["agentstacks.lock: file[0].path: \"a\\b\" must use / as the separator"]
@@ -173,20 +206,23 @@ mod tests {
         let legacy = lock_text(None, &[(X, LOCKED)]).replacen("api = 1", "api = 0", 1);
         assert!(legacy.starts_with("api = 0\n"));
         let workspace = FakeWorkspace::new().lock(&legacy).file(&path(X)?, LOCKED);
-        assert!(run(&workspace, &FakeBinary::new()).is_empty());
+        assert!(run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")).is_empty());
         let edited = FakeWorkspace::new()
             .lock(&legacy)
             .file(&path(X)?, b"edited");
-        assert_eq!(run(&edited, &FakeBinary::new()), ["changed: .claude/x"]);
+        assert_eq!(
+            run(&edited, &FakeBinary::new().airsl("airsl 0.1.5")),
+            ["changed: .claude/x"]
+        );
         Ok(())
     }
 
     #[test]
     fn doctor_finds_nothing_for_an_empty_healthy_lock() {
-        let binary = FakeBinary::new();
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let workspace = FakeWorkspace::new().lock(&lock_text(None, &[]));
         assert!(run(&workspace, &binary).is_empty());
-        assert!(binary.asked().is_empty());
+        assert_eq!(binary.asked(), [BinaryCall::AirslVersion]);
     }
 
     #[test]
@@ -196,7 +232,7 @@ mod tests {
             &[(".claude/skills/status/SKILL.md", LOCKED)],
         ));
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             ["missing: .claude/skills/status/SKILL.md"]
         );
     }
@@ -205,7 +241,7 @@ mod tests {
     fn doctor_reports_a_directory_as_not_a_regular_file() -> TestResult {
         let workspace = locked_x(FakeWorkspace::new()).not_regular(&path(X)?);
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             ["not a regular file: .claude/x"]
         );
         Ok(())
@@ -215,7 +251,7 @@ mod tests {
     fn doctor_reports_a_dangling_symlink_as_not_a_regular_file() -> TestResult {
         let workspace = locked_x(FakeWorkspace::new()).symlink(&path(X)?, &path(".claude/gone")?);
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             ["not a regular file: .claude/x"]
         );
         Ok(())
@@ -224,7 +260,10 @@ mod tests {
     #[test]
     fn doctor_reports_a_changed_file() -> TestResult {
         let workspace = locked_x(FakeWorkspace::new()).file(&path(X)?, b"edited");
-        assert_eq!(run(&workspace, &FakeBinary::new()), ["changed: .claude/x"]);
+        assert_eq!(
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
+            ["changed: .claude/x"]
+        );
         Ok(())
     }
 
@@ -233,7 +272,7 @@ mod tests {
         let workspace = locked_x(FakeWorkspace::new())
             .file(&path("shared/x")?, LOCKED)
             .symlink(&path(X)?, &path("shared/x")?);
-        assert!(run(&workspace, &FakeBinary::new()).is_empty());
+        assert!(run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")).is_empty());
         Ok(())
     }
 
@@ -242,7 +281,10 @@ mod tests {
         let workspace = locked_x(FakeWorkspace::new())
             .file(&path("shared/x")?, b"edited")
             .symlink(&path(X)?, &path("shared/x")?);
-        assert_eq!(run(&workspace, &FakeBinary::new()), ["changed: .claude/x"]);
+        assert_eq!(
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
+            ["changed: .claude/x"]
+        );
         Ok(())
     }
 
@@ -250,7 +292,7 @@ mod tests {
     fn doctor_reports_a_file_resolving_outside() -> TestResult {
         let workspace = locked_x(FakeWorkspace::new()).outside(&path(X)?);
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             ["outside the project: .claude/x"]
         );
         Ok(())
@@ -262,7 +304,7 @@ mod tests {
             .lock(&lock_text(None, &[(X, LOCKED), (".claude/y", LOCKED)]))
             .fail(WorkspaceCall::Resolve(path(X)?));
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             [
                 format!(".claude/x: {}", denied()),
                 "missing: .claude/y".to_owned()
@@ -281,7 +323,7 @@ mod tests {
             .file(&path("b.md")?, LOCKED)
             .file(&path("c.md")?, b"edited");
         assert_eq!(
-            run(&workspace, &FakeBinary::new()),
+            run(&workspace, &FakeBinary::new().airsl("airsl 0.1.5")),
             ["missing: a.md", "changed: c.md"]
         );
         Ok(())
@@ -295,7 +337,9 @@ mod tests {
     fn doctor_reports_airsl_missing_from_path() {
         assert_eq!(
             run(&pinned(), &FakeBinary::new()),
-            ["airsl: not found on PATH (lock pins 0.1.4)"]
+            [
+                "airsl: not found on PATH (lock pins 0.1.4) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            ]
         );
     }
 
@@ -344,10 +388,10 @@ mod tests {
 
     #[test]
     fn doctor_skips_airsl_without_a_pin() {
-        let binary = FakeBinary::new();
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let workspace = FakeWorkspace::new().lock(&lock_text(None, &[]));
         assert!(run(&workspace, &binary).is_empty());
-        assert!(binary.asked().is_empty());
+        assert_eq!(binary.asked(), [BinaryCall::AirslVersion]);
     }
 
     #[test]
@@ -359,7 +403,7 @@ mod tests {
             run(&workspace, &FakeBinary::new()),
             [
                 "changed: .claude/x",
-                "airsl: not found on PATH (lock pins 0.1.4)"
+                "airsl: not found on PATH (lock pins 0.1.4) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
             ]
         );
         Ok(())

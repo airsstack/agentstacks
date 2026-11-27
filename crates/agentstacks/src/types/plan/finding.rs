@@ -59,11 +59,18 @@ pub enum Finding {
         error: std::io::Error,
     },
     /// The lock pins airsl and none is on `PATH`.
-    #[error("airsl: not found on PATH (lock pins {pin})")]
+    #[error(
+        "airsl: not found on PATH (lock pins {pin}) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+    )]
     AirslNotFound {
         /// The pinned version.
         pin: PackVersion,
     },
+    /// No lock pins airsl and none is on `PATH`.
+    #[error(
+        "airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+    )]
+    AirslMissing,
     /// `airsl --version` printed text that is not `airsl <version>`.
     #[error("airsl: --version printed \"{text}\", expected \"airsl <version>\"")]
     AirslUnparsed {
@@ -126,7 +133,7 @@ mod tests {
             ),
             (
                 Finding::AirslNotFound { pin: old.clone() },
-                "airsl: not found on PATH (lock pins 0.1.4)",
+                "airsl: not found on PATH (lock pins 0.1.4) (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)",
             ),
             (
                 Finding::AirslUnparsed {

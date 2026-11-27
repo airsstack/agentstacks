@@ -6,6 +6,7 @@ local frontmatter = agentstacks.require("lib.frontmatter")
 local hooks = agentstacks.require("lib.hooks")
 local plugin = agentstacks.require("lib.plugin")
 local translate = agentstacks.require("lib.translate")
+local stamp = agentstacks.require("lib.stamp")
 
 local SHIM = ".opencode/plugins/agentstacks.js"
 
@@ -47,10 +48,10 @@ local function propose_skill(pack, skill)
     agentstacks.skip({ item = skill.id, reason = reason })
     return
   end
-  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = content, covers = { main.id } })
+  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = stamp.stamp(skill.dir .. "/SKILL.md", content), covers = { main.id } })
   agentstacks.write({
     path = ".opencode/commands/" .. name .. ".md",
-    content = frontmatter.command(name, skill.meta),
+    content = stamp.stamp(".opencode/commands/" .. name .. ".md", frontmatter.command(name, skill.meta)),
     covers = { main.id },
   })
   for _, file in ipairs(others) do
@@ -65,7 +66,7 @@ local function propose_agent(pack, agent)
     agentstacks.skip({ item = agent.id, reason = reason })
     return
   end
-  agentstacks.write({ path = ".opencode/agents/" .. name .. ".md", content = content, covers = { agent.id } })
+  agentstacks.write({ path = ".opencode/agents/" .. name .. ".md", content = stamp.stamp(".opencode/agents/" .. name .. ".md", content), covers = { agent.id } })
 end
 
 -- Every hook of a pack, in payload order, as `{ hook =, native = }`: the neutral ones by index, then
@@ -116,8 +117,8 @@ agentstacks.on("plan", function(payload)
   end
 
   local entries, covers, has_lua = render_hooks(payload.packs)
-  agentstacks.write({ path = SHIM, content = plugin.text(entries), covers = covers })
+  agentstacks.write({ path = SHIM, content = stamp.stamp(SHIM, plugin.text(entries)), covers = covers })
   if has_lua then
-    agentstacks.write({ path = payload.root .. "/translate.lua", content = translate.text() })
+    agentstacks.write({ path = payload.root .. "/translate.lua", content = stamp.stamp(payload.root .. "/translate.lua", translate.text()) })
   end
 end)

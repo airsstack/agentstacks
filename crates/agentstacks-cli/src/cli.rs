@@ -36,11 +36,21 @@ pub(crate) enum Command {
         #[arg(long, required = true, value_name = "PACK")]
         pack: Vec<String>,
         /// Apply without asking.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "dry_run")]
         yes: bool,
+        /// Show the rendered agentstacks.toml and the plan, and write nothing.
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Show what apply would do, and write nothing.
-    Plan,
+    Plan {
+        /// Show counts per owner (the default).
+        #[arg(long, conflicts_with = "verbose")]
+        summary: bool,
+        /// Show every file.
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Show the plan, ask, then write the files and the lock.
     Apply {
         /// Apply without asking.
@@ -130,7 +140,10 @@ mod tests {
             "./packs/team",
             "--yes",
         ])?;
-        let Command::Init { tool, pack, yes } = cli.command else {
+        let Command::Init {
+            tool, pack, yes, ..
+        } = cli.command
+        else {
             return Err("expected init".into());
         };
         assert_eq!(tool, ["claude"]);
@@ -171,6 +184,55 @@ mod tests {
                 .contains("unrecognized subcommand 'frobnicate'"),
             "{error}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn init_dry_run_and_yes_conflict() -> TestResult {
+        assert!(
+            Cli::try_parse_from([
+                "agentstacks",
+                "init",
+                "--tool",
+                "claude",
+                "--pack",
+                "core",
+                "--dry-run"
+            ])
+            .is_ok()
+        );
+        let Err(error) = Cli::try_parse_from([
+            "agentstacks",
+            "init",
+            "--tool",
+            "claude",
+            "--pack",
+            "core",
+            "--dry-run",
+            "--yes",
+        ]) else {
+            return Err("--dry-run with --yes must fail".into());
+        };
+        assert_eq!(error.exit_code(), 2);
+        assert!(
+            error
+                .to_string()
+                .contains("the argument '--dry-run' cannot be used with '--yes'"),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn plan_summary_and_verbose_conflict() -> TestResult {
+        assert!(Cli::try_parse_from(["agentstacks", "plan", "--summary"]).is_ok());
+        assert!(Cli::try_parse_from(["agentstacks", "plan", "--verbose"]).is_ok());
+        assert!(Cli::try_parse_from(["agentstacks", "plan"]).is_ok());
+        let Err(error) = Cli::try_parse_from(["agentstacks", "plan", "--summary", "--verbose"])
+        else {
+            return Err("--summary with --verbose must fail".into());
+        };
+        assert_eq!(error.exit_code(), 2);
         Ok(())
     }
 

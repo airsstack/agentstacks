@@ -166,8 +166,16 @@ fn init_with_yes_writes_toml_and_applies() -> TestResult {
     for written in [SKILL, ".claude/settings.json", "agentstacks.lock"] {
         assert!(project.path(written).is_file(), "{written} was not written");
     }
-    let last = run.stdout.lines().last().ok_or("stdout is empty")?;
-    assert!(last.starts_with("applied: "), "{last}");
+    let lines: Vec<&str> = run.stdout.lines().collect();
+    let last = lines.last().ok_or("stdout is empty")?;
+    assert_eq!(
+        *last,
+        "note: start a new session — hooks, skills and agents load at session start"
+    );
+    let applied = lines
+        .get(lines.len() - 2)
+        .ok_or("stdout has an applied line")?;
+    assert!(applied.starts_with("applied: "), "{applied}");
     Ok(())
 }
 

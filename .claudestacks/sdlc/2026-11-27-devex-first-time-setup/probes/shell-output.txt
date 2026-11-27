@@ -1,0 +1,4 @@
+$ AIRSSTACK_HOME unset/set/empty shell expansion
+/home/u/.airsstack
+/sandbox/home
+[/home/u/.airsstack]

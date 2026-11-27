@@ -50,6 +50,19 @@ agentstacks --version
 
 prints `agentstacks 1.0.0`. `airsl --version` reports 0.1.5 or newer.
 
+## Where agentstacks keeps things
+
+The git cache of fetched packs and extensions lives under one root: `$AIRSSTACK_HOME` when
+it is set and non-empty, otherwise `~/.airsstack`. In a sandboxed environment that cannot
+write to your home directory, set it to a writable directory:
+
+```sh
+export AIRSSTACK_HOME=/path/writable/airsstack
+```
+
+The same variable moves the journal vault and snapshot stores, and the hooks already
+honour it.
+
 Next, set up [a first project](ch01-02-first-project.md).
 
 claudevs installs separately: see [its installation](ch08-01-installation.md).

@@ -36,8 +36,33 @@ fn main() -> ExitCode {
         Err(outcome) => return outcome.code(),
     };
     let outcome = match cli.command {
-        Command::Init { tool, pack, yes } => command::init(&ports, &tool, &pack, yes, &mut console),
-        Command::Plan => command::plan(&ports, &mut console),
+        Command::Init {
+            tool,
+            pack,
+            yes,
+            dry_run,
+        } => command::init(
+            &ports,
+            &tool,
+            &pack,
+            if dry_run {
+                command::InitMode::DryRun
+            } else if yes {
+                command::InitMode::Yes
+            } else {
+                command::InitMode::Ask
+            },
+            &mut console,
+        ),
+        Command::Plan { verbose, .. } => command::plan(
+            &ports,
+            if verbose {
+                crate::show::PlanView::Full
+            } else {
+                crate::show::PlanView::Summary
+            },
+            &mut console,
+        ),
         Command::Apply { yes } => command::apply(&ports, yes, &mut console),
         Command::Doctor => command::doctor(&ports.workspace, &ports.binary, &mut console),
         Command::Update { yes } => command::update(&ports, yes, &mut console),

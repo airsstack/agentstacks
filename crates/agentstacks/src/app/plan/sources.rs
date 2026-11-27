@@ -572,7 +572,9 @@ mod tests {
         let scenario = Scenario::new(&text).git(FakeGit::home_unset);
         assert_eq!(
             refused(fetch(&scenario)?),
-            ["agentstacks.toml: HOME is not set, so the cache (~/.airsstack/cache) has no home"]
+            [
+                "agentstacks.toml: AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
+            ]
         );
         Ok(())
     }

@@ -17,8 +17,8 @@ may be given together. To use an extension from a checkout of this repository in
 copy it into your project, for example `extensions/opencode` to `ext/opencode`, and pass
 `--tool ext/opencode` (a tool path must stay inside the project).
 
-`init` writes `agentstacks.toml`, prints the plan, one line per file, and asks before applying. The
-plan ends:
+`init` writes `agentstacks.toml`, prints the plan as counts per owner (the full one-line-per-file
+list is `agentstacks plan --verbose`), and asks before applying. The plan ends:
 
 ```text
 76 to write, 0 to delete, 0 unchanged, 1 skipped
@@ -28,7 +28,13 @@ Answering yes applies at once, as `--yes` does, and prints:
 
 ```text
 applied: 76 written, 0 deleted
+note: start a new session — hooks, skills and agents load at session start
 ```
+
+Hooks, skills and agents load when a session starts, so a setup applied into an already
+running session takes effect in the next one. Preview an `init` without writing anything
+with `agentstacks init --tool … --pack … --dry-run`, which prints the would-be
+`agentstacks.toml` and its plan.
 
 With no terminal and no `--yes`, `init` still writes `agentstacks.toml` but applies nothing. It
 ends with:
@@ -39,7 +45,8 @@ stdin is not a terminal; pass --yes to apply
 agentstacks.toml written; nothing applied (run apply)
 ```
 
-Then `agentstacks apply --yes` applies it and ends with `applied: 76 written, 0 deleted`.
+Then `agentstacks apply --yes` applies it and ends with `applied: 76 written, 0 deleted`
+and the new-session note above.
 
 ## The project file
 
