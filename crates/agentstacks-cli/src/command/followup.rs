@@ -134,7 +134,7 @@ mod tests {
         let got = plan_then_apply(&world.ports, true, Rewrite::Updated, &mut console);
         assert_eq!(got, Outcome::Success);
         assert_eq!(err_of(&console), "");
-        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\n"));
+        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"));
         Ok(())
     }
 

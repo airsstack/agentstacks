@@ -93,7 +93,7 @@ mod tests {
         let mut console = console(false, "");
         let got = run(&world.ports, true, &mut console);
         assert_eq!(got, Outcome::Success);
-        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\n"));
+        assert!(out_of(&console).ends_with("applied: 1 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"));
         let workspace = &world.ports.workspace;
         assert_eq!(
             workspace.file_bytes(&OpPath::new(AGENT_FILE)?),

@@ -129,7 +129,7 @@ mod tests {
             )),
             "{out}"
         );
-        assert!(out.ends_with("applied: 1 written, 0 deleted\n"), "{out}");
+        assert!(out.ends_with("applied: 1 written, 0 deleted\nnote: start a new session — hooks, skills and agents load at session start\n"), "{out}");
         assert_eq!(err_of(&console), "");
         let written = world.ports.workspace.project_written().ok_or("a project")?;
         assert_eq!(written, GIT_PROJECT.replace("packs-v0.1.0", "packs-v0.2.0"));
