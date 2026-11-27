@@ -6,6 +6,7 @@ local frontmatter = agentstacks.require("lib.frontmatter")
 local hooks = agentstacks.require("lib.hooks")
 local settings = agentstacks.require("lib.settings")
 local translate = agentstacks.require("lib.translate")
+local stamp = agentstacks.require("lib.stamp")
 
 local SETTINGS = ".claude/settings.json"
 
@@ -44,7 +45,7 @@ local function propose_skill(pack, skill)
     agentstacks.skip({ item = skill.id, reason = reason })
     return
   end
-  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = content, covers = { main.id } })
+  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = stamp.stamp(skill.dir .. "/SKILL.md", content), covers = { main.id } })
   for _, file in ipairs(others) do
     agentstacks.copy({ path = skill.dir .. "/" .. file.rel, file = file.id })
   end
@@ -57,7 +58,7 @@ local function propose_agent(pack, agent)
     agentstacks.skip({ item = agent.id, reason = reason })
     return
   end
-  agentstacks.write({ path = ".claude/agents/" .. name .. ".md", content = content, covers = { agent.id } })
+  agentstacks.write({ path = ".claude/agents/" .. name .. ".md", content = stamp.stamp(".claude/agents/" .. name .. ".md", content), covers = { agent.id } })
 end
 
 -- Every hook of a pack, in payload order: the neutral ones by index, then the native ones.
@@ -125,7 +126,7 @@ local function propose_settings(groups, members)
   table.sort(covers)
 
   if settings.should_write(old, merged.edits) then
-    agentstacks.write({ path = SETTINGS, content = text, covers = covers })
+    agentstacks.write({ path = SETTINGS, content = stamp.stamp(SETTINGS, text), covers = covers })
   end
   return has_lua
 end
@@ -145,6 +146,6 @@ agentstacks.on("plan", function(payload)
 
   local groups, members = render_hooks(payload.packs)
   if propose_settings(groups, members) then
-    agentstacks.write({ path = payload.root .. "/translate.lua", content = translate.text() })
+    agentstacks.write({ path = payload.root .. "/translate.lua", content = stamp.stamp(payload.root .. "/translate.lua", translate.text()) })
   end
 end)

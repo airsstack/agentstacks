@@ -7,6 +7,7 @@ local frontmatter = agentstacks.require("lib.frontmatter")
 local hooks = agentstacks.require("lib.hooks")
 local hookfile = agentstacks.require("lib.hookfile")
 local translate = agentstacks.require("lib.translate")
+local stamp = agentstacks.require("lib.stamp")
 
 local HOOKS_FILE = ".muse/hooks.json"
 
@@ -47,7 +48,7 @@ local function propose_skill(pack, skill)
     agentstacks.skip({ item = skill.id, reason = reason })
     return
   end
-  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = content, covers = { main.id } })
+  agentstacks.write({ path = skill.dir .. "/SKILL.md", content = stamp.stamp(skill.dir .. "/SKILL.md", content), covers = { main.id } })
   for _, file in ipairs(others) do
     agentstacks.copy({ path = skill.dir .. "/" .. file.rel, file = file.id })
   end
@@ -62,7 +63,7 @@ local function propose_agent(pack, agent)
   end
   agentstacks.write({
     path = ".agents/agents/" .. name .. ".md",
-    content = content,
+    content = stamp.stamp(".agents/agents/" .. name .. ".md", content),
     covers = { agent.id },
   })
 end
@@ -134,7 +135,7 @@ local function propose_hooks_file(groups, members)
   table.sort(covers)
 
   if hookfile.should_write(old, merged.edits) then
-    agentstacks.write({ path = HOOKS_FILE, content = text, covers = covers })
+    agentstacks.write({ path = HOOKS_FILE, content = stamp.stamp(HOOKS_FILE, text), covers = covers })
   end
   return has_lua
 end
@@ -154,6 +155,6 @@ agentstacks.on("plan", function(payload)
 
   local groups, members = render_hooks(payload.packs)
   if propose_hooks_file(groups, members) then
-    agentstacks.write({ path = payload.root .. "/translate.lua", content = translate.text() })
+    agentstacks.write({ path = payload.root .. "/translate.lua", content = stamp.stamp(payload.root .. "/translate.lua", translate.text()) })
   end
 end)
