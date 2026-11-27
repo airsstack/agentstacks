@@ -18,8 +18,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate 
 
 - A successful apply that wrote or deleted a file now ends with
   `note: start a new session — hooks, skills and agents load at session start`.
-- `doctor` always checks the `airsl` runtime, with or without a lock pin; a missing
-  `airsl` is reported with the install command.
+- `doctor` checks the `airsl` runtime when the project needs it (a lock pin, a locked
+  hook runtime, or no usable lock); a missing `airsl` is reported with the install command.
 - Cache refusals when neither `AIRSSTACK_HOME` nor `HOME` is set now name both variables,
   and a failed cache write names the `AIRSSTACK_HOME` remedy (see the library changelog).
 

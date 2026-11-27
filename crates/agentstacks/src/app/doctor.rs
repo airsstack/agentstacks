@@ -7,10 +7,10 @@
 //! # Responsibilities
 //!
 //! - [`doctor`] reads the lock text, parses it, asks the workspace where each locked path leads,
-//!   asks the binary port for the airsl version when the lock pins one, and hands each answer to
-//!   the drift rules in `types`. It orders the calls and collects the findings: the lock's own
-//!   findings alone when the lock is missing, unreadable or refused, otherwise one finding at most
-//!   per locked file in the lock's path order, then the airsl finding.
+//!   asks the binary port for the airsl version when the project needs airsl, and hands each answer
+//!   to the drift rules in `types`. It orders the calls and collects the findings: the lock's own
+//!   findings plus the airsl finding when the lock is missing, unreadable or refused, otherwise one
+//!   finding at most per locked file in the lock's path order, then the airsl finding.
 //!
 //! # Non-responsibilities
 //!
@@ -30,24 +30,24 @@ const LOCK_FILE: &str = "agentstacks.lock";
 
 /// Every way the project has drifted from `agentstacks.lock`; an empty list means healthy.
 ///
-/// When the lock is missing, cannot be read or is refused, the result holds the findings about the
-/// lock alone and nothing else is checked, because there is nothing to check against. Otherwise it
+/// When the lock is missing, cannot be read or is refused, the result holds the findings about
+/// the lock and the airsl binary, because there is nothing else to check against. Otherwise it
 /// holds the findings about the locked files in the lock's path order, every file checked, and
-/// last the finding about the airsl binary when the lock pins one. The workspace is asked about
-/// each locked path and the binary port only when the lock pins airsl.
+/// last the finding about the airsl binary when the project needs it: the lock pins airsl, or a
+/// locked file is a hook runtime (`runtime.lua`), whose hooks run on airsl. A project with
+/// neither does not need airsl, so its absence is healthy there.
 #[must_use]
 pub fn doctor<W: Workspace, B: Binary>(workspace: &W, binary: &B) -> Vec<Finding> {
-    let answer = binary.airsl_version();
     let text = match workspace.lock_text() {
         Ok(Some(text)) => text,
         Ok(None) => {
             let mut findings = vec![Finding::LockMissing];
-            findings.extend(airsl_finding(None, answer));
+            findings.extend(airsl_finding(None, binary.airsl_version()));
             return findings;
         }
         Err(error) => {
             let mut findings = vec![Finding::LockIo(error)];
-            findings.extend(airsl_finding(None, answer));
+            findings.extend(airsl_finding(None, binary.airsl_version()));
             return findings;
         }
     };
@@ -59,7 +59,7 @@ pub fn doctor<W: Workspace, B: Binary>(workspace: &W, binary: &B) -> Vec<Finding
                 .into_iter()
                 .map(Finding::Lock)
                 .collect();
-            findings.extend(airsl_finding(None, answer));
+            findings.extend(airsl_finding(None, binary.airsl_version()));
             return findings;
         }
     };
@@ -68,8 +68,18 @@ pub fn doctor<W: Workspace, B: Binary>(workspace: &W, binary: &B) -> Vec<Finding
         .iter()
         .filter_map(|entry| file_check(workspace, entry))
         .collect();
-    findings.extend(airsl_finding(lock.airsl(), answer));
+    if lock.airsl().is_some() || has_hook_runtime(&lock) {
+        findings.extend(airsl_finding(lock.airsl(), binary.airsl_version()));
+    }
     findings
+}
+
+/// Whether a locked file is the hook runtime an extension's Lua hooks run on.
+fn has_hook_runtime(lock: &Lockfile) -> bool {
+    lock.files().iter().any(|entry| {
+        let path = entry.path().as_str();
+        path == "runtime.lua" || path.ends_with("/runtime.lua")
+    })
 }
 
 /// The finding for one locked file, asking `workspace` where its path leads.
@@ -219,10 +229,10 @@ mod tests {
 
     #[test]
     fn doctor_finds_nothing_for_an_empty_healthy_lock() {
-        let binary = FakeBinary::new().airsl("airsl 0.1.5");
+        let binary = FakeBinary::new();
         let workspace = FakeWorkspace::new().lock(&lock_text(None, &[]));
         assert!(run(&workspace, &binary).is_empty());
-        assert_eq!(binary.asked(), [BinaryCall::AirslVersion]);
+        assert!(binary.asked().is_empty());
     }
 
     #[test]
@@ -391,7 +401,24 @@ mod tests {
         let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let workspace = FakeWorkspace::new().lock(&lock_text(None, &[]));
         assert!(run(&workspace, &binary).is_empty());
-        assert_eq!(binary.asked(), [BinaryCall::AirslVersion]);
+        assert!(binary.asked().is_empty());
+    }
+
+    #[test]
+    fn doctor_reports_missing_airsl_for_a_hook_runtime_without_a_pin() -> TestResult {
+        let workspace = FakeWorkspace::new()
+            .lock(&lock_text(
+                None,
+                &[(".claude/agentstacks/runtime.lua", LOCKED)],
+            ))
+            .file(&path(".claude/agentstacks/runtime.lua")?, LOCKED);
+        assert_eq!(
+            run(&workspace, &FakeBinary::new()),
+            [
+                "airsl: not found on PATH (install: curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh)"
+            ]
+        );
+        Ok(())
     }
 
     #[test]
