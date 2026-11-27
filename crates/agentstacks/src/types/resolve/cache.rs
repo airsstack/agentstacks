@@ -25,12 +25,16 @@ use crate::types::project::GitUrl;
 use crate::types::resolve::FetchError;
 use crate::types::tree::ContentHash;
 
-/// The home directory the cache lives under, from the `HOME` value the caller read.
+/// The airsstack root directory the cache lives under.
+///
+/// `airsstack_home` (the `AIRSSTACK_HOME` value the caller read) wins when it is set and
+/// non-empty; otherwise the root is `<HOME>/.airsstack`. An empty value counts as unset,
+/// matching the `${AIRSSTACK_HOME:-$HOME/.airsstack}` expansion the hooks use.
 ///
 /// # Errors
 ///
-/// Returns the unlocated [`FetchError::HomeUnset`] when `home` is `None` or empty; the caller
-/// locates it at `agentstacks.toml` and reports it once.
+/// Returns the unlocated [`FetchError::HomeUnset`] when neither value is set and non-empty;
+/// the caller locates it at `agentstacks.toml` and reports it once.
 ///
 /// # Examples
 ///
@@ -40,19 +44,35 @@ use crate::types::tree::ContentHash;
 ///
 /// use agentstacks::types::resolve::cache_home;
 ///
-/// assert_eq!(cache_home(Some(OsStr::new("/home/u")))?, Path::new("/home/u"));
-/// assert!(cache_home(None).is_err());
-/// assert!(cache_home(Some(OsStr::new(""))).is_err());
+/// assert_eq!(
+///     cache_home(Some(OsStr::new("/sandbox/home")), Some(OsStr::new("/home/u")))?,
+///     Path::new("/sandbox/home")
+/// );
+/// assert_eq!(
+///     cache_home(None, Some(OsStr::new("/home/u")))?,
+///     Path::new("/home/u/.airsstack")
+/// );
+/// assert_eq!(
+///     cache_home(Some(OsStr::new("")), Some(OsStr::new("/home/u")))?,
+///     Path::new("/home/u/.airsstack")
+/// );
+/// assert!(cache_home(None, None).is_err());
 /// # Ok::<(), agentstacks::types::resolve::FetchError>(())
 /// ```
-pub fn cache_home(home: Option<&OsStr>) -> Result<PathBuf, FetchError> {
-    match home {
+pub fn cache_home(
+    airsstack_home: Option<&OsStr>,
+    home: Option<&OsStr>,
+) -> Result<PathBuf, FetchError> {
+    match airsstack_home {
         Some(value) if !value.is_empty() => Ok(PathBuf::from(value)),
-        _ => Err(FetchError::HomeUnset),
+        _ => match home {
+            Some(value) if !value.is_empty() => Ok(PathBuf::from(value).join(".airsstack")),
+            _ => Err(FetchError::HomeUnset),
+        },
     }
 }
 
-/// `<home>/.airsstack/cache/git/<hex sha256 of the url>`: the directory of one repository URL.
+/// `<root>/cache/git/<hex sha256 of the url>`: the directory of one repository URL.
 ///
 /// # Examples
 ///
@@ -63,17 +83,14 @@ pub fn cache_home(home: Option<&OsStr>) -> Result<PathBuf, FetchError> {
 /// use agentstacks::types::resolve::url_dir;
 ///
 /// let url = GitUrl::new("https://github.com/airsstack/agentstacks")?;
-/// let dir = url_dir(Path::new("/home/u"), &url);
+/// let dir = url_dir(Path::new("/home/u/.airsstack"), &url);
 /// assert!(dir.starts_with("/home/u/.airsstack/cache/git"));
 /// # Ok::<(), agentstacks::types::InvalidGitUrl>(())
 /// ```
 #[must_use]
-pub fn url_dir(home: &Path, url: &GitUrl) -> PathBuf {
+pub fn url_dir(root: &Path, url: &GitUrl) -> PathBuf {
     let digest = ContentHash::of_bytes(url.as_str().as_bytes());
-    home.join(".airsstack")
-        .join("cache")
-        .join("git")
-        .join(digest.hex())
+    root.join("cache").join("git").join(digest.hex())
 }
 
 /// `<url dir>/<rev>.git`: the directory of one cached revision.
@@ -126,33 +143,53 @@ mod tests {
 
     #[test]
     fn cache_home_refuses_a_missing_home() -> TestResult {
-        let error = cache_home(None).err().ok_or("expected a refusal")?;
+        let error = cache_home(None, None).err().ok_or("expected a refusal")?;
         assert!(matches!(error, FetchError::HomeUnset));
         assert_eq!(
             Diagnostic::new(Location::file("agentstacks.toml"), error).to_string(),
-            "agentstacks.toml: HOME is not set, so the cache (~/.airsstack/cache) has no home"
+            "agentstacks.toml: AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
         );
         Ok(())
     }
 
     #[test]
     fn cache_home_refuses_an_empty_home() -> TestResult {
-        let error = cache_home(Some(OsStr::new("")))
+        let error = cache_home(Some(OsStr::new("")), Some(OsStr::new("")))
             .err()
             .ok_or("expected a refusal")?;
         assert!(matches!(error, FetchError::HomeUnset));
         assert_eq!(
             Diagnostic::new(Location::file("agentstacks.toml"), error).to_string(),
-            "agentstacks.toml: HOME is not set, so the cache (~/.airsstack/cache) has no home"
+            "agentstacks.toml: AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
         );
         Ok(())
     }
 
     #[test]
-    fn cache_home_takes_the_given_home() -> TestResult {
+    fn cache_home_prefers_airsstack_home() -> TestResult {
         assert_eq!(
-            cache_home(Some(OsStr::new("/home/u")))?,
-            Path::new("/home/u")
+            cache_home(
+                Some(OsStr::new("/sandbox/home")),
+                Some(OsStr::new("/home/u"))
+            )?,
+            Path::new("/sandbox/home")
+        );
+        assert_eq!(
+            cache_home(Some(OsStr::new("/sandbox/home")), None)?,
+            Path::new("/sandbox/home")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cache_home_falls_back_to_home_dot_airsstack() -> TestResult {
+        assert_eq!(
+            cache_home(None, Some(OsStr::new("/home/u")))?,
+            Path::new("/home/u/.airsstack")
+        );
+        assert_eq!(
+            cache_home(Some(OsStr::new("")), Some(OsStr::new("/home/u")))?,
+            Path::new("/home/u/.airsstack")
         );
         Ok(())
     }
@@ -160,7 +197,7 @@ mod tests {
     #[test]
     fn url_dir_is_the_sha256_of_the_url() -> TestResult {
         let url = GitUrl::new(URL)?;
-        let dir = url_dir(Path::new("/home/u"), &url);
+        let dir = url_dir(Path::new("/home/u/.airsstack"), &url);
         let hex = ContentHash::of_bytes(URL.as_bytes());
         assert_eq!(
             dir,

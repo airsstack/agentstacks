@@ -35,7 +35,7 @@ use crate::types::tree::ContentHash;
 ///
 /// assert_eq!(
 ///     FetchError::HomeUnset.to_string(),
-///     "HOME is not set, so the cache (~/.airsstack/cache) has no home",
+///     "AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home",
 /// );
 /// ```
 #[derive(Debug, thiserror::Error)]
@@ -62,7 +62,7 @@ pub enum FetchError {
     #[error("git: {0}")]
     GitSpawn(std::io::Error),
     /// A cache operation failed. The caller locates it at the carried path.
-    #[error("{error}")]
+    #[error("{error} (set AIRSSTACK_HOME to a writable directory to move the cache)")]
     CacheIo {
         /// The cache path the operation failed on; for a failed rename, the target.
         path: PathBuf,
@@ -99,8 +99,8 @@ pub enum FetchError {
         /// The `subdir`, as written.
         subdir: Quoted,
     },
-    /// `HOME` is unset or empty, so the cache has no home.
-    #[error("HOME is not set, so the cache (~/.airsstack/cache) has no home")]
+    /// `AIRSSTACK_HOME` and `HOME` are unset or empty, so the cache has no home.
+    #[error("AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home")]
     HomeUnset,
 }
 
@@ -189,7 +189,9 @@ mod tests {
         };
         assert_eq!(
             Diagnostic::new(Location::file(path), error).to_string(),
-            format!("/home/u/.airsstack/cache/git/{HEX}/{REV}.git: permission denied")
+            format!(
+                "/home/u/.airsstack/cache/git/{HEX}/{REV}.git: permission denied (set AIRSSTACK_HOME to a writable directory to move the cache)"
+            )
         );
     }
 
@@ -256,7 +258,7 @@ mod tests {
     fn fetch_error_home_unset() {
         assert_eq!(
             Diagnostic::new(Location::file("agentstacks.toml"), FetchError::HomeUnset).to_string(),
-            "agentstacks.toml: HOME is not set, so the cache (~/.airsstack/cache) has no home"
+            "agentstacks.toml: AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
         );
     }
 
@@ -264,7 +266,7 @@ mod tests {
     fn fetch_error_converts_and_displays_unchanged() {
         assert_eq!(
             FormatError::from(FetchError::HomeUnset).to_string(),
-            "HOME is not set, so the cache (~/.airsstack/cache) has no home"
+            "AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
         );
     }
 }

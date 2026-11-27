@@ -24,21 +24,24 @@ use std::path::{Path, PathBuf};
 use crate::types::project::{CommitId, GitUrl};
 use crate::types::resolve::{FetchError, cache_home, rev_dir, url_dir};
 
-/// The git cache under a home directory.
+/// The git cache under the resolved airsstack root.
 #[derive(Debug, Clone)]
 pub(crate) struct Cache {
-    home: PathBuf,
+    root: PathBuf,
 }
 
 impl Cache {
-    /// The cache under `home`, the value of `HOME`.
+    /// The cache under the root resolved from `AIRSSTACK_HOME` and `HOME`.
     ///
     /// # Errors
     ///
-    /// The unlocated [`FetchError::HomeUnset`] when `home` is `None` or empty.
-    pub(crate) fn from_home(home: Option<&OsStr>) -> Result<Self, FetchError> {
+    /// The unlocated [`FetchError::HomeUnset`] when both are `None` or empty.
+    pub(crate) fn from_home(
+        airsstack_home: Option<&OsStr>,
+        home: Option<&OsStr>,
+    ) -> Result<Self, FetchError> {
         Ok(Self {
-            home: cache_home(home)?,
+            root: cache_home(airsstack_home, home)?,
         })
     }
 
@@ -48,7 +51,7 @@ impl Cache {
     ///
     /// [`FetchError::CacheIo`] at the `<rev>.git` path when it cannot be looked at.
     pub(crate) fn repo(&self, url: &GitUrl, rev: &CommitId) -> Result<Option<PathBuf>, FetchError> {
-        let installed = rev_dir(&url_dir(&self.home, url), rev);
+        let installed = rev_dir(&url_dir(&self.root, url), rev);
         match installed.try_exists() {
             Ok(true) => Ok(Some(installed)),
             Ok(false) => Ok(None),
@@ -63,7 +66,7 @@ impl Cache {
     ///
     /// [`FetchError::CacheIo`] at the directory being created, or at the leftover being removed.
     pub(crate) fn temp(&self, url: &GitUrl, name: &str) -> Result<PathBuf, FetchError> {
-        let dir = url_dir(&self.home, url);
+        let dir = url_dir(&self.root, url);
         std::fs::create_dir_all(&dir).map_err(|error| cache_io(dir.clone(), error))?;
         let temp = dir.join(name);
         remove_entry(&temp)?;
@@ -84,7 +87,7 @@ impl Cache {
         url: &GitUrl,
         rev: &CommitId,
     ) -> Result<PathBuf, FetchError> {
-        let target = rev_dir(&url_dir(&self.home, url), rev);
+        let target = rev_dir(&url_dir(&self.root, url), rev);
         match std::fs::rename(temp, &target) {
             Ok(()) => Ok(target),
             Err(error) if error.kind() == io::ErrorKind::DirectoryNotEmpty => {
@@ -143,7 +146,7 @@ mod tests {
     /// A cache over a temp home.
     fn cache() -> Result<(tempfile::TempDir, Cache), Box<dyn std::error::Error>> {
         let home = tempfile::tempdir()?;
-        let cache = Cache::from_home(Some(home.path().as_os_str()))?;
+        let cache = Cache::from_home(None, Some(home.path().as_os_str()))?;
         Ok((home, cache))
     }
 
@@ -157,17 +160,19 @@ mod tests {
 
     /// `<home>/.airsstack/cache/git/<hex sha256 of the url>`, spelled out.
     fn url_directory(home: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
-        Ok(url_dir(home, &url()?))
+        Ok(url_dir(&home.join(".airsstack"), &url()?))
     }
 
     #[test]
     fn no_home_is_refused() {
         for home in [None, Some(OsString::new())] {
-            let error = Cache::from_home(home.as_deref()).err();
+            let error = Cache::from_home(None, home.as_deref()).err();
             assert!(matches!(error, Some(FetchError::HomeUnset)));
             assert_eq!(
                 error.map(|e| e.to_string()).as_deref(),
-                Some("HOME is not set, so the cache (~/.airsstack/cache) has no home")
+                Some(
+                    "AIRSSTACK_HOME and HOME are not set, so the cache (~/.airsstack/cache) has no home"
+                )
             );
         }
     }
@@ -184,7 +189,10 @@ mod tests {
             return Err("expected the cache I/O variant".into());
         };
         assert_eq!(path, &url_directory(home.path())?);
-        let expected = format!("{}: {io}", path.display());
+        let expected = format!(
+            "{}: {io} (set AIRSSTACK_HOME to a writable directory to move the cache)",
+            path.display()
+        );
         assert_eq!(
             Diagnostic::new(Location::file(path.clone()), error).to_string(),
             expected

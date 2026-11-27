@@ -44,7 +44,7 @@ static SCRATCHES: AtomicU64 = AtomicU64::new(0);
 /// use agentstacks::types::resolve::FetchError;
 ///
 /// // A program that does not exist is the per-source git-not-found answer.
-/// let git = GitCli::new("/nonexistent/dir/git", None);
+/// let git = GitCli::new("/nonexistent/dir/git", None, None);
 /// let url = GitUrl::new("https://github.com/airsstack/agentstacks")?;
 /// let refusal = git.list_tags(&url, "packs-v").err().ok_or("expected a refusal")?;
 /// assert!(matches!(refusal, FetchError::GitNotFound { needed_by } if needed_by.is_empty()));
@@ -53,23 +53,34 @@ static SCRATCHES: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug, Clone)]
 pub struct GitCli {
     program: OsString,
+    airsstack_home: Option<OsString>,
     home: Option<OsString>,
 }
 
 impl GitCli {
-    /// Runs `program` as git, and keeps its cache under `home`, the value of `HOME`.
+    /// Runs `program` as git, and keeps its cache under the root resolved from
+    /// `airsstack_home` (the value of `AIRSSTACK_HOME`) and `home` (the value of `HOME`).
     #[must_use]
-    pub fn new(program: impl Into<OsString>, home: Option<OsString>) -> Self {
+    pub fn new(
+        program: impl Into<OsString>,
+        airsstack_home: Option<OsString>,
+        home: Option<OsString>,
+    ) -> Self {
         Self {
             program: program.into(),
+            airsstack_home,
             home,
         }
     }
 
-    /// Runs `git` from `PATH`, with the cache under the `HOME` of the environment.
+    /// Runs `git` from `PATH`, with the cache under the root the environment resolves to.
     #[must_use]
     pub fn from_env() -> Self {
-        Self::new("git", std::env::var_os("HOME"))
+        Self::new(
+            "git",
+            std::env::var_os("AIRSSTACK_HOME"),
+            std::env::var_os("HOME"),
+        )
     }
 
     /// A run of `subcommand` by this git.
@@ -79,7 +90,7 @@ impl GitCli {
 
     /// The cache, which needs a home.
     fn cache(&self) -> Result<Cache, FetchError> {
-        Cache::from_home(self.home.as_deref())
+        Cache::from_home(self.airsstack_home.as_deref(), self.home.as_deref())
     }
 
     /// Fetches `refspec` of `url` into a scratch repository, asks `name` for the commit it holds,
@@ -207,7 +218,7 @@ mod tests {
     use crate::types::resolve::{rev_dir, url_dir};
 
     fn cli(home: &tempfile::TempDir) -> GitCli {
-        GitCli::new("git", Some(home.path().as_os_str().to_owned()))
+        GitCli::new("git", None, Some(home.path().as_os_str().to_owned()))
     }
 
     fn tag(name: &str) -> Result<GitTag, Box<dyn std::error::Error>> {
@@ -228,7 +239,7 @@ mod tests {
     /// The names in the cache directory of `url`.
     fn cached(home: &Path, url: &GitUrl) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let mut names = Vec::new();
-        for entry in std::fs::read_dir(url_dir(home, url))? {
+        for entry in std::fs::read_dir(url_dir(&home.join(".airsstack"), url))? {
             names.push(entry?.file_name().to_string_lossy().into_owned());
         }
         Ok(names)
@@ -271,7 +282,7 @@ mod tests {
     #[test]
     fn list_tags_needs_no_home() -> TestResult {
         let source = SourceRepo::new()?;
-        let tags = GitCli::new("git", None).list_tags(&source.url, "other-v")?;
+        let tags = GitCli::new("git", None, None).list_tags(&source.url, "other-v")?;
         assert_eq!(tags, [remote("other-v9.9.9", &source.two)?]);
         Ok(())
     }
@@ -283,7 +294,7 @@ mod tests {
         let rev = cli(&home).fetch_tag(&source.url, &tag("packs-v0.1.0")?)?;
         assert_eq!(rev, source.one);
         assert_ne!(rev, source.annotated);
-        let installed = rev_dir(&url_dir(home.path(), &source.url), &rev);
+        let installed = rev_dir(&url_dir(&home.path().join(".airsstack"), &source.url), &rev);
         assert!(installed.is_dir());
         no_scratch_left(home.path(), &source.url)
     }
@@ -423,7 +434,10 @@ mod tests {
         let home = tempfile::tempdir()?;
         let git = cli(&home);
         let first = git.fetch_tag(&source.url, &tag("packs-v0.1.0")?)?;
-        let installed = rev_dir(&url_dir(home.path(), &source.url), &first);
+        let installed = rev_dir(
+            &url_dir(&home.path().join(".airsstack"), &source.url),
+            &first,
+        );
         let marker = installed.join("marker");
         std::fs::write(&marker, b"first")?;
         let second = git.fetch_tag(&source.url, &tag("packs-v0.1.0")?)?;
@@ -450,6 +464,7 @@ mod tests {
         let home = tempfile::tempdir()?;
         let git = GitCli::new(
             "/nonexistent/dir/git",
+            None,
             Some(home.path().as_os_str().to_owned()),
         );
         let at = pin("packs-v0.1.0")?;
@@ -471,7 +486,7 @@ mod tests {
     fn no_home_is_refused_when_the_cache_is_needed() -> TestResult {
         let source = SourceRepo::new()?;
         for home in [None, Some(OsString::new())] {
-            let git = GitCli::new(OsStr::new("git"), home);
+            let git = GitCli::new(OsStr::new("git"), None, home);
             let error = git.fetch_tag(&source.url, &tag("packs-v0.1.0")?);
             assert!(matches!(error, Err(FetchError::HomeUnset)), "{error:?}");
         }
