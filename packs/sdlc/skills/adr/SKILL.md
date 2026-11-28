@@ -7,7 +7,7 @@ description: Use to record or change an architecture decision — write, approve
 
 ## The rule
 
-An ADR is one decision in `.claudestacks/sdlc/adrs/NNNN-<topic>.md`, cited by specs via their
+An ADR is one decision in `.agentstacks/sdlc/adrs/NNNN-<topic>.md`, cited by specs via their
 `adrs` key. This skill is the only writer of `adrs/` and of ADR status. ADRs are optional. An
 approved ADR is sealed: its body never changes; a changed decision is a new ADR that supersedes.
 
@@ -81,7 +81,7 @@ Once per draft, spawn `{{agent artifact-reviewer}}`:
 kind: adr
 draft: <the ADR file>
 authority: <none, or the replaced ADR file(s)>
-handoff: <TMPDIR>/claudestacks-sdlc-adr-<NNNN>-01.md
+handoff: <TMPDIR>/agentstacks-sdlc-adr-<NNNN>-01.md
 handoff-protocol: <the path {{skill core/context-handoff}} gave you>
 ```
 

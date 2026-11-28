@@ -1,4 +1,4 @@
--- Architecture decision records for the claudestacks-sdlc status board:
+-- Architecture decision records for the agentstacks-sdlc status board:
 -- scans `adrs/`, reads number-list frontmatter values, checks each ADR's seal
 -- and supersession, resolves an ADR by number, marks the ADRs a plan
 -- disproves, and derives each ADR's board row and the block's heading.

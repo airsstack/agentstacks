@@ -100,7 +100,7 @@ riskiest step, what was not done — never an unproven premise) and **`## Proof`
 session, expand `${TMPDIR:-/tmp}` yourself). Spawn `{{agent artifact-reviewer}}` once for
 the set, never per plan: `kind: plan-set`, `draft: <chain>/plans/NN-*.md` (every draft),
 `authority: <chain>/spec.md` (or `intent.md` on spec-skip),
-`handoff: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-01.md`, `handoff-protocol: <path>`.
+`handoff: <TMPDIR>/agentstacks-sdlc-<chain>-plan-set-01.md`, `handoff-protocol: <path>`.
 
 - One round; never re-spawn after fixes or author changes. Route off the summary; read
   `<detail>` only to act. You fix every finding; the agent never edits, flips or commits.

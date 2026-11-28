@@ -19,7 +19,7 @@ rename under `roadmaps/`, never move a chain directory; joining or leaving edits
 
 ## Input
 
-`<roadmap>/<NN>` resolves to one `.claudestacks/sdlc/roadmaps/<roadmap>/<NN>-*.md`. No match:
+`<roadmap>/<NN>` resolves to one `.agentstacks/sdlc/roadmaps/<roadmap>/<NN>-*.md`. No match:
 report the pattern, ask. Two matches: refuse (`INVALID (<file>: duplicate number NN)`). `add` and
 `roll up` take a roadmap name (`roll up` also accepts a reference).
 

@@ -707,7 +707,7 @@ fn sdlc_attention_hook_reports_the_board() -> TestResult {
     let project = project()?;
     let root = project.path();
     init_all(root)?;
-    let chain = root.join(".claudestacks/sdlc/2026-01-01-x");
+    let chain = root.join(".agentstacks/sdlc/2026-01-01-x");
     fs::create_dir_all(&chain)?;
     fs::write(
         chain.join("intent.md"),
@@ -723,6 +723,34 @@ fn sdlc_attention_hook_reports_the_board() -> TestResult {
     )?;
     let context = additional_context(reply.as_ref())?;
     assert!(context.contains("1 open, 0 need attention"), "{context}");
+    Ok(())
+}
+
+#[test]
+fn sdlc_attention_hook_points_at_setup_for_a_legacy_only_chain() -> TestResult {
+    if skip_without_airsl()? {
+        return Ok(());
+    }
+    let project = project()?;
+    let root = project.path();
+    init_all(root)?;
+    let chain = root.join(".claudestacks/sdlc/2026-01-01-x");
+    fs::create_dir_all(&chain)?;
+    fs::write(
+        chain.join("intent.md"),
+        "---\nstatus: approved\ncreated: 2026-01-01\n---\n# Intent: x\n",
+    )?;
+
+    let command = hook_command(root, "SessionStart", None, "sdlc.scripts.attention")?;
+    let reply = run_hook(
+        root,
+        &root.join("home"),
+        &command,
+        &session_event(root, "SessionStart"),
+    )?;
+    let context = additional_context(reply.as_ref())?;
+    assert!(context.contains("Legacy chain detected"), "{context}");
+    assert!(context.contains("setup skill"), "{context}");
     Ok(())
 }
 

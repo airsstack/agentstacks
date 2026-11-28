@@ -1,5 +1,5 @@
 #!/bin/sh
-# claudestacks-sdlc status launcher. Resolves airsl without relying on PATH
+# agentstacks-sdlc status launcher. Resolves airsl without relying on PATH
 # (hooks and commands are spawned by the CLI, not a login shell, so an
 # installed binary under ~/.local/bin or ~/.cargo/bin can be present but
 # invisible).

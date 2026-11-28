@@ -1,7 +1,7 @@
 ---
 name: task-briefer
 description: >
-  Mechanical brief extractor over a claudestacks-sdlc plan file. Two modes:
+  Mechanical brief extractor over an agentstacks-sdlc plan file. Two modes:
   `ledger` returns one compact row per task in the plan; `brief` writes ONE
   task's complete verbatim content to a handoff file and returns only its
   summary. Also lists, without judging, every fact the task asserts about the

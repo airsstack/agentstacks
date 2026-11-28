@@ -21,7 +21,7 @@ only what it says.**
 | 🔵 | nit | wording, ordering, or a body-shape deviation that changes nothing material |
 | ❓ | question | needs the author's intent before it can be judged |
 
-Report every finding at every tier, nits included. `.claudestacks/sdlc/REVIEW.md` does not
+Report every finding at every tier, nits included. `.agentstacks/sdlc/REVIEW.md` does not
 govern here; it is for code diffs.
 
 ## What closes a round

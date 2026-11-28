@@ -1,7 +1,7 @@
 ---
 name: chain-reader
 description: >
-  Mechanical section extractor over claudestacks-sdlc chain artifacts. Given a
+  Mechanical section extractor over agentstacks-sdlc chain artifacts. Given a
   glob and a heading, returns each match's content VERBATIM, tagged with the file
   it came from, and nothing else. Does not group, categorize, count, deduplicate,
   or judge. Use to pull one named section out of many chain files without loading
@@ -50,7 +50,7 @@ say that instead. They are different answers.
 byte (interior blank lines and indents intact). No separator, no commentary:
 
 ```
-### .claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-retry-core.md
+### .agentstacks/sdlc/2026-08-24-webhook-reliability/plans/01-retry-core.md
 
 <the extracted section, verbatim>
 ```

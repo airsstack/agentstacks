@@ -7,7 +7,7 @@ description: Use before designing or building anything new — captures a proble
 
 ## The rule
 
-An intent parks a problem as `.claudestacks/sdlc/<YYYY-MM-DD>-<kebab-topic>/intent.md`. It is
+An intent parks a problem as `.agentstacks/sdlc/<YYYY-MM-DD>-<kebab-topic>/intent.md`. It is
 the first stage with discussion; it states the problem, never the solution. Writing it commits
 to nothing.
 
@@ -47,7 +47,7 @@ reads:
 
 ## Before the dialogue
 
-List `prds/` and `rfcs/` under `.claudestacks/sdlc/` (absent or empty prompts nothing). If files
+List `prds/` and `rfcs/` under `.agentstacks/sdlc/` (absent or empty prompts nothing). If files
 look relevant, ask whether any should seed this intent. A user-named file that does not exist:
 report the path and ask. Record docs used in list keys `derived-from-prd:` / `derived-from-rfc:`.
 
@@ -70,7 +70,7 @@ Optional `milestone: <roadmap>/<NN>` in frontmatter.
 
 - Write the key only when the user names a milestone; otherwise write none and ask nothing about
   milestones. Never infer membership.
-- Find `.claudestacks/sdlc/roadmaps/<roadmap>/<NN>-<topic>.md`; write the key only if exactly one
+- Find `.agentstacks/sdlc/roadmaps/<roadmap>/<NN>-<topic>.md`; write the key only if exactly one
   file matches and its status is `draft` or `approved`. Otherwise write no key, report the path,
   status or duplicate files, and ask.
 - After dropping an intent with `milestone`, run the roll-up from `artifact-chain.md` for its

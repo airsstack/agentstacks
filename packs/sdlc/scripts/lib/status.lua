@@ -1,4 +1,4 @@
--- The claudestacks-sdlc status board: scans the committed chain root,
+-- The agentstacks-sdlc status board: scans the committed chain root,
 -- parses artifact frontmatter, derives each chain's STATE and NEXT, and
 -- renders the board, grouped under roadmaps and milestones when `roadmaps/`
 -- holds at least one roadmap directory and followed by an ADR block when
@@ -22,7 +22,11 @@ local path = airsstack.path
 local M = {}
 
 -- Chain root, relative to the consuming repository's root.
-M.ROOT = ".claudestacks/sdlc"
+M.ROOT = ".agentstacks/sdlc"
+
+-- Pre-rename location. Never read for chain data; only checked for
+-- existence so the board and the session hook can point at the setup skill.
+M.LEGACY_ROOT = ".claudestacks/sdlc"
 
 -- Top-level entries that are not chains.
 local SKIP = { prds = true, rfcs = true, [roadmap.DIR] = true, [adr.DIR] = true }
@@ -827,7 +831,7 @@ function M.attention(rootdir, command)
     end
   end
 
-  local head = string.format("claudestacks-sdlc: %d open, %d need attention", board.open, #blocks)
+  local head = string.format("agentstacks-sdlc: %d open, %d need attention", board.open, #blocks)
   if type(command) == "string" and command ~= "" then
     head = head .. " — full board: " .. command
   end
@@ -842,6 +846,22 @@ function M.attention(rootdir, command)
     size = size + 1 + #block
   end
   return table.concat(out, "\n")
+end
+
+-- The migration pointer for a repository directory, or nil. Returns the
+-- pointer when the canonical root is absent but the legacy root exists, so
+-- the board driver and the session hook can send the engineer to the setup
+-- skill. Existence only; legacy chain data is never read.
+function M.migration_hint(cwddir)
+  local canonical = path.join(cwddir, M.ROOT)
+  if fs.exists(canonical) and fs.is_dir(canonical) then
+    return nil
+  end
+  local legacy = path.join(cwddir, M.LEGACY_ROOT)
+  if fs.exists(legacy) and fs.is_dir(legacy) then
+    return "Legacy chain detected under " .. M.LEGACY_ROOT .. ". Run the setup skill to migrate it."
+  end
+  return nil
 end
 
 return M

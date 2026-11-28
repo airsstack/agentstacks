@@ -6,10 +6,13 @@ Normative. Every skill resolves paths and states from this file. The Lua under
 
 ## 1. Chain root
 
-- `.claudestacks/sdlc/` at the consuming repository's root. Everything under it is
+- `.agentstacks/sdlc/` at the consuming repository's root. Everything under it is
   committed; no worktree-local or HOME-global split.
-- The pack never writes or edits a `.gitignore`; nothing under `.claudestacks/` is
+- The pack never writes or edits a `.gitignore`; nothing under `.agentstacks/` is
   excluded from git.
+- A repository migrated from the legacy name keeps a frozen `.claudestacks/sdlc/`
+  snapshot beside it. The board and the skills ignore that snapshot; the setup
+  skill copies from it once, on explicit approval, and never writes to it.
 
 ## 2. Chain directory naming
 
@@ -19,7 +22,7 @@ Normative. Every skill resolves paths and states from this file. The Lua under
 ## 3. Layout
 
 ```
-.claudestacks/sdlc/                        # committed; provisioned by the setup skill
+.agentstacks/sdlc/                         # committed; provisioned by the setup skill
 ├── prds/.gitkeep                          # optional product input docs (inbox)
 ├── rfcs/.gitkeep                          # optional technical input docs (inbox)
 ├── roadmaps/                              # optional; created on first use by the roadmap skill
@@ -444,7 +447,7 @@ no ADR behaviour at all. Body shape: `references/templates.md`.
 
 ### 13.1 Files
 
-- `.claudestacks/sdlc/adrs/NNNN-<topic>.md`: four-digit `NNNN`, kebab-case `<topic>`. One
+- `.agentstacks/sdlc/adrs/NNNN-<topic>.md`: four-digit `NNNN`, kebab-case `<topic>`. One
   repository-wide series.
 - `adrs/` is created by the `adr` skill on first use, never by `setup`.
 - A new ADR takes the next number after the highest `NNNN` of any file matching

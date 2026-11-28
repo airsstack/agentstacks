@@ -1,6 +1,6 @@
 # Artifact Templates — body shapes for intent, spec, plan, roadmap, milestone, and ADR
 
-Body-shape authority for the `claudestacks-sdlc` skills. A skill writing a new artifact
+Body-shape authority for the `agentstacks-sdlc` skills. A skill writing a new artifact
 reproduces the shape below. Bracketed text is guidance, not content to leave in the file.
 
 ## `intent.md`

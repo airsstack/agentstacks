@@ -89,8 +89,8 @@ adapters get one contract test each against the real thing.
 
 ## How work is done
 
-- Work goes through the claudestacks-sdlc chain (intent → design/spec → plan →
-  execute), with files under `.claudestacks/sdlc/`. Read progress from that
+- Work goes through the agentstacks-sdlc chain (intent → design/spec → plan →
+  execute), with files under `.agentstacks/sdlc/`. Read progress from that
   board, not from `CLAUDE.md`.
 - Conventional Commits, `type(scope): summary`; the scope is the crate name, or
   `repo` for cross-cutting changes.

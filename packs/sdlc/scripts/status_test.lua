@@ -1,5 +1,5 @@
 -- Tests for lib/status — frontmatter parsing, chain scanning, state derivation
--- and board rendering, ADR block included, for the claudestacks-sdlc committed
+-- and board rendering, ADR block included, for the agentstacks-sdlc committed
 -- chain.
 --
 --   cargo make lua
@@ -1554,14 +1554,14 @@ return {
     artifact(path.join(chain, "plans"), "01-core.md",
       { "status: approved", "created: 2026-10-16", BUILT })
     assert(status.attention(dir, BOARD)
-      == "claudestacks-sdlc: 3 open, 0 need attention — full board: /sdlc-status",
+      == "agentstacks-sdlc: 3 open, 0 need attention — full board: /sdlc-status",
       status.attention(dir, BOARD))
   end,
 
   attention_omits_the_board_suffix_without_a_command = function()
     local dir = root()
     member(dir, "2026-10-13-mfa", "approved", nil)
-    local want = "claudestacks-sdlc: 1 open, 0 need attention"
+    local want = "agentstacks-sdlc: 1 open, 0 need attention"
     local nil_text = status.attention(dir, nil)
     assert(nil_text == want, nil_text)
     local empty_text = status.attention(dir, "")
@@ -1587,7 +1587,7 @@ return {
     chain("2026-10-07-ready", SPEC, { "status: approved", "created: 2026-10-07", BUILT })
     member(dir, "2026-10-08-idea", "draft", nil)
     assert(trimmed(status.attention(dir, BOARD)) == table.concat({
-      "claudestacks-sdlc: 8 open, 6 need attention — full board: /sdlc-status",
+      "agentstacks-sdlc: 8 open, 6 need attention — full board: /sdlc-status",
       "2026-10-01-invalid                INVALID (intent.md missing)   fix 2026-10-01-invalid",
       "2026-10-02-stale                  plan 01 approved: stale (spec changed)  plan",
       "2026-10-03-blocked                plan 01 approved: blocked (spec not approved)  approve spec",
@@ -1610,7 +1610,7 @@ return {
       "derived-from-prd:", "  - prds/p.md",
     })
     assert(trimmed(status.attention(dir, BOARD)) == table.concat({
-      "claudestacks-sdlc: 1 open, 3 need attention — full board: /sdlc-status",
+      "agentstacks-sdlc: 1 open, 3 need attention — full board: /sdlc-status",
       "MILESTONE old/01-left             approved, 0 of 0 done         park scope",
       "  ⤷ roadmap old is dropped — drop this milestone",
       "MILESTONE platform/01-auth        milestone complete            roll up",
@@ -1627,7 +1627,7 @@ return {
     roadmap_file(dir, "next", "01-only.md", "done")
     fs.mkdir(path.join(dir, "2026-10-01-broken"))
     assert(trimmed(status.attention(dir, BOARD)) == table.concat({
-      "claudestacks-sdlc: 1 open, 2 need attention — full board: /sdlc-status",
+      "agentstacks-sdlc: 1 open, 2 need attention — full board: /sdlc-status",
       "ROADMAP next                      roadmap complete              roll up",
       "  2026-10-01-broken               INVALID (intent.md missing)   fix 2026-10-01-broken",
     }, "\n"), status.attention(dir, BOARD))
@@ -1653,7 +1653,7 @@ return {
     end
     local text = status.attention(dir, BOARD)
     assert(#text < status.ATTENTION_LIMIT, "want under " .. status.ATTENTION_LIMIT .. " bytes, got " .. #text)
-    assert(text:find("claudestacks-sdlc: 200 open, 200 need attention", 1, true), text:sub(1, 120))
+    assert(text:find("agentstacks-sdlc: 200 open, 200 need attention", 1, true), text:sub(1, 120))
     local shown = select(2, text:gsub("\n2026%-10%-01%-broken", ""))
     assert(shown > 0 and shown < 200, "want some rows shown, got " .. shown)
     assert(text:sub(-#string.format("  (%d more rows not shown)", 200 - shown))
@@ -1771,7 +1771,7 @@ return {
     local dir = root()
     adr_file(dir, "0001-a.md", { "status: approved", "created: 2026-10-20" })
     assert(trimmed(status.attention(dir, BOARD)) == table.concat({
-      "claudestacks-sdlc: 0 open, 1 need attention — full board: /sdlc-status",
+      "agentstacks-sdlc: 0 open, 1 need attention — full board: /sdlc-status",
       trimmed(row_line(2, "ADR 0001", "INVALID (0001-a.md: missing sealed)", "fix adr 0001")),
     }, "\n"), status.attention(dir, BOARD))
   end,
@@ -1790,7 +1790,35 @@ return {
     member(dir, "2026-10-01-a", "draft")
     adr_file(dir, "0001-a.md", ADR_DRAFT)
     assert(status.attention(dir, BOARD)
-      == "claudestacks-sdlc: 1 open, 0 need attention — full board: /sdlc-status",
+      == "agentstacks-sdlc: 1 open, 0 need attention — full board: /sdlc-status",
       status.attention(dir, BOARD))
+  end,
+
+  -- The migration pointer: existence only, never chain data.
+  migration_hint_is_nil_when_the_canonical_root_exists = function()
+    local cwd = fs.tempdir()
+    fs.mkdir(path.join(cwd, ".agentstacks"))
+    fs.mkdir(path.join(cwd, ".agentstacks", "sdlc"))
+    fs.mkdir(path.join(cwd, ".claudestacks"))
+    fs.mkdir(path.join(cwd, ".claudestacks", "sdlc"))
+    assert(status.migration_hint(cwd) == nil)
+  end,
+
+  migration_hint_names_setup_when_only_the_legacy_root_exists = function()
+    local cwd = fs.tempdir()
+    fs.mkdir(path.join(cwd, ".claudestacks"))
+    fs.mkdir(path.join(cwd, ".claudestacks", "sdlc"))
+    assert(status.migration_hint(cwd)
+      == "Legacy chain detected under .claudestacks/sdlc. Run the setup skill to migrate it.")
+  end,
+
+  migration_hint_is_nil_when_neither_root_exists = function()
+    assert(status.migration_hint(fs.tempdir()) == nil)
+  end,
+
+  migration_hint_ignores_a_legacy_file_that_is_not_a_directory = function()
+    local cwd = fs.tempdir()
+    fs.write(path.join(cwd, ".claudestacks"), "not a dir\n")
+    assert(status.migration_hint(cwd) == nil)
   end,
 }

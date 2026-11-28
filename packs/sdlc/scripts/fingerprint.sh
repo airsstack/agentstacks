@@ -1,5 +1,5 @@
 #!/bin/sh
-# claudestacks-sdlc body fingerprint: the first 12 hex characters of the
+# agentstacks-sdlc body fingerprint: the first 12 hex characters of the
 # SHA-256 of an artifact's body (every line after the line that closes the
 # frontmatter, carriage returns stripped, each line ending in one newline).
 #

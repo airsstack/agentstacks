@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: Use when work is larger than one chain — creates a roadmap and its first milestones under .claudestacks/sdlc/roadmaps/, or approves, amends, drops or un-drops an existing one. Optional.
+description: Use when work is larger than one chain — creates a roadmap and its first milestones under .agentstacks/sdlc/roadmaps/, or approves, amends, drops or un-drops an existing one. Optional.
 ---
 
 # Roadmap
@@ -12,12 +12,12 @@ roadmap records no progress (no counts, percentages, or lists of milestones or c
 derives all of it.
 
 Paths, keys, transitions: `{{var project_dir}}/{{root}}/references/artifact-chain.md`. Body shapes:
-`{{var project_dir}}/{{root}}/references/templates.md`. Lazy-create `.claudestacks/sdlc/roadmaps/` and the
+`{{var project_dir}}/{{root}}/references/templates.md`. Lazy-create `.agentstacks/sdlc/roadmaps/` and the
 roadmap directory (`setup` does not). Never commit. Flip `status` only as the last step of the
 interaction, on the user's explicit word. Never delete or rename under `roadmaps/`.
 
 ```
-.claudestacks/sdlc/roadmaps/<roadmap>/
+.agentstacks/sdlc/roadmaps/<roadmap>/
 ├── roadmap.md
 ├── 01-<topic>.md      # one per milestone
 └── 02-<topic>.md
