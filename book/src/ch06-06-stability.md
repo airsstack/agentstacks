@@ -19,6 +19,9 @@ write for `api = 1` keeps working until 2.0.
 - **`agentstacks.toml`.**
 - **`agentstacks.lock`:** its format is frozen for all of 1.x. Every 1.x reads and writes the same
   lock, and reads a lock written with `api = 0`.
+- **Release stream prefixes:** `packs-<name>-v` and `ext-<name>-v` are frozen for all of 1.x.
+  Renaming a prefix would break every pin, so a new naming scheme needs `api = 2`.
+  [Versions and Release Streams](ch06-08-versioning.md) is the contract.
 - **The command line:** the commands, their flags and their exit codes.
 
 ## What a 1.x minor release may add
@@ -52,7 +55,7 @@ cover:
 | R3 | A hook with no `match` gets every value | The vocabularies are frozen, so no value an extension does not know can appear in 1.x. |
 | R4 | Item ids such as `core/hook/0` | Ids are opaque strings: copy them back, never parse them. |
 | R5 | The exact text of refusals and messages | Not covered. Only the location and key shapes are. |
-| R6 | A future `packs-v2.*` release would be fetched by the shorthand and by `update` | They only take `packs-v1.*` tags from the official repository (see [The Command Line](ch04-00-cli.md)). |
+| R6 | A future `packs-v2.*` release would be fetched by the shorthand and by `update` | They never fetch it: the bundle stream is frozen, and each artifact moves only inside its own `*-v1.*` stream (see [Versions and Release Streams](ch06-08-versioning.md) and [The Command Line](ch04-00-cli.md)). |
 | R7 | A key added in 1.N to `agentstacks.toml` is `unknown key` to 1.0 | A team that uses a 1.N key needs agentstacks 1.N everywhere. There is no gate for it. |
 
 ## What authors do

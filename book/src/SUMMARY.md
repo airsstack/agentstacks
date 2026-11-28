@@ -25,6 +25,7 @@
   - [The Pack Format](ch06-05-pack-format.md)
   - [The 1.x Stability Promise](ch06-06-stability.md)
   - [Muse Code](ch06-07-musecode.md)
+  - [Versions and Release Streams](ch06-08-versioning.md)
 - [Under the Hood](ch07-00-architecture.md)
 
 # claudevs

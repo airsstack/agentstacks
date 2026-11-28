@@ -265,7 +265,7 @@ api = 1
 
 [tools.claude]
 git    = "https://github.com/airsstack/agentstacks"
-tag    = "packs-v1.0.0"
+tag    = "ext-claude-v1.1.0"
 subdir = "extensions/claude"
 
 [packs.team-lint]
@@ -280,8 +280,9 @@ option, add a `[packs.team-lint.options]` table with the values
 ([section 6 of the pack format](ch06-05-pack-format.md#6-options)). Then run `agentstacks plan` and
 `agentstacks apply`. The tag, the commit and the tree hash of the source are pinned in
 `agentstacks.lock`. `agentstacks update` moves a third-party source to the newest tag with the same
-prefix (`v1.0.0` to `v1.0.1`; a tag with another prefix such as `other-2.0.0` is not chosen). The
-official repository's own tags are limited to `packs-v1.*`
+prefix (`v1.0.0` to `v1.0.1`; a tag with another prefix such as `other-2.0.0` is not chosen). Each
+official artifact moves inside its own stream instead (`packs-core-v1.*`, `ext-claude-v1.*`),
+never across streams
 (see [The Command Line](ch04-00-cli.md)).
 
 This was run end to end on `team-lint` with a local git repository (`git = "file:///..."`): the
@@ -291,6 +292,8 @@ installed skill.
 ### 11. Before you call it done
 
 - [ ] `pack.toml` has `api = 1`, a valid `name` and `version`, and a `description`.
+- [ ] `version` moves if and only if the pack's shipped content changed, and the change has a
+  `CHANGELOG.md` entry (see [Versions and Release Streams](ch06-08-versioning.md)).
 - [ ] `agentstacks plan` on the pack has no refusal; each `skip` has a reason you accept.
 - [ ] `agentstacks apply --yes`, then `agentstacks plan` shows `0 to write`; `doctor` says `healthy`.
 - [ ] `airsl test <pack>` reports `0 failed`, and `airsl check <pack>` compiles every file.

@@ -40,6 +40,10 @@ entry = "adapter.lua"
 reads = [".claude/settings.json"]
 ```
 
+The `version` tracks this extension's own releases: bump it if and only if the extension's
+shipped content changed, with a changelog entry in the extension's own `CHANGELOG.md`
+(see [Versions and Release Streams](ch06-08-versioning.md)).
+
 The optional `[requires]` table holds one key, `agentstacks`, a version range. Declare it when the
 extension uses something a later 1.x release added (see [the stability
 page](ch06-06-stability.md#what-authors-do)):

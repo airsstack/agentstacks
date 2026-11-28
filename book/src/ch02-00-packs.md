@@ -18,5 +18,8 @@ come with agentstacks:
 agentstacks.toml: packs.sdlc: sdlc requires pack "core", which agentstacks.toml does not list (add it: --pack core)
 ```
 
-The packs are released together as `packs-v*` tags. `agentstacks update` moves a project to the
-newest release of the api it speaks (`packs-v1.*` for api 1). One page per pack follows.
+Each pack is released on its own stream of tags, `packs-<name>-v*`, carrying only its own
+version: a pack's number moves if and only if that pack's shipped content changed, with a
+changelog entry beside it. `agentstacks update` moves each pinned pack to the newest release
+of its stream whose major version is the `api` this agentstacks speaks (`packs-core-v1.*` for
+`api = 1`). One page per pack follows.

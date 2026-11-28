@@ -67,7 +67,9 @@ Refusals are printed one `Diagnostic` per line, sorted.
   its directory (for example `extensions/opencode`) into the project and pass that path, such as
   `--tool ext/opencode`.
 - An official name expands to `git = "https://github.com/airsstack/agentstacks"`, the latest
-  `packs-v<api>.*` tag (the newest release whose major version is the `api` this agentstacks speaks, so `packs-v1.*` for `api = 1`), and `subdir = "packs/<name>"` (a tool: `extensions/<name>`).
+  tag of its stream whose major version is the `api` this agentstacks speaks (`packs-core-v1.*`
+  for the `core` pack, `ext-claude-v1.*` for the `claude` tool, so `*-v1.*` for `api = 1`), and
+  `subdir = "packs/<name>"` (a tool: `extensions/<name>`).
 - A path's table key is the `name` in that directory's `pack.toml` or `extension.toml`.
 - Git URLs are not arguments. Add one to `agentstacks.toml` by hand.
 - A repeated identical argument is written once. Two different arguments that resolve to the same
@@ -92,7 +94,7 @@ The rendered file lists tools first in name order, then packs in name order, wit
 |---|---|
 | file exists | `agentstacks.toml: already exists (edit it and run apply)` |
 | unknown name | `--pack "x": not an official pack; pass a path, or add a git source to agentstacks.toml` / `--tool "x": not an official tool; pass a path, or add a git source to agentstacks.toml` |
-| no release tag | `--pack "core": no packs-v1 release tag in https://github.com/airsstack/agentstacks` |
+| no release tag | `--pack "core": no packs-core-v1 release tag in https://github.com/airsstack/agentstacks` |
 | git missing from `PATH` | one refusal for all official arguments: `init: git not found on PATH (needed by --tool "claude", --pack "core")` |
 | path absolute / climbs out | `--pack "/x": absolute paths are not portable` / `--pack "../x": must stay inside the project` |
 | path resolves outside through a symlink | `--pack "./x": resolves outside the project` |
@@ -202,10 +204,12 @@ nothing applied (run apply)`).
 
 ## 7. `update`
 
-1. List the newer tags. A refusal is printed and exits 1.
+1. List the newer tags, one stream per git source: each source is listed under its own
+   `packs-<name>-v*` or `ext-<name>-v*` prefix. A refusal is printed and exits 1.
 2. Print each entry on stdout: `  <key>: <current> → <new>` for a new tag, `  note     <UpdateNote Display>`
-   for a note. `<key>` is `packs.core` or `tools.claude`. A project written for the 0.x releases
-   (`api = 0`) first prints `  api: 0 → 1`.
+   for a note. `<key>` is `packs.core` or `tools.claude`. A source pinned to a retired `packs-v*`
+   bundle tag reports the frozen note — the stream and whether it lists a newer tag — and is never
+   rewritten. A project written for the 0.x releases (`api = 0`) first prints `  api: 0 → 1`.
 3. With no new tag and the `api` already current, print `nothing to update`, exit 0 and write
    nothing. A 0.x project is not in this case: it is moved to `api = 1` even when no tag is newer.
 4. Rewrite `agentstacks.toml` with each new tag and, for a 0.x project, with `api = 1`, comments
@@ -236,9 +240,14 @@ reconciles that entry as stale and resolves it again, so `update` needs no speci
 
 ## 8. `doctor`
 
-Prints each finding on stdout, one per line, in the order returned, for example
-`changed: .claude/agents/core-coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`. With no findings it
-prints `healthy` and exits 0. Any finding exits 1.
+Prints each finding on stdout, one per line, in the order returned, then each advisory, for
+example `changed: .claude/agents/core-coder.md` or `airsl: 0.1.5 installed, lock pins 0.1.4`.
+With neither findings nor advisories it prints `healthy` and exits 0. Any finding exits 1;
+advisories never change the exit code. An advisory names a newer stream tag, a frozen bundle
+pin, or a stream that could not be checked (`agentstacks.toml: packs.core: packs-core-v1.0.2
+is available (pinned packs-core-v1.0.1)`); without a network, without git, or with an
+unlistable remote, `doctor` reports `could not check <name>` notes and otherwise behaves exactly
+as it would offline.
 
 `doctor` reads the lock and the files it names, never `agentstacks.toml`, and checks the
 `airsl` runtime when the project needs it: the lock pins airsl, a locked file is a hook
@@ -265,7 +274,7 @@ agentstacks [-C <DIR>] ext add <SOURCE> [--tag <TAG> | --rev <REV>] [--subdir <D
 
 - `--tag` and `--rev` exclude each other (clap, exit 2). `--tag`, `--rev` and `--subdir` apply only
   to a git URL.
-- An official name is written as the official repository at its newest `packs-v1.*` tag, with
+- An official name is written as the official repository at its newest `ext-<name>-v1.*` tag, with
   `subdir = "extensions/<name>"`, the same rule as `init` (section 3).
 - The table key is the `name` in the extension's `extension.toml`. The extension is fetched or read
   and loaded before anything is written, so a refused extension never reaches `agentstacks.toml`.
@@ -301,7 +310,7 @@ A refusal in steps 1 to 4 exits 1 with no plan and the file as it was.
 | git missing from `PATH` | `ext add: git not found on PATH (needed by ext add "<source>")` |
 | git fails | `ext add: git <subcommand> failed: <stderr>` |
 | `--subdir` missing in the repository | `ext add "<url>": "<dir>" not found at <rev>` / `ext add "<url>": "<dir>" is a file, not a directory` |
-| no tag of this major | `ext add "claude": no packs-v1 release tag in https://github.com/airsstack/agentstacks` |
+| no tag of this major | `ext add "claude": no ext-claude-v1 release tag in https://github.com/airsstack/agentstacks` |
 | the extension is refused | the loader's own refusals, located at its files, such as `ext/mytool/extension.toml: extension.api: 2 not supported (this agentstacks speaks 1)` |
 | tool already listed | `agentstacks.toml: tools.<name> already exists (edit it there)` |
 | file changed meanwhile | `agentstacks.toml: changed during ext add (run it again)` |

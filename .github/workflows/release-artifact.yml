@@ -1,0 +1,121 @@
+name: Release artifact
+
+# Mints one per-artifact release tag after verifying the manifest, the
+# changelog, and the release gate. Triggered by hand or by
+# scripts/release-artifact.sh, one artifact at a time: GitHub creates no
+# event when more than three tags are pushed at once, so batch pushes would
+# go silent.
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Pack or extension name (core, sdlc, journal, guideline-rust, guideline-python, claude, musecode, opencode)"
+        required: true
+        type: string
+      version:
+        description: "Release version without a leading v (for example 1.2.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Verify everything without creating or pushing the tag"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Same pinned airsl as the CI jobs that run Lua: the release script and
+      # the Lua decision checks need it.
+      - name: Install the airsl binary
+        env:
+          AIRSL_VERSION: 0.1.5
+          AIRSL_SHA256: a8a8f9e527c20fc6bd61fcdb07cc7ce6eb1a9ea0100c1a1706b60a87aab83006
+        run: |
+          target=airsl-cli-x86_64-unknown-linux-gnu
+          curl -sSfL -o "$RUNNER_TEMP/airsl.tar.xz" "https://github.com/airsstack/airsl/releases/download/airsl-cli-v${AIRSL_VERSION}/${target}.tar.xz"
+          echo "${AIRSL_SHA256}  $RUNNER_TEMP/airsl.tar.xz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xJf "$RUNNER_TEMP/airsl.tar.xz" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/${target}/airsl" "$HOME/.local/bin/airsl"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/airsl" --version
+
+      - name: Verify the manifest declares the release and the changelog names it
+        run: |
+          case "${{ inputs.artifact }}" in
+            core|sdlc|journal|guideline-rust|guideline-python) manifest="packs/${{ inputs.artifact }}/pack.toml"; kind=pack; changelog="packs/${{ inputs.artifact }}/CHANGELOG.md" ;;
+            claude|musecode|opencode) manifest="extensions/${{ inputs.artifact }}/extension.toml"; kind=ext; changelog="extensions/${{ inputs.artifact }}/CHANGELOG.md" ;;
+            *) echo "release-artifact: unknown artifact '${{ inputs.artifact }}'" >&2; exit 1 ;;
+          esac
+          echo "kind=$kind" >> "$GITHUB_ENV"
+          airsl run --policy trusted scripts/release/agreement.lua "$manifest" "$changelog" "${{ inputs.version }}"
+
+      - name: Resolve the stream tag and its base
+        run: |
+          case "${{ inputs.version }}" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "release-artifact: '${{ inputs.version }}' is not a version (expected MAJOR.MINOR.PATCH)" >&2; exit 1 ;;
+          esac
+          case "$kind" in
+            pack) prefix="packs-${{ inputs.artifact }}-v" ;;
+            *) prefix="ext-${{ inputs.artifact }}-v" ;;
+          esac
+          tag="${prefix}${{ inputs.version }}"
+          echo "stream_tag=$tag" >> "$GITHUB_ENV"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "release-artifact: $tag already exists" >&2
+            exit 1
+          fi
+          base=$(git tag --list "${prefix}*" | sort -V | tail -1)
+          echo "stream_base=$base" >> "$GITHUB_ENV"
+          echo "release-artifact: tag $tag, base ${base:-(none)}"
+
+      - name: Run the release gate over the stream range
+        if: env.stream_base != ''
+        run: sh scripts/release-gate.sh --repo . "${{ env.stream_base }}" HEAD
+
+      - name: Suggest the bump from the stream's history
+        run: |
+          case "$kind" in
+            pack) subdir="packs/${{ inputs.artifact }}" ;;
+            *) subdir="extensions/${{ inputs.artifact }}" ;;
+          esac
+          if [ -n "${{ env.stream_base }}" ]; then
+            range="${{ env.stream_base }}...HEAD"
+          else
+            range="HEAD"
+          fi
+          subjects=$(git log --format=%s "$range" -- "$subdir" | head -50)
+          # shellcheck disable=SC2086
+          set -- $subjects
+          airsl run --policy trusted scripts/release/suggest.lua "$@" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Mint and push the tag alone
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git tag -a "${{ env.stream_tag }}" -m "${{ env.stream_tag }}"
+          git push origin "refs/tags/${{ env.stream_tag }}"
+
+      - name: Smoke-verify through init, update, apply, and doctor
+        if: ${{ !inputs.dry_run }}
+        run: |
+          case "$kind" in
+            pack) tool=claude; pack="${{ inputs.artifact }}" ;;
+            *) tool="${{ inputs.artifact }}"; pack=core ;;
+          esac
+          work=$(mktemp -d)
+          cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" --pack "$pack" --yes
+          grep -q "tag = \"${{ env.stream_tag }}\"" agentstacks.toml || { echo "release-artifact: smoke init did not pin ${{ env.stream_tag }}" >&2; exit 1; }
+          test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- update --yes)" = "nothing to update" || { echo "release-artifact: smoke update found more than the new tag" >&2; exit 1; }
+          cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- apply --yes >/dev/null
+          test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- doctor)" = "healthy" || { echo "release-artifact: smoke doctor is not healthy" >&2; exit 1; }

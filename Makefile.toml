@@ -101,7 +101,7 @@ args = ["test", "--workspace", "--all-features", "--doc"]
 
 [tasks.lua]
 category = "Gate"
-description = "Lua: airsl check and airsl test over extensions/, packs/ and the conformance pack asset (airsl check also over the opencode-check and musecode-check packs), the fingerprint gate, the pack text gates, the api-0 gate, then the airsl pin gate"
+description = "Lua: airsl check and airsl test over extensions/, packs/, the conformance pack asset and scripts/release (airsl check also over the opencode-check and musecode-check packs), the fingerprint gate, the pack text gates, the api-0 gate, then the airsl pin gate"
 # A shell script because the pack tests' write grant is `${TMPDIR:-/tmp}`, which
 # needs shell expansion. `set -e` stops the run at the first failing step. The text
 # gates at the end fail on any line their grep prints: the `if` form is needed
@@ -112,11 +112,13 @@ set -e
 airsl check extensions
 airsl check packs
 airsl check crates/agentstacks/assets/conformance
+airsl check scripts/release
 airsl check crates/agentstacks-cli/tests/opencode-check/pack
 airsl check crates/agentstacks-cli/tests/musecode-check/pack
 airsl test extensions
 airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git packs
 airsl test crates/agentstacks/assets/conformance
+airsl test scripts/release
 
 # The fingerprint gate. `packs/sdlc/scripts/fingerprint.sh` is the one piece of
 # the status board with no Lua test: it exists for machines without airsl. It
@@ -280,24 +282,45 @@ if [ -n "$left" ]; then
 fi
 echo "api-0 gate: passed"
 
-# The airsl pin gate. Each ci.yml job that installs the airsl binary holds its own copy of
+# The airsl pin gate. Each workflow job that installs the airsl binary holds its own copy of
 # the pinned version and hash, so the copies must name one AIRSL_VERSION and one
-# AIRSL_SHA256. It reads grep's status before filtering, as the gates above do.
+# AIRSL_SHA256 across ci.yml and release-artifact.yml. It reads grep's status before filtering,
+# as the gates above do.
 rc=0
-pins=$(grep -E '^ *AIRSL_(VERSION|SHA256): ' .github/workflows/ci.yml) || rc=$?
+pins=$(grep -E '^ *AIRSL_(VERSION|SHA256): ' .github/workflows/ci.yml .github/workflows/release-artifact.yml) || rc=$?
 if [ "$rc" -gt 1 ]; then
-  echo "airsl pin gate: grep failed over .github/workflows/ci.yml (exit $rc)" >&2
+  echo "airsl pin gate: grep failed over the workflows (exit $rc)" >&2
   exit 1
 fi
-distinct=$(printf '%s\n' "$pins" | sed -E 's/^ +//; s/ +$//' | grep -v '^$' | sort -u)
+distinct=$(printf '%s\n' "$pins" | sed -E 's/^([A-Za-z0-9_.\/-]+\.yml:)? *//; s/ *$//' | grep -v '^$' | sort -u)
 versions=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_VERSION: ' || true)
 hashes=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_SHA256: ' || true)
 if [ "$versions" != 1 ] || [ "$hashes" != 1 ]; then
   printf '%s\n' "$distinct"
-  echo "airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins in .github/workflows/ci.yml differ or are missing; give every job the same version and hash" >&2
+  echo "airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins differ or are missing; give every installing job the same version and hash" >&2
   exit 1
 fi
-echo "airsl pin gate: passed ($(printf '%s\n' "$pins" | grep -c '^ *AIRSL_VERSION: ') jobs)"
+echo "airsl pin gate: passed ($(printf '%s\n' "$pins" | grep -c 'AIRSL_VERSION: ') installs)"
+'''
+
+# ---------------------------------------------------------------------------
+# release discipline
+# ---------------------------------------------------------------------------
+
+[tasks.release-gate]
+category = "Gate"
+description = "Manifest discipline: every shipped artifact change travels with a version bump and a changelog entry, and no bump travels without one"
+# Not a dependency of `dod`: dod is the five cargo commands plus the `lua`
+# step. This task runs the gate's self-test fixtures, which need no
+# repository state; the `release-readiness` CI job and the release workflow
+# call the same script against real ranges.
+script_runner = "@shell"
+script = '''
+set -e
+sh -n scripts/release-gate.sh
+sh -n scripts/release-artifact.sh
+sh scripts/release-gate.sh --self-test
+sh scripts/release-artifact.sh --self-test
 '''
 
 # ---------------------------------------------------------------------------

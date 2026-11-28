@@ -88,7 +88,7 @@ of it is reported at once, except that a TOML syntax error is the file's only re
 | Key | Required | Rule | Refusal |
 |---|---|---|---|
 | `name` | yes | a pack name | `pack.name: "Team-Lint" is not a valid name` |
-| `version` | yes | `major.minor.patch` semver | `pack.version: "1.2" is not semver` |
+| `version` | yes | `major.minor.patch` semver; tracks this pack's own releases — bump it if and only if the pack's shipped content changed, with a changelog entry (see [Versions and Release Streams](ch06-08-versioning.md)) | `pack.version: "1.2" is not semver` |
 | `api` | yes | the integer `1` | `team-lint: api 2 not supported (this agentstacks speaks 1)` |
 | `description` | yes | text that is not blank | `pack.description: empty` |
 

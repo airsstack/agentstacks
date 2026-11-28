@@ -284,9 +284,17 @@ pub use shorthand::Argument;
 #[doc(inline)]
 pub use shorthand::Flag;
 #[doc(inline)]
+pub use shorthand::STREAM_PREFIXES;
+#[doc(inline)]
 pub use shorthand::ShorthandError;
 #[doc(inline)]
+pub use shorthand::Stream;
+#[doc(inline)]
 pub use shorthand::classify as classify_argument;
+#[doc(inline)]
+pub use shorthand::stream_major;
+#[doc(inline)]
+pub use shorthand::stream_prefix;
 #[doc(inline)]
 pub use tokens::ItemRef;
 #[doc(inline)]

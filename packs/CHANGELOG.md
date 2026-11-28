@@ -1,7 +1,18 @@
 # Changelog
 
-All notable changes to the official packs and tool extensions are recorded here. They are released
-together under `packs-v*` tags, which `agentstacks init` and `agentstacks update` resolve. The format
+> **Frozen.** No new `packs-v*` bundle releases are made. Each official pack
+> and tool extension now versions and releases on its own, recorded in its
+> own changelog beside it: [`core`](core/CHANGELOG.md),
+> [`sdlc`](sdlc/CHANGELOG.md), [`journal`](journal/CHANGELOG.md),
+> [`guideline-rust`](guideline-rust/CHANGELOG.md),
+> [`guideline-python`](guideline-python/CHANGELOG.md), and the
+> [`claude`](../extensions/claude/CHANGELOG.md),
+> [`musecode`](../extensions/musecode/CHANGELOG.md) and
+> [`opencode`](../extensions/opencode/CHANGELOG.md) tool extensions. What
+> follows is the history of the bundle era, closed, not rewritten.
+
+All notable changes to the official packs and tool extensions were recorded here. They were released
+together under `packs-v*` tags, which `agentstacks init` and `agentstacks update` resolved. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and each pack and extension
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
