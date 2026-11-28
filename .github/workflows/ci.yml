@@ -114,8 +114,10 @@ jobs:
         run: |
           sh -n scripts/release-gate.sh
           sh -n scripts/release-artifact.sh
+          sh -n scripts/release-crate.sh
           sh scripts/release-gate.sh --self-test
           sh scripts/release-artifact.sh --self-test
+          sh scripts/release-crate.sh --self-test
 
       - name: Check the pull request diff
         if: github.event_name == 'pull_request'

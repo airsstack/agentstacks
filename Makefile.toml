@@ -323,6 +323,19 @@ sh scripts/release-gate.sh --self-test
 sh scripts/release-artifact.sh --self-test
 '''
 
+[tasks.release-crate]
+category = "Gate"
+description = "Binary release automation: the prepare/ship wrapper self-test against stubbed gh, curl and cargo"
+# Not a dependency of `dod`, like the task above: the self-test fixture needs
+# no repository state, and the `release-readiness` CI job calls the script
+# directly.
+script_runner = "@shell"
+script = '''
+set -e
+sh -n scripts/release-crate.sh
+sh scripts/release-crate.sh --self-test
+'''
+
 # ---------------------------------------------------------------------------
 # claudevs
 # ---------------------------------------------------------------------------

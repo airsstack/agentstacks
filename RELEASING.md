@@ -42,8 +42,13 @@ only by its own `claudevs-v*` and `claudevs-cli-v*` tags.
 1. The release pull request is green: `cargo make dod` (which runs the release gate over the
    diff), `cargo make claudevs-check`, `cargo make opencode-check`, `cargo deny check`, the
    `installers`, `book` and `release-readiness` jobs, and the release workflow's plan job.
-   Replace `Unreleased` with the day of steps 2-5 in the CHANGELOGs of the crates and artifacts
-   being released, then merge.
+   Open the crate side with `sh scripts/release-crate.sh prepare
+   (agentstacks|agentstacks-cli|all) <version>` (dry run first with `--dry-run`): from a
+   clean, up-to-date `main` it refuses unless every released crate has `Unreleased` changelog
+   entries, then bumps the manifests (and the workspace dependency on the library), refreshes
+   `Cargo.lock`, dates the changelog entries, pushes a `release/<target>-<version>` branch, and
+   opens the pull request. Replace `Unreleased` with the day of steps 2-5 in the CHANGELOGs of
+   the artifacts being released by hand, then merge.
 2. Only when packs or extensions release: mint one annotated tag per artifact, each pushed alone
    (GitHub creates no event when more than three tags are pushed at once). The usual way is the
    wrapper, which preflights everything locally before triggering the workflow:
@@ -58,12 +63,17 @@ only by its own `claudevs-v*` and `claudevs-cli-v*` tags.
    pushes it alone, and smoke-tests it with a fresh `init`, `update`, `apply` and `doctor`.
    If the workflow runner is unavailable, the wrapper's header records the manual equivalent:
    the same checks, one annotated tag, one solo push, then the smoke steps by hand.
-3. Only when the binary releases: push `agentstacks-cli-v<cli-version>` and wait for its release
-   workflow to finish green. If it fails, nothing was published (`host` waits for smoke): delete
-   any GitHub Release it left and the tag (`git tag -d <tag>`, `git push origin :refs/tags/<tag>`),
-   fix it in a pull request, and tag the same version on the new merged commit. If the fix touches
-   an artifact, also delete that artifact's tag the same way and push it again on the new merged
-   commit, because step 2 tagged the old one.
+3. Only when the binary releases: from a clean, up-to-date `main`, run
+   `sh scripts/release-crate.sh ship (agentstacks|agentstacks-cli|all)` (without `PUBLISH=1`; the
+   publish comes at step 5). It re-verifies the merged release, mints and pushes
+   `agentstacks-cli-v<cli-version>` (and `agentstacks-v<lib-version>`, only when the library
+   releases) one at a time, then waits for the `release` workflow on the CLI tag to finish
+   green. If the workflow fails, nothing was published (the workflow waits for smoke before the
+   GitHub Release, and crates.io comes at step 5): delete any GitHub Release it left and the
+   tag(s) (`git tag -d <tag>`, `git push origin :refs/tags/<tag>`), fix it in a pull request,
+   and ship again on the new merged commit. If the fix touches an artifact, also delete that
+   artifact's tag the same way and push it again on the new merged commit, because step 2 tagged
+   the old one.
 4. Verify in one subshell with a throwaway home, as step 5 of the 0.1.0 record does. The installer
    also installs airsl. `<cli-version>` is the version of the newest binary release and
    `<stream-tag>` is one of the tags step 2 minted (for example `packs-core-v1.0.1`).
@@ -96,15 +106,15 @@ only by its own `claudevs-v*` and `claudevs-cli-v*` tags.
    `curl` exit non-zero on any 4xx or 5xx).
 
    A failure here is fixed like step 3's: nothing is on crates.io yet.
-5. Publish to crates.io, one crate at a time, from a clean, up-to-date `main`:
-   `cargo publish --workspace --dry-run`, then ✋ `cargo publish -p agentstacks` (only when the
-   library changed), then `cargo publish -p agentstacks-cli` (only when the binary releases).
-   Each command polls until its crate is in the index. On a timeout, confirm the version on
-   crates.io before the next command. **If a publish fails**, the crates before it stay
-   published, and you continue from the failed crate once the cause is fixed. A fix that changes
-   that crate's code needs a new version: bump it, and for `agentstacks-cli` release that version
-   again through steps 3 and 4. Then push `agentstacks-v<lib-version>` (only when the library was
-   published), alone.
+5. Publish to crates.io, one crate at a time, from a clean, up-to-date `main`: re-run the
+   step 3 command with ✋ `PUBLISH=1` in the environment. It skips the tags the earlier ship
+   already pushed at this commit, then runs `cargo publish -p agentstacks` (only when the
+   library releases) and `cargo publish -p agentstacks-cli`, verifying each landed in the index.
+   On a timeout, confirm the version on crates.io before continuing. **If a publish fails**,
+   the crates before it stay published: when nothing in the set published yet, re-run the same
+   command; otherwise publish each remaining crate by hand (`cargo publish -p <crate>`, then
+   check the index). A fix that changes that crate's code needs a new version: prepare it
+   through steps 1 and 3 again, then ship and publish it.
 6. Commit the org docs in the org root, push the `.github` repository, and run
    `/claudestacks-sdlc:milestone <milestone>` for the milestone this release closes, to roll it
    up.
