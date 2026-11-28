@@ -108,16 +108,17 @@ jobs:
           git tag -a "${{ env.stream_tag }}" -m "${{ env.stream_tag }}"
           git push origin "refs/tags/${{ env.stream_tag }}"
 
-      # The counterpart side comes from a local path, which needs no tag:
-      # streams ship one at a time, so the other stream may not exist yet.
+      # The counterpart side is copied into the scratch project, which needs no
+      # tag: streams ship one at a time, so the other stream may not exist yet.
+      # (Paths must stay inside the project, hence the copy.)
       - name: Smoke-verify through init, update, apply, and doctor
         if: ${{ !inputs.dry_run }}
         run: |
-          case "$kind" in
-            pack) tool="$GITHUB_WORKSPACE/extensions/claude"; pack="${{ inputs.artifact }}" ;;
-            *) tool="${{ inputs.artifact }}"; pack="$GITHUB_WORKSPACE/packs/core" ;;
-          esac
           work=$(mktemp -d)
+          case "$kind" in
+            pack) cp -r "$GITHUB_WORKSPACE/extensions/claude" "$work/tool-local"; tool=./tool-local; pack="${{ inputs.artifact }}" ;;
+            *) cp -r "$GITHUB_WORKSPACE/packs/core" "$work/pack-local"; tool="${{ inputs.artifact }}"; pack=./pack-local ;;
+          esac
           cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" --pack "$pack" --yes
           grep -q "tag = \"${{ env.stream_tag }}\"" agentstacks.toml || { echo "release-artifact: smoke init did not pin ${{ env.stream_tag }}" >&2; exit 1; }
           test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- update --yes)" = "nothing to update" || { echo "release-artifact: smoke update found more than the new tag" >&2; exit 1; }
