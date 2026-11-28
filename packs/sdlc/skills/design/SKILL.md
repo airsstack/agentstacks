@@ -84,7 +84,7 @@ An unsettled edge case makes the spec unapprovable.
    them and ask which apply (none or absent: no prompt). A named file missing: give the path,
    ask. Never write to `rfcs/`.
 3. **Explore.** `{{agent core/explorer}}` for broad locating (unresolved: inline, say so); read
-   directly only what you must judge. Load the stack guideline. If `.claudestacks/sdlc/adrs/`
+   directly only what you must judge. Load the stack guideline. If `.agentstacks/sdlc/adrs/`
    exists, read every `approved` ADR title and the body of each bearing on the intent.
 4. **Ground** every external claim (Proof) before writing any down.
 5. **Ask one question at a time**, multiple-choice where natural, only when the answer changes
@@ -103,7 +103,7 @@ An unsettled edge case makes the spec unapprovable.
 9. **One agent review.** `{{skill core/context-handoff}}` for the protocol path (one subagent:
    literal temp path, no session, expand `${TMPDIR:-/tmp}` yourself). Spawn
    `{{agent artifact-reviewer}}` with `kind: spec`, `draft: <chain>/spec.md`,
-   `authority: <chain>/intent.md`, `handoff: <TMPDIR>/claudestacks-sdlc-<chain>-spec-01.md`,
+   `authority: <chain>/intent.md`, `handoff: <TMPDIR>/agentstacks-sdlc-<chain>-spec-01.md`,
    `handoff-protocol: <path>`. One round, never a second. Route off the summary; read `<detail>`
    only to act; you fix, the agent never edits, flips or commits. Criteria:
    `{{var project_dir}}/{{root}}/references/artifact-review.md` § *Reviewing a draft spec* — inline if

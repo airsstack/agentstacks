@@ -1,4 +1,4 @@
--- Body fingerprints for claudestacks-sdlc artifacts: the first 12 hex
+-- Body fingerprints for agentstacks-sdlc artifacts: the first 12 hex
 -- characters of the SHA-256 of an artifact's body.
 --
 -- Code side of the definition whose prose mirror is the "Fingerprints"

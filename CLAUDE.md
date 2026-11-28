@@ -27,7 +27,7 @@ Makefile.toml, deny.toml  the cargo-make gate and the cargo-deny policy
 ```
 
 Everything below the Status section except Commands describes the agreed design: the contract to
-build toward. Parts marked "built" exist today. `/claudestacks-sdlc:status` shows progress.
+build toward. Parts marked "built" exist today. `/sdlc-status` shows progress.
 
 ## What agentstacks is
 
@@ -163,8 +163,8 @@ same runner. Releases follow `RELEASING.md`.
 
 ## How work is done
 
-- Work goes through the `claudestacks-sdlc` chain (intent → design/spec → plan → execute), with
-  files under `.claudestacks/sdlc/`. `/claudestacks-sdlc:status` shows the board. Read progress from
+- Work goes through the `agentstacks-sdlc` chain (intent → design/spec → plan → execute), with
+  files under `.agentstacks/sdlc/`. `/sdlc-status` shows the board. Read progress from
   the board, not from this file.
 - Conventional Commits, `type(scope): summary`. The scope is the crate name, or `repo` for
   cross-cutting changes. Work on a branch or worktree, never on `main`.

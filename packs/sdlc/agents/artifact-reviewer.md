@@ -1,7 +1,7 @@
 ---
 name: artifact-reviewer
 description: >
-  Reviews a draft claudestacks-sdlc artifact — a spec, a set of plans, or an ADR —
+  Reviews a draft agentstacks-sdlc artifact — a spec, a set of plans, or an ADR —
   against its upstream authority and the pack's artifact-review criteria.
   Severity-tagged findings, report-only: never edits the artifact, never flips a
   status, never commits. Spawned by the design and plan skills at the intent→spec

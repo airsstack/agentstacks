@@ -1,6 +1,6 @@
 # Review policy
 
-`REVIEW.md` is the consuming repository's review policy, at `.claudestacks/sdlc/REVIEW.md`:
+`REVIEW.md` is the consuming repository's review policy, at `.agentstacks/sdlc/REVIEW.md`:
 what a review of a diff looks at, in what order, and what blocks.
 
 `{{skill setup}}` creates it only when absent; an existing file is never
@@ -12,7 +12,7 @@ The template follows. `setup` writes the body of this fenced block, without the 
 ```markdown
 # REVIEW.md — review policy
 
-<!-- Provisioned by claudestacks-sdlc. Versioned: edit deliberately, log changes
+<!-- Provisioned by agentstacks-sdlc. Versioned: edit deliberately, log changes
      in the Tuning log. Reviewer-agent consumption of this file is a separate
      future chain; until then this policy is documentation you can point any
      reviewer at, including pasting it into a review prompt by hand. -->

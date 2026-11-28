@@ -105,9 +105,20 @@ The other changes:
 
 ## What stays
 
-- `.claudestacks/sdlc/` chain files are read and written at the same paths.
+- Chain files keep their names and bodies; only the chain root moves, from
+  `.claudestacks/sdlc/` to `.agentstacks/sdlc/`.
 - The journal vault stays at `$AIRSSTACK_HOME/journal` (default `~/.airsstack/journal`).
 - The snapshot store stays at `${AIRSSTACK_HOME:-~/.airsstack}/snapshots/`.
+
+## Chain root rename
+
+The chain root moved from `.claudestacks/sdlc/` to `.agentstacks/sdlc/`.
+Run the setup skill once in each project: it detects the legacy tree, asks
+whether to migrate it, and copies it byte for byte on approval, so every
+chain's board row reads exactly as before. The legacy tree is never edited
+or deleted by tooling, and the board and the skills read only the new root.
+Deleting the legacy snapshot, once the new board is verified, is the owner's
+manual choice.
 
 ## claudevs users
 

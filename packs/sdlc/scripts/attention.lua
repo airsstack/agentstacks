@@ -1,6 +1,7 @@
--- Session-start hook module for claudestacks-sdlc: returns the board rows that need attention,
+-- Session-start hook module for agentstacks-sdlc: returns the board rows that need attention,
 -- which the host adds to the session's context. `event.args[1]` names the command that shows
--- the full board.
+-- the full board. When the canonical root is absent but the legacy root exists, returns the
+-- migration pointer instead, so the engineer learns to run the setup skill.
 --
 -- The chain root is taken from the event's `cwd` — the session's directory, which in a
 -- worktree is the worktree root — and from the process directory when the event carries none.
@@ -14,6 +15,10 @@ local path = airsstack.path
 
 return function(event)
   local cwd = type(event.cwd) == "string" and event.cwd ~= "" and event.cwd or path.absolute(".")
+  local hint = status.migration_hint(cwd)
+  if hint then
+    return { context = hint }
+  end
   local text = status.attention(path.join(cwd, status.ROOT), event.args[1])
   if text == "" then
     return nil

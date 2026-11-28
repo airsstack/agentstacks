@@ -1,6 +1,6 @@
 ---
 name: status
-description: Render the claudestacks-sdlc chain status board. Use when the user says "{{skill status}}", asks what state the SDLC chains are in, or what to work on next.
+description: Render the agentstacks-sdlc chain status board. Use when the user says "{{skill status}}", asks what state the SDLC chains are in, or what to work on next.
 ---
 
 ## Board
@@ -15,7 +15,7 @@ If empty, `airsl` is not installed: derive the board by hand from
 `{{var project_dir}}/{{root}}/references/artifact-chain.md` alone (it owns the non-chain entries, keys,
 sync rules and NEXT derivation).
 
-1. Scan `.claudestacks/sdlc/`, skipping the entries that file names and every non-directory. Read
+1. Scan `.agentstacks/sdlc/`, skipping the entries that file names and every non-directory. Read
    each chain's `intent.md`, `spec.md`, `plans/NN-*.md` frontmatter; derive STATE and NEXT; render an
    unparseable chain as `INVALID (<file>: <reason>)`.
 2. If `adrs/` exists, read each §13.1 ADR file's frontmatter: ADR rows by §13.3, chain ADR

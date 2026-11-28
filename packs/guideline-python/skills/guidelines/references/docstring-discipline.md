@@ -159,7 +159,7 @@ docstring is part of what a consumer of the object reads.
 ### Disallowed in source (docstrings and `#` comments alike)
 
 - Paths or filenames under internal-only directories (out-of-band planning or tooling directories).
-  Example: `# see .claudestacks/sdlc/x/plans/02.md` — **rejected**.
+  Example: `# see .agentstacks/sdlc/x/plans/02.md` — **rejected**.
 - Names of internal rules, rule-numbered exceptions, or shortcodes that only resolve inside the
   local project.
 - Plan, spec, phase and task identifiers. Examples: `Added in Phase 3 Task 2`,
@@ -205,7 +205,7 @@ screen from the project root and reads each hit. `ls -d` hands `grep` only the p
 because a missing `README.md` operand made `grep` exit `2` even when it had printed hits:
 
 ```bash
-grep -rnE '\.claudestacks|\.airsstack|docs/(specs|plans)|(Phase|Task|Step) [0-9]|subagent|implementer|brainstorm|the (plan|spec)\b|(Claude|Opus|Sonnet|Haiku)|(PR|issue) #[0-9]+' \
+grep -rnE '\.claudestacks|\.agentstacks|\.airsstack|docs/(specs|plans)|(Phase|Task|Step) [0-9]|subagent|implementer|brainstorm|the (plan|spec)\b|(Claude|Opus|Sonnet|Haiku)|(PR|issue) #[0-9]+' \
   --include='*.py' --include='*.pyi' --include='*.toml' --include='README.md' \
   $(ls -d src tests pyproject.toml README.md 2>/dev/null)
 ```
@@ -262,7 +262,7 @@ All ten are **held by review** except 5's doctest half and 8, which the gate enf
 
 | Leaky or wrong | Clean |
 |---|---|
-| `# Per .claudestacks/.../plans/02.md, keep this a list.` | `# Order matters: callers index by position.` |
+| `# Per .agentstacks/.../plans/02.md, keep this a list.` | `# Order matters: callers index by position.` |
 | `"""Added in Phase 3 Task 2, as the plan describes."""` | *(delete; the function either exists or does not)* |
 | `# TODO Phase 5: support floats.` | `# TODO: floats are unsupported.` |
 | `# Decided in the implementer session to keep this unbounded.` | `# The server enforces the bound; a client-side cap would age badly.` |

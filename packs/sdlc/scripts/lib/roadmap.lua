@@ -1,4 +1,4 @@
--- Roadmaps and milestones for the claudestacks-sdlc status board: scans
+-- Roadmaps and milestones for the agentstacks-sdlc status board: scans
 -- `roadmaps/`, resolves a chain's `milestone` key, counts progress, and
 -- derives each roadmap's and milestone's STATE and NEXT.
 --

@@ -13,8 +13,8 @@ local path = airsstack.path
 local function project_with_open_chain()
   local cwd = fs.tempdir()
   local chain = path.join(cwd, status.ROOT, "2026-10-13-mfa")
-  fs.mkdir(path.join(cwd, ".claudestacks"))
-  fs.mkdir(path.join(cwd, ".claudestacks", "sdlc"))
+  fs.mkdir(path.join(cwd, ".agentstacks"))
+  fs.mkdir(path.join(cwd, ".agentstacks", "sdlc"))
   fs.mkdir(chain)
   fs.write(
     path.join(chain, "intent.md"),
@@ -29,13 +29,15 @@ return {
     local result = attention({ cwd = cwd, args = { "/sdlc-status" } })
     assert(type(result) == "table" and type(result.context) == "string", "want a context result")
     local first = result.context:match("^[^\n]*")
-    local want = "claudestacks-sdlc: 1 open, 0 need attention — full board: /sdlc-status"
+    local want = "agentstacks-sdlc: 1 open, 0 need attention — full board: /sdlc-status"
     assert(first == want, first)
   end,
 
   attention_falls_back_to_the_process_directory_without_a_cwd = function()
-    local want = status.attention(path.join(path.absolute("."), status.ROOT), "/sdlc-status")
-    local expected = want ~= "" and { context = want } or nil
+    local cwd = path.absolute(".")
+    local text = status.migration_hint(cwd)
+      or status.attention(path.join(cwd, status.ROOT), "/sdlc-status")
+    local expected = text ~= "" and { context = text } or nil
     for _, event in ipairs({
       { args = { "/sdlc-status" } },
       { cwd = "", args = { "/sdlc-status" } },
@@ -53,5 +55,16 @@ return {
   attention_returns_nil_without_a_chain_root = function()
     local cwd = fs.tempdir()
     assert(attention({ cwd = cwd, args = { "/sdlc-status" } }) == nil)
+  end,
+
+  attention_points_at_setup_when_only_the_legacy_root_exists = function()
+    local cwd = fs.tempdir()
+    fs.mkdir(path.join(cwd, ".claudestacks"))
+    fs.mkdir(path.join(cwd, ".claudestacks", "sdlc"))
+    local result = attention({ cwd = cwd, args = { "/sdlc-status" } })
+    assert(type(result) == "table" and type(result.context) == "string", "want a context result")
+    assert(result.context
+      == "Legacy chain detected under .claudestacks/sdlc. Run the setup skill to migrate it.",
+      result.context)
   end,
 }

@@ -163,7 +163,7 @@ return {
     local file = written(
       "---\nagent: artifact-reviewer\ntask: review spec.md against intent.md\n---\n"
         .. "<summary>\nSPEC: none blocking\n</summary>\n<detail>\nthe findings\n</detail>\n",
-      "claudestacks-sdlc-chain-spec-01.md"
+      "agentstacks-sdlc-chain-spec-01.md"
     )
     assert(ids(file) == "", ids(file))
   end,
