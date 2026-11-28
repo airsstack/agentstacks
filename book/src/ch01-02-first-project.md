@@ -2,7 +2,7 @@
 
 This chapter sets up Claude Code in a project with three official packs: `core`, `sdlc` and
 `guideline-rust`. (`sdlc` requires `core`, so the two always come together.) The counts and
-files shown are those of `packs-v1.1.0`.
+files shown are those of the streams' `1.x` releases (for example `packs-core-v1.0.1`).
 
 ## Init
 
@@ -57,22 +57,22 @@ api = 1
 
 [tools.claude]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.1.0"
+tag = "ext-claude-v1.1.0"
 subdir = "extensions/claude"
 
 [packs.core]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.1.0"
+tag = "packs-core-v1.0.1"
 subdir = "packs/core"
 
 [packs.guideline-rust]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.1.0"
+tag = "packs-guideline-rust-v1.0.0"
 subdir = "packs/guideline-rust"
 
 [packs.sdlc]
 git = "https://github.com/airsstack/agentstacks"
-tag = "packs-v1.1.0"
+tag = "packs-sdlc-v1.1.0"
 subdir = "packs/sdlc"
 ```
 
@@ -100,8 +100,8 @@ An item a tool cannot express is shown as a skip with its reason, never dropped.
 healthy
 ```
 
-`agentstacks update` looks for a newer `packs-v1.*` tag. While `packs-v1.1.0` is the newest, it
-ends with:
+`agentstacks update` looks for a newer tag in each artifact's own stream. While every pinned
+stream is current, it ends with:
 
 ```text
 nothing to update

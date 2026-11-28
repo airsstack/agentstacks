@@ -17,7 +17,7 @@ you use. Before anything is written, you see exactly what will change.
 
 agentstacks is at 1.1. It ships official extensions for Claude Code, Muse Code and OpenCode and
 five official packs: `core`, `sdlc`, `journal`, `guideline-rust` and `guideline-python`. The
-Muse Code (`musecode`) extension is released in `packs-v1.1.0`. The pack format and the
+Muse Code (`musecode`) extension is released on the `ext-musecode-v*` stream (first release `ext-musecode-v1.1.0`). The pack format and the
 extension API are frozen as `api = 1`;
 [the stability page](ch06-06-stability.md) says what that promises. A project written for the 0.x
 releases moves with `agentstacks update`, see [Moving a Project from 0.x](ch03-01-from-0x.md). You

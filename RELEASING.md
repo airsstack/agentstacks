@@ -30,33 +30,43 @@ and this is the maintainer's runbook.
 
 ## Later releases
 
-The reusable runbook. The crates and the packs release on their own, so it uses three placeholders:
-`<cli-version>` for `agentstacks-cli` (and its `agentstacks-cli-v` tag), `<packs-version>` for the
-packs and extensions (and the `packs-v` tag), and `<lib-version>` for the `agentstacks` library
-crate (and its `agentstacks-v` tag). A first release of 1.0.0 uses `1.0.0` for all three. A step
-marked "only when" is skipped when nothing of that kind is released. Every step before step 5 can
-be undone; step 5 cannot (see [Notes](#notes)). claudevs is not part of it: it is released only by
-its own `claudevs-v*` and `claudevs-cli-v*` tags.
+The reusable runbook. The crates and the artifacts release on their own, so it uses placeholders
+per release: `<cli-version>` for `agentstacks-cli` (and its `agentstacks-cli-v` tag),
+`<lib-version>` for the `agentstacks` library crate (and its `agentstacks-v` tag), and, for each
+pack or extension shipped, `<artifact>` for its name and `<version>` for its release (tagged
+`packs-<artifact>-v<version>` for packs, `ext-<artifact>-v<version>` for extensions). A step
+marked "only when" is skipped when nothing of that kind is released. Every step before step 5
+can be undone; step 5 cannot (see [Notes](#notes)). claudevs is not part of it: it is released
+only by its own `claudevs-v*` and `claudevs-cli-v*` tags.
 
-1. The release pull request is green: `cargo make dod`, `cargo make claudevs-check`,
-   `cargo make opencode-check`, `cargo deny check`, the `installers` and `book` jobs, and the
-   release workflow's plan job. Replace `Unreleased` with the day of steps 2-5 in the CHANGELOGs
-   of the crates and packs being released, then merge.
-2. Only when the packs release: push `packs-v<packs-version>` first. Until the project is moved
-   (`agentstacks update` with 1.x), a 0.x binary keeps `packs-v<packs-version>` in
-   `agentstacks.toml` and every `plan` or `apply` refuses it, because the packs are `api = 1`; a
-   0.x `init` or `update` fetches them and is refused the same way. The remedy is to install 1.x
-   and run `agentstacks update`. Keep the window to step 3 short.
+1. The release pull request is green: `cargo make dod` (which runs the release gate over the
+   diff), `cargo make claudevs-check`, `cargo make opencode-check`, `cargo deny check`, the
+   `installers`, `book` and `release-readiness` jobs, and the release workflow's plan job.
+   Replace `Unreleased` with the day of steps 2-5 in the CHANGELOGs of the crates and artifacts
+   being released, then merge.
+2. Only when packs or extensions release: mint one annotated tag per artifact, each pushed alone
+   (GitHub creates no event when more than three tags are pushed at once). The usual way is the
+   wrapper, which preflights everything locally before triggering the workflow:
+
+   ```sh
+   sh scripts/release-artifact.sh <artifact> <version>   # dry run first with --dry-run
+   ```
+
+   It checks the tree is clean, the manifest declares `<version>`, the changelog names it, the
+   tag is new, and the release gate passes; then it dispatches the `release-artifact` workflow,
+   which re-verifies, mints `packs-<artifact>-v<version>` or `ext-<artifact>-v<version>`,
+   pushes it alone, and smoke-tests it with a fresh `init`, `update`, `apply` and `doctor`.
+   If the workflow runner is unavailable, the wrapper's header records the manual equivalent:
+   the same checks, one annotated tag, one solo push, then the smoke steps by hand.
 3. Only when the binary releases: push `agentstacks-cli-v<cli-version>` and wait for its release
    workflow to finish green. If it fails, nothing was published (`host` waits for smoke): delete
    any GitHub Release it left and the tag (`git tag -d <tag>`, `git push origin :refs/tags/<tag>`),
    fix it in a pull request, and tag the same version on the new merged commit. If the fix touches
-   `packs/` or `extensions/`, also delete `packs-v<packs-version>` the same way and push it again
-   on the new merged commit, because step 2 tagged the old one.
+   an artifact, also delete that artifact's tag the same way and push it again on the new merged
+   commit, because step 2 tagged the old one.
 4. Verify in one subshell with a throwaway home, as step 5 of the 0.1.0 record does. The installer
-   also installs airsl. `<cli-version>` is the version of the newest binary release,
-   `<packs-version>` is the packs tag the project must resolve, and
-   `<previous-packs-version>` is the packs release before it.
+   also installs airsl. `<cli-version>` is the version of the newest binary release and
+   `<stream-tag>` is one of the tags step 2 minted (for example `packs-core-v1.0.1`).
 
    ```sh
    (
@@ -64,28 +74,24 @@ its own `claudevs-v*` and `claudevs-cli-v*` tags.
      curl -LsSf https://airsstack.github.io/agentstacks/install.sh | sh
      export PATH="$HOME/.local/bin:$PATH"
      agentstacks --version    # agentstacks <cli-version>
-     src="$(mktemp -d)" && git clone -q --depth 1 --branch packs-v<packs-version> https://github.com/airsstack/agentstacks "$src"
+     src="$(mktemp -d)" && git clone -q --depth 1 --branch <stream-tag> https://github.com/airsstack/agentstacks "$src"
      agentstacks ext test "$src/extensions/claude"     # passed
      agentstacks ext test "$src/extensions/opencode"   # passed
      agentstacks ext test "$src/extensions/musecode"   # passed
      cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
-       && grep 'tag = "packs-v<packs-version>"' agentstacks.toml && agentstacks doctor    # healthy
+       && grep 'tag = "<stream-tag>"' agentstacks.toml && agentstacks doctor    # healthy
      cd "$(mktemp -d)" && agentstacks init --tool musecode --pack core --yes \
-       && grep 'tag = "packs-v<packs-version>"' agentstacks.toml && agentstacks doctor    # healthy
+       && agentstacks doctor    # healthy (advisories allowed, no findings)
      cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
        && agentstacks ext add musecode --yes && agentstacks doctor    # healthy
      cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
-       && agentstacks ext add https://github.com/airsstack/agentstacks --subdir extensions/musecode --tag packs-v<packs-version> --yes \
-       && agentstacks doctor    # healthy
-     cd "$(mktemp -d)" && agentstacks init --tool claude --pack core --yes \
-       && sed -i.bak 's/tag = "packs-v<packs-version>"/tag = "packs-v<previous-packs-version>"/' agentstacks.toml \
-       && agentstacks update --yes && grep 'tag = "packs-v<packs-version>"' agentstacks.toml \
-       && agentstacks doctor    # healthy
+       && agentstacks apply --yes && agentstacks doctor    # healthy
    )
    ```
 
    The crate READMEs published at step 5 link into the book, so check that its pages serve 200:
-   `curl -fsI https://airsstack.github.io/agentstacks/ch06-06-stability.html` and
+   `curl -fsI https://airsstack.github.io/agentstacks/ch06-06-stability.html`,
+   `curl -fsI https://airsstack.github.io/agentstacks/ch06-08-versioning.html` and
    `curl -fsI https://airsstack.github.io/agentstacks/ch03-01-from-0x.html` (the `-f` flag makes
    `curl` exit non-zero on any 4xx or 5xx).
 
@@ -104,8 +110,10 @@ its own `claudevs-v*` and `claudevs-cli-v*` tags.
    up.
 
 The workflows, the installers and `dist-workspace.toml` need no change for a release: the release
-workflow starts on `agentstacks-cli-v*` and `claudevs-cli-v*` tags, `packs-v*` tags start none,
-and the installer looks up `"tag_name": "<app>-v<x.y.z>"`.
+workflow starts on `agentstacks-cli-v*` and `claudevs-cli-v*` tags, artifact tags and `packs-v*`
+tags start none, and the installer looks up `"tag_name": "<app>-v<x.y.z>"`. The
+`release-artifact` workflow starts only by hand (or through `scripts/release-artifact.sh`),
+one artifact at a time.
 
 ## The 0.1.0 release
 

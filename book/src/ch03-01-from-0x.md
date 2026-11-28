@@ -23,14 +23,13 @@ In the project:
 agentstacks update
 ```
 
-`update` sees `api = 0` and prints that first, then each official pack and extension that has a
-newer release. The 1.0 binary only takes releases of its own major version, so a project at
-`packs-v0.2.0` moves to the newest `packs-v1.*` tag:
+`update` sees `api = 0` and prints that first. Each bundle pin reports its frozen stream
+instead of updating in place — `update` never rewrites a frozen pin. Retag each source to its
+stream (the note names it), then `update` moves it within the stream's `*-v1.*` tags:
 
 ```text
   api: 0 → 1
-  packs.core: packs-v0.2.0 → packs-v1.0.0
-  tools.claude: packs-v0.2.0 → packs-v1.0.0
+  note: agentstacks.toml: packs.core: pinned to bundle tag packs-v0.2.0 (frozen stream); packs-core-v1.0.1 is available — retag to migrate
 agentstacks.toml updated
 ```
 
