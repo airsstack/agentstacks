@@ -141,6 +141,13 @@ jobs:
           # shellcheck disable=SC2086
           cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" $pack_args --yes
           grep -q "tag = \"${{ env.stream_tag }}\"" agentstacks.toml || { echo "release-artifact: smoke init did not pin ${{ env.stream_tag }}" >&2; exit 1; }
-          test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- update --yes)" = "nothing to update" || { echo "release-artifact: smoke update found more than the new tag" >&2; exit 1; }
+          updated=$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- update --yes)
+          case "$updated" in
+            *"nothing to update"*) ;;
+            *) echo "release-artifact: smoke update found more than the new tag" >&2; exit 1 ;;
+          esac
+          case "$updated" in
+            *"→"*) echo "release-artifact: smoke update found a newer tag" >&2; exit 1 ;;
+          esac
           cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- apply --yes >/dev/null
           test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- doctor)" = "healthy" || { echo "release-artifact: smoke doctor is not healthy" >&2; exit 1; }
