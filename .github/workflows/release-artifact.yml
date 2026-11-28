@@ -108,12 +108,14 @@ jobs:
           git tag -a "${{ env.stream_tag }}" -m "${{ env.stream_tag }}"
           git push origin "refs/tags/${{ env.stream_tag }}"
 
+      # The counterpart side comes from a local path, which needs no tag:
+      # streams ship one at a time, so the other stream may not exist yet.
       - name: Smoke-verify through init, update, apply, and doctor
         if: ${{ !inputs.dry_run }}
         run: |
           case "$kind" in
-            pack) tool=claude; pack="${{ inputs.artifact }}" ;;
-            *) tool="${{ inputs.artifact }}"; pack=core ;;
+            pack) tool="$GITHUB_WORKSPACE/extensions/claude"; pack="${{ inputs.artifact }}" ;;
+            *) tool="${{ inputs.artifact }}"; pack="$GITHUB_WORKSPACE/packs/core" ;;
           esac
           work=$(mktemp -d)
           cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" --pack "$pack" --yes
