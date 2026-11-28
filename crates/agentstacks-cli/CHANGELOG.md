@@ -4,6 +4,16 @@ All notable changes to `agentstacks-cli` (the `agentstacks` binary) are recorded
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `doctor` prints advisories after findings (`healthy` only when neither exists):
+  per-stream staleness such as `packs.core: packs-v0.2.0 is available
+  (pinned packs-v0.1.0)` is advisory and never changes the exit code.
+- `update` lists one row per artifact stream (`<key>: <current> → <new>`) so each
+  pack and extension shows its own newest tag.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added
