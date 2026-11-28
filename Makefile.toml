@@ -282,24 +282,25 @@ if [ -n "$left" ]; then
 fi
 echo "api-0 gate: passed"
 
-# The airsl pin gate. Each ci.yml job that installs the airsl binary holds its own copy of
+# The airsl pin gate. Each workflow job that installs the airsl binary holds its own copy of
 # the pinned version and hash, so the copies must name one AIRSL_VERSION and one
-# AIRSL_SHA256. It reads grep's status before filtering, as the gates above do.
+# AIRSL_SHA256 across ci.yml and release-artifact.yml. It reads grep's status before filtering,
+# as the gates above do.
 rc=0
-pins=$(grep -E '^ *AIRSL_(VERSION|SHA256): ' .github/workflows/ci.yml) || rc=$?
+pins=$(grep -E '^ *AIRSL_(VERSION|SHA256): ' .github/workflows/ci.yml .github/workflows/release-artifact.yml) || rc=$?
 if [ "$rc" -gt 1 ]; then
-  echo "airsl pin gate: grep failed over .github/workflows/ci.yml (exit $rc)" >&2
+  echo "airsl pin gate: grep failed over the workflows (exit $rc)" >&2
   exit 1
 fi
-distinct=$(printf '%s\n' "$pins" | sed -E 's/^ +//; s/ +$//' | grep -v '^$' | sort -u)
+distinct=$(printf '%s\n' "$pins" | sed -E 's/^([A-Za-z0-9_.\/-]+\.yml:)? *//; s/ *$//' | grep -v '^$' | sort -u)
 versions=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_VERSION: ' || true)
 hashes=$(printf '%s\n' "$distinct" | grep -c '^AIRSL_SHA256: ' || true)
 if [ "$versions" != 1 ] || [ "$hashes" != 1 ]; then
   printf '%s\n' "$distinct"
-  echo "airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins in .github/workflows/ci.yml differ or are missing; give every job the same version and hash" >&2
+  echo "airsl pin gate: the AIRSL_VERSION and AIRSL_SHA256 pins differ or are missing; give every installing job the same version and hash" >&2
   exit 1
 fi
-echo "airsl pin gate: passed ($(printf '%s\n' "$pins" | grep -c '^ *AIRSL_VERSION: ') jobs)"
+echo "airsl pin gate: passed ($(printf '%s\n' "$pins" | grep -c 'AIRSL_VERSION: ') installs)"
 '''
 
 # ---------------------------------------------------------------------------
