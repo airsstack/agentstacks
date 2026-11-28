@@ -6,10 +6,9 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0/): the version
 moves if and only if the pack's shipped content changed. Each release is
 tagged `packs-sdlc-v<version>`.
 
-## [Unreleased]
+## [1.1.0] - 2026-11-28
 
-First per-stream release, cut after merge: bump the manifest to 1.1.0,
-date this entry, and tag `packs-sdlc-v1.1.0`.
+First per-stream release.
 
 ### Changed
 
@@ -17,3 +16,6 @@ date this entry, and tag `packs-sdlc-v1.1.0`.
   `.claudestacks/sdlc/` tree to `.agentstacks/sdlc/`, with a copy-once
   migration that heals existing checkouts and leaves in-flight sessions
   working.
+
+[Unreleased]: https://github.com/airsstack/agentstacks/compare/packs-sdlc-v1.1.0...HEAD
+[1.1.0]: https://github.com/airsstack/agentstacks/tree/packs-sdlc-v1.1.0
