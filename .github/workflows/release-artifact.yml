@@ -111,15 +111,35 @@ jobs:
       # The counterpart side is copied into the scratch project, which needs no
       # tag: streams ship one at a time, so the other stream may not exist yet.
       # (Paths must stay inside the project, hence the copy.)
+      # The artifact's required packs ride along: init refuses a pack whose
+      # requirements are not listed, and each requirement resolves through
+      # its own stream (which must already exist).
       - name: Smoke-verify through init, update, apply, and doctor
         if: ${{ !inputs.dry_run }}
         run: |
           work=$(mktemp -d)
           case "$kind" in
-            pack) cp -r "$GITHUB_WORKSPACE/extensions/claude" "$work/tool-local"; tool=./tool-local; pack="${{ inputs.artifact }}" ;;
-            *) cp -r "$GITHUB_WORKSPACE/packs/core" "$work/pack-local"; tool="${{ inputs.artifact }}"; pack=./pack-local ;;
+            pack)
+              cp -r "$GITHUB_WORKSPACE/extensions/claude" "$work/tool-local"
+              tool=./tool-local
+              pack_args="--pack ${{ inputs.artifact }}"
+              deps=$(sed -n '/^\[requires\]/,/^\[/p' "$GITHUB_WORKSPACE/packs/${{ inputs.artifact }}/pack.toml" | grep '^packs' | tr ',' '\n' | sed 's/[^"]*"\([^"]*\)".*/\1/' || true)
+              # shellcheck disable=SC2086
+              for dep in $deps; do
+                case " $pack_args " in
+                  *" $dep "*) ;;
+                  *) pack_args="$pack_args --pack $dep" ;;
+                esac
+              done
+              ;;
+            *)
+              cp -r "$GITHUB_WORKSPACE/packs/core" "$work/pack-local"
+              tool="${{ inputs.artifact }}"
+              pack_args="--pack ./pack-local"
+              ;;
           esac
-          cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" --pack "$pack" --yes
+          # shellcheck disable=SC2086
+          cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- init --tool "$tool" $pack_args --yes
           grep -q "tag = \"${{ env.stream_tag }}\"" agentstacks.toml || { echo "release-artifact: smoke init did not pin ${{ env.stream_tag }}" >&2; exit 1; }
           test "$(cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- update --yes)" = "nothing to update" || { echo "release-artifact: smoke update found more than the new tag" >&2; exit 1; }
           cd "$work" && cargo run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p agentstacks-cli -- apply --yes >/dev/null
