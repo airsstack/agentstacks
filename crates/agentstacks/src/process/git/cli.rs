@@ -280,6 +280,48 @@ mod tests {
     }
 
     #[test]
+    fn contract_lists_only_matching_prefix() -> TestResult {
+        let source = SourceRepo::new()?;
+        let home = tempfile::tempdir()?;
+        tag_at(&source, "packs-core-v1.0.1")?;
+        tag_at(&source, "packs-core-v1.0.2")?;
+        tag_at(&source, "ext-claude-v1.0.0")?;
+        assert_eq!(
+            cli(&home).list_tags(&source.url, "packs-core-v")?,
+            [
+                remote("packs-core-v1.0.1", &source.two)?,
+                remote("packs-core-v1.0.2", &source.two)?,
+            ]
+        );
+        assert_eq!(
+            cli(&home).list_tags(&source.url, "ext-")?,
+            [remote("ext-claude-v1.0.0", &source.two)?]
+        );
+        assert_eq!(
+            cli(&home).list_tags(&source.url, "packs-v")?,
+            [
+                remote("packs-v0.1.0", &source.annotated)?,
+                remote("packs-v0.10.0", &source.two)?,
+                remote("packs-v0.2.0", &source.two)?,
+                remote("packs-v0.9.0", &source.two)?,
+            ]
+        );
+        Ok(())
+    }
+
+    /// Tags `name` at the source repository's head commit.
+    fn tag_at(source: &SourceRepo, name: &str) -> TestResult {
+        let status = std::process::Command::new("git")
+            .args(["tag", name])
+            .current_dir(source.path())
+            .status()?;
+        if !status.success() {
+            return Err(format!("git tag {name} failed").into());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn list_tags_needs_no_home() -> TestResult {
         let source = SourceRepo::new()?;
         let tags = GitCli::new("git", None, None).list_tags(&source.url, "other-v")?;

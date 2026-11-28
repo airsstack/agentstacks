@@ -163,6 +163,48 @@ mod tests {
     }
 
     #[test]
+    fn splits_every_stream_shape() -> TestResult {
+        for (tag, prefix, version) in [
+            ("packs-core-v1.0.1", "packs-core-v", "1.0.1"),
+            ("packs-sdlc-v1.1.0", "packs-sdlc-v", "1.1.0"),
+            ("packs-journal-v1.0.0", "packs-journal-v", "1.0.0"),
+            (
+                "packs-guideline-rust-v1.0.0",
+                "packs-guideline-rust-v",
+                "1.0.0",
+            ),
+            (
+                "packs-guideline-python-v1.0.0",
+                "packs-guideline-python-v",
+                "1.0.0",
+            ),
+            ("ext-claude-v1.2.0", "ext-claude-v", "1.2.0"),
+            ("ext-musecode-v1.2.0", "ext-musecode-v", "1.2.0"),
+            ("ext-opencode-v1.2.0", "ext-opencode-v", "1.2.0"),
+            ("packs-v0.1.0", "packs-v", "0.1.0"),
+        ] {
+            let split = TagVersion::split(&GitTag::new(tag)?).ok_or("no split")?;
+            assert_eq!(split.prefix, prefix);
+            assert_eq!(split.version, PackVersion::new(version)?);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_anchoring_rejects_lookalikes() -> TestResult {
+        let names = ["packs-core-v1.0.1", "packs-core-v-extra-v1.0.0"];
+        assert_eq!(
+            latest(&names, "packs-core-v")?.as_deref(),
+            Some("packs-core-v1.0.1")
+        );
+        assert_eq!(
+            latest(&names, "packs-core-v-extra-v")?.as_deref(),
+            Some("packs-core-v-extra-v1.0.0")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn latest_is_by_semver_not_lexical() -> TestResult {
         let names = [
             "packs-v0.1.0",

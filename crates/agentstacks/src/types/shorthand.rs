@@ -88,6 +88,156 @@ pub const OFFICIAL_PACKS: [&str; 5] = [
 /// The tool names the official repository holds under `extensions/`.
 pub const OFFICIAL_TOOLS: [&str; 3] = ["claude", "musecode", "opencode"];
 
+/// One per-artifact release stream: the tag prefix and the flag it serves.
+///
+/// Packs resolve `packs-<name>-v*` tags, tools resolve `ext-<name>-v*` tags.
+/// The table is closed: eight official streams, and the retired `packs-v`
+/// bundle prefix is deliberately absent from it.
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::{Flag, Stream, STREAM_PREFIXES};
+///
+/// assert_eq!(STREAM_PREFIXES.len(), 8);
+/// assert_eq!(Stream::PREFIX_CORE, "packs-core-v");
+/// assert_eq!(Stream::PREFIX_CLAUDE, "ext-claude-v");
+/// assert!(STREAM_PREFIXES.iter().any(|stream| stream.flag() == Flag::Pack));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Stream {
+    /// The tag prefix, such as `packs-core-v` or `ext-claude-v`.
+    prefix: &'static str,
+    /// The flag the stream serves; tool streams cover both `--tool` and `ext add`.
+    flag: Flag,
+}
+
+impl Stream {
+    /// The `packs/core` stream prefix.
+    pub const PREFIX_CORE: &'static str = "packs-core-v";
+    /// The `packs/sdlc` stream prefix.
+    pub const PREFIX_SDLC: &'static str = "packs-sdlc-v";
+    /// The `packs/journal` stream prefix.
+    pub const PREFIX_JOURNAL: &'static str = "packs-journal-v";
+    /// The `packs/guideline-rust` stream prefix.
+    pub const PREFIX_GUIDELINE_RUST: &'static str = "packs-guideline-rust-v";
+    /// The `packs/guideline-python` stream prefix.
+    pub const PREFIX_GUIDELINE_PYTHON: &'static str = "packs-guideline-python-v";
+    /// The `extensions/claude` stream prefix.
+    pub const PREFIX_CLAUDE: &'static str = "ext-claude-v";
+    /// The `extensions/musecode` stream prefix.
+    pub const PREFIX_MUSECODE: &'static str = "ext-musecode-v";
+    /// The `extensions/opencode` stream prefix.
+    pub const PREFIX_OPENCODE: &'static str = "ext-opencode-v";
+
+    /// The tag prefix, such as `packs-core-v`.
+    #[must_use]
+    pub const fn prefix(self) -> &'static str {
+        self.prefix
+    }
+
+    /// The flag the stream serves.
+    #[must_use]
+    pub const fn flag(self) -> Flag {
+        self.flag
+    }
+
+    /// The artifact name the prefix holds, such as `core` in `packs-core-v`.
+    #[must_use]
+    pub fn name(self) -> Option<&'static str> {
+        let (head, tail) = match self.flag {
+            Flag::Pack => ("packs-", "-v"),
+            Flag::Tool | Flag::Ext => ("ext-", "-v"),
+        };
+        self.prefix.strip_prefix(head)?.strip_suffix(tail)
+    }
+}
+
+/// The eight per-artifact release streams, in pack then tool order.
+pub const STREAM_PREFIXES: [Stream; 8] = [
+    Stream {
+        prefix: Stream::PREFIX_CORE,
+        flag: Flag::Pack,
+    },
+    Stream {
+        prefix: Stream::PREFIX_SDLC,
+        flag: Flag::Pack,
+    },
+    Stream {
+        prefix: Stream::PREFIX_JOURNAL,
+        flag: Flag::Pack,
+    },
+    Stream {
+        prefix: Stream::PREFIX_GUIDELINE_RUST,
+        flag: Flag::Pack,
+    },
+    Stream {
+        prefix: Stream::PREFIX_GUIDELINE_PYTHON,
+        flag: Flag::Pack,
+    },
+    Stream {
+        prefix: Stream::PREFIX_CLAUDE,
+        flag: Flag::Tool,
+    },
+    Stream {
+        prefix: Stream::PREFIX_MUSECODE,
+        flag: Flag::Tool,
+    },
+    Stream {
+        prefix: Stream::PREFIX_OPENCODE,
+        flag: Flag::Tool,
+    },
+];
+
+/// The stream prefix of an official name under a flag, or `None` for anything else.
+///
+/// `ext add` shares the tool streams. A pack name under a tool flag, or any
+/// unofficial name, is not a stream.
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::{Flag, stream_prefix};
+///
+/// assert_eq!(stream_prefix(Flag::Pack, "sdlc"), Some("packs-sdlc-v"));
+/// assert_eq!(stream_prefix(Flag::Ext, "musecode"), Some("ext-musecode-v"));
+/// assert_eq!(stream_prefix(Flag::Pack, "cmux"), None);
+/// ```
+#[must_use]
+pub fn stream_prefix(flag: Flag, name: &str) -> Option<&'static str> {
+    let kind = match flag {
+        Flag::Pack => Flag::Pack,
+        Flag::Tool | Flag::Ext => Flag::Tool,
+    };
+    STREAM_PREFIXES
+        .iter()
+        .find(|stream| stream.flag == kind && stream.name() == Some(name))
+        .map(|stream| stream.prefix())
+}
+
+/// The major a stream tag must have on the official repository, or `None` when any major is accepted.
+///
+/// It is the major of the `api` when `url` is the official repository and `prefix` is one of the
+/// eight stream prefixes, so a binary never moves to a release of a later `api`. The retired
+/// `packs-v` bundle prefix is not a stream and keeps its own rule in [`official_major`].
+///
+/// # Examples
+///
+/// ```
+/// use agentstacks::types::{GitUrl, stream_major};
+/// use agentstacks::types::shorthand::OFFICIAL_REPOSITORY;
+///
+/// let official = GitUrl::new(OFFICIAL_REPOSITORY)?;
+/// assert_eq!(stream_major(&official, "packs-core-v"), Some(1));
+/// assert_eq!(stream_major(&official, "packs-v"), None);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[must_use]
+pub fn stream_major(url: &GitUrl, prefix: &str) -> Option<u64> {
+    (url.as_str() == OFFICIAL_REPOSITORY && STREAM_PREFIXES.iter().any(|s| s.prefix == prefix))
+        .then_some(API_MAJOR)
+}
+
 /// The `init` option or the command an argument came from.
 ///
 /// # Examples
@@ -251,6 +401,7 @@ pub fn classify(flag: Flag, arg: &str) -> Result<Argument, Diagnostic> {
 mod tests {
     use super::*;
     use crate::types::FormatError;
+    use crate::types::PackVersion;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -449,6 +600,74 @@ mod tests {
             refusal(Flag::Ext, "--upload-pack=x://y")?,
             "ext add \"--upload-pack=x://y\": URL must not start with \"-\""
         );
+        Ok(())
+    }
+
+    #[test]
+    fn stream_prefixes_map_all_eight_to_api_major() -> TestResult {
+        let official = GitUrl::new(OFFICIAL_REPOSITORY)?;
+        for (flag, name, prefix) in [
+            (Flag::Pack, "core", "packs-core-v"),
+            (Flag::Pack, "sdlc", "packs-sdlc-v"),
+            (Flag::Pack, "journal", "packs-journal-v"),
+            (Flag::Pack, "guideline-rust", "packs-guideline-rust-v"),
+            (Flag::Pack, "guideline-python", "packs-guideline-python-v"),
+            (Flag::Tool, "claude", "ext-claude-v"),
+            (Flag::Tool, "musecode", "ext-musecode-v"),
+            (Flag::Tool, "opencode", "ext-opencode-v"),
+        ] {
+            assert_eq!(stream_prefix(flag, name), Some(prefix));
+            assert_eq!(stream_major(&official, prefix), Some(API_MAJOR));
+        }
+        assert_eq!(stream_prefix(Flag::Ext, "claude"), Some("ext-claude-v"));
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_prefix_maps_to_none() -> TestResult {
+        let official = GitUrl::new(OFFICIAL_REPOSITORY)?;
+        assert_eq!(stream_prefix(Flag::Pack, "cmux"), None);
+        assert_eq!(stream_prefix(Flag::Pack, ""), None);
+        assert_eq!(stream_prefix(Flag::Tool, "core"), None);
+        assert_eq!(stream_prefix(Flag::Tool, "packs-core-v1.0.1"), None);
+        assert_eq!(stream_major(&official, "packs-evil-v"), None);
+        assert_eq!(stream_major(&official, ""), None);
+        let other = GitUrl::new("https://github.com/acme/packs")?;
+        assert_eq!(stream_major(&other, "packs-core-v"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn git_suffix_is_third_party() -> TestResult {
+        let suffixed = GitUrl::new("https://github.com/airsstack/agentstacks.git")?;
+        for prefix in [
+            "packs-core-v",
+            "packs-sdlc-v",
+            "packs-journal-v",
+            "packs-guideline-rust-v",
+            "packs-guideline-python-v",
+            "ext-claude-v",
+            "ext-musecode-v",
+            "ext-opencode-v",
+        ] {
+            assert_eq!(stream_major(&suffixed, prefix), None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_bundle_rule_is_untouched() -> TestResult {
+        let official = GitUrl::new(OFFICIAL_REPOSITORY)?;
+        assert_eq!(official_major(&official, "packs-v"), Some(API_MAJOR));
+        assert_eq!(stream_major(&official, "packs-v"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn existing_refusals_still_hold() -> TestResult {
+        assert!(refusal(Flag::Pack, "cmux")?.contains("not an official pack"));
+        assert!(refusal(Flag::Tool, "x")?.contains("not an official tool"));
+        assert!(PackVersion::new("1.2").is_err());
         Ok(())
     }
 
