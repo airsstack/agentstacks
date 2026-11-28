@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-28
 depends-on: [01]
 built-on: a7f1874ed5fe
@@ -33,9 +33,40 @@ scripts/release/agreement_test.lua            — create airsl tests for the che
 
 **Change:** The gate owns both modes. PR mode diffs the pull request against its merge-base with the target branch; release mode diffs the release commit against the stream's last tag, or — with no prior tag — asserts manifest equals the minted tag plus a changelog entry instead of diffing. Both modes compute the installed set per artifact through the existing loaders' exclude rules, evaluate multi-artifact diffs per artifact independently, and fail changed-without-bump, bumped-without-change, and bump-without-entry.
 
-**Proof:** written first, seen failing, then passing — `gate_rejects_82d7561_shape` — a fixture diff with 26 shipped files, unchanged manifest, no entry fails both directions; `gate_accepts_paperwork_only` — a manifest-plus-changelog-only fixture passes; `gate_accepts_excluded_only` — a README plus `*_test.lua` fixture passes with no bump; `gate_rejects_exclude_edit_without_bump` — a fixture editing only `exclude` fails for missing bump; `gate_rejects_skill_change_without_bump` — a `SKILL.md`, adapter, and hook fixture each fail without a bump; `release_mode_without_base_asserts_equality` — a no-prior-tag fixture passes on manifest-equals-tag plus entry and fails without the entry.
+**Proof:** written first, seen failing, then passing — `gate_rejects_82d7561_shape` — a two-artifact SKILL plus adapter plus hook fixture with unchanged manifests and no entry fails naming both artifacts; `gate_accepts_paperwork_only` — a changelog-only fixture passes; `gate_accepts_excluded_only` — a README plus `*_test.lua` fixture passes with no bump; `gate_rejects_exclude_edit_without_bump` — an exclude-only fixture fails; skill, adapter, and hook fixtures each fail without a bump; a vanity bump fails; a bump without an entry fails; `release_mode_without_base_asserts_equality` — manifest-equals-tag plus entry is asserted by the agreement check the release workflow runs, covered by its unit tests.
 
 **Done when:** the gate task passes on `main` and fails on the fixtures, and the Definition of Done is green. Commit `ci(repo): manifest-discipline release-readiness gate`.
+
+---
+
+## Review findings
+
+One agent round against the plan. All fixed in this plan before close:
+
+| # | Tier | Disposition |
+|---|------|-------------|
+| 1 | 🔴 | Applied — smoke now asserts init pin, `update` printing `nothing to update`, a successful apply, and `doctor` printing `healthy`. |
+| 2 | 🔴 | Applied — every `gh` call is guarded with `|| fail`; a gh-stub self-test proves a failed dispatch stops before `run watch`. |
+| 3 | 🔴 | Applied — the wrapper header documents the manual `git tag -a` fallback with the same checks. |
+| 4 | 🟡 | Applied — paperwork-only and excluded-only fixtures are separate passing cases; the vanity bump fails between them. |
+| 5 | 🟡 | Applied — the 82d7561 fixture spans two artifacts with SKILL, adapter, and hook changes and must name both. |
+| 6 | 🟡 | Applied — a hook-only fixture joins the SKILL and adapter fixtures. |
+| 7 | 🟡 | Applied — no-base equality lives in the tested agreement check the workflow calls; the gate's diff mode needs no base. |
+| 8 | 🟡 | Applied — a gh-stub self-test proves a mismatched version never reaches `gh`, and the failing dispatch test guards the call. |
+| 9 | 🟡 | Applied — a version-matching, entry-missing fixture proves the entry refusal path at wrapper level. |
+| 10 | 🟡 | Applied — the wrapper prints the suggestion on every release and the workflow posts it to the run summary. |
+| 11 | 🟡 | Applied — the release-gate task and the CI job both run `sh -n` over both scripts. |
+| 12 | 🟡 | Applied — dry-run prints that the remote tag check is skipped, real runs warn on listing failure and the workflow re-verifies before pushing. |
+
+`cargo make release-gate` green (10/10 gate fixtures, 8/8 wrapper cases), `cargo make lua` green (7 new Lua tests), `cargo make dod` green, workflow YAML parses.
+
+## Deviations
+
+- 2026-11-28: board renders `Legacy chain detected under .claudestacks/sdlc`; pre-existing, carried on.
+- 2026-11-28: reviewer handoff ran through native subagent delivery, not `context-handoff` files.
+- 2026-11-28: the gate's scope matcher treats unknown glob shapes as shipped (fail-closed) rather than refusing unknown shapes; documented in the script header.
+- 2026-11-28: plan Task 1's `release_mode_without_base_asserts_equality` is covered by agreement.lua unit tests plus the workflow's no-base skip, not by a gate self-test case — the gate is diff-only by design and the no-base path has no diff to check.
+- 2026-11-28: no `set -e` in the wrapper; fallible calls carry explicit `|| fail` guards instead, so preflight checks keep their tailored messages.
 
 ### Task 2 — Mint tags from a dispatch workflow
 
@@ -43,7 +74,7 @@ scripts/release/agreement_test.lua            — create airsl tests for the che
 
 **Change:** The workflow re-verifies a clean tree with manifest equal to version and entry present, mints one annotated tag, pushes it alone, and smoke-verifies with fresh `init`, `update`, and healthy `doctor` in a throwaway home; `contents: write` for the push.
 
-**Proof:** written first, seen failing, then passing — `dispatch_rejects_version_mismatch` — dry-run with manifest behind version stops before any tag; `smoke_asserts_all_three` — the smoke step asserts init resolves, update discovers, doctor is healthy.
+**Proof:** written first, seen failing, then passing — `dispatch_rejects_version_mismatch` — dry-run with manifest behind version stops before any tag; `smoke_asserts_all_three` — the smoke step asserts init pins the new tag, update reports nothing to update, apply succeeds, and doctor reports healthy.
 
 **Done when:** `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release-artifact.yml'))"` exits 0, the workflow dispatches cleanly on a test input, and the Definition of Done is green. Commit `ci(repo): per-artifact release dispatch workflow`.
 

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-28
 depends-on: [02, 03]
 built-on: a7f1874ed5fe
@@ -28,6 +28,8 @@ book/src/ch02-00-packs.md                     — modify streams replace the bun
 book/src/ch06-01-extensions.md                — modify extension version rules
 book/src/ch06-04-pack-authoring.md            — modify version and changelog rules
 book/src/ch06-05-pack-format.md               — modify version field meaning
+book/src/ch06-06-stability.md                 — correct R6 to the frozen-bundle rule (review follow-up)
+book/src/ch06-07-musecode.md                  — point release at the ext-musecode stream (review follow-up)
 book/src/ch01-02-first-project.md             — modify tag examples to streams
 book/src/ch03-01-from-0x.md                   — modify migration path to streams
 book/src/introduction.md                      — modify release pointer
@@ -77,3 +79,22 @@ RELEASING.md                                  — modify per-artifact placeholde
 
 - `cargo make book-build` green.
 - Every grep assertion green.
+
+---
+
+## Review findings
+
+One agent round against the plan. Both fixed in this plan before close:
+
+| # | Tier | Disposition |
+|---|------|-------------|
+| 1 | 🔴 | Applied — `ch06-07-musecode.md` now points at the `ext-musecode-v*` stream instead of the bundle tag; the whole-tree sweep also corrected the R6 row in `ch06-06-stability.md`. |
+| 2 | 🟡 | Applied — intro and the `ch06-04` example now name seeded stream tags (`ext-musecode-v1.1.0`, `ext-claude-v1.1.0`); the split example in `ch05-00` gained a stream case. |
+
+`cargo make book-build` green, `cargo make dod` green, proof greps green.
+
+## Deviations
+
+- 2026-11-28: board renders `Legacy chain detected under .claudestacks/sdlc`; pre-existing, carried on.
+- 2026-11-28: reviewer handoff ran through native subagent delivery, not `context-handoff` files.
+- 2026-11-28: the Task 2 whole-tree grep caught two chapters the plan's file list did not name (`ch06-07-musecode.md`, `ch06-06-stability.md` R6); both fixed in this plan rather than opened as new scope, since the plan's own rule already required the whole tree.

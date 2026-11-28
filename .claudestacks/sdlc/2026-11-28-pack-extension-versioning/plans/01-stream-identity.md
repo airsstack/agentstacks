@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-28
 built-on: a7f1874ed5fe
 ---
@@ -17,6 +17,7 @@ built-on: a7f1874ed5fe
 book/src/ch06-08-versioning.md              — create the scheme section, wired in SUMMARY.md
 book/src/ch06-06-stability.md               — modify stream format frozen for 1.x
 crates/agentstacks/src/types/shorthand.rs   — modify closed stream-prefix table + major rule
+crates/agentstacks/src/types/mod.rs        — modify re-exports for the new stream items
 crates/agentstacks/src/types/resolve/tag.rs — modify stream-tag split tests
 crates/agentstacks/src/process/git/cli.rs   — modify prefix-filter contract tests
 ```
@@ -64,3 +65,37 @@ crates/agentstacks/src/process/git/cli.rs   — modify prefix-filter contract te
 
 - `cargo make dod-crate agentstacks` green.
 - `cargo make book-build` green with the new section linked from the summary.
+
+---
+
+## Review findings
+
+One agent round against this plan only. All fixed in this plan before close:
+
+| # | Disposition |
+|---|---|
+| 1 | Applied — section is `ch06-08-versioning.md`, SUMMARY wiring in Files; book task leads. |
+| 2 | Applied — new Task 3 owns stream-tag split tests; Task 1 consumes them. |
+| 3 | Applied — five doctor sub-case tests named in plan 02 Task 3. |
+| 4 | Applied — 03 Task 1 owns both gate modes including no-base equality check. |
+| 5 | Applied — exclude-edit and SKILL/adapter/hook fixtures in 03 Task 1. |
+| 6 | Applied — cli contract test in 01 Task 3. |
+| 7 | Applied — `runbook_corpora_green` in 05 Task 3. |
+| 8 | Applied — missing-airsl pointer text prescribed; six refusal tests in 03 Task 3. |
+| 9 | Applied — `ch06-01` (plus `ch06-05` under the same-change rule) in 04 Task 2. |
+| 10 | Applied — 05 Task 1 owns only the sdlc manifest plus its entry. |
+| 11 | Applied — no-base mode stipulation check replaces the contradiction. |
+| 12 | Applied — `existing_refusals_still_hold` pins both sides in 01 Task 2. |
+| 13 | Applied — book task leads 01; 03 needs no chapter (runbook covers it in 04). |
+| 14 | Applied — third-party and lookalike tests in 02 Task 1. |
+| 15 | Applied — concrete `python3 -c yaml.safe_load` check in 03 Task 2. |
+| 16 | Acknowledged — live proofs ride the plan-05 checkpoints by design. |
+
+`cargo make dod-crate agentstacks` green (unit suite plus doctests, zero failures), `cargo fmt --check` clean, `cargo make book-build` green with the new section wired in.
+
+## Deviations
+
+- 2026-11-28: board renders `Legacy chain detected under .claudestacks/sdlc`; pre-existing condition, carried on per the chain's out-of-scope rule.
+- 2026-11-28: reviewer handoff ran through native subagent delivery, not `context-handoff` files; the review round itself happened as specified.
+- 2026-11-28: Task 3 characterization tests (split, anchoring, contract) passed on first run — they pin existing generic machinery, so there was no red phase; the genuinely new shorthand code went red-then-green.
+- 2026-11-28: closed table ships as `STREAM_PREFIXES` with `Stream` items; `stream_prefix`/`Stream::name` are the accessors plan-02 tasks consume.

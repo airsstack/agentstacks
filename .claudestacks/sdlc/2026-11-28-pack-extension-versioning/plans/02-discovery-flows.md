@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-28
 depends-on: [01]
 built-on: a7f1874ed5fe
@@ -18,7 +18,7 @@ built-on: a7f1874ed5fe
 crates/agentstacks/src/app/newest.rs         — modify per-stream newest resolution
 crates/agentstacks/src/app/init.rs           — modify official shorthand per artifact
 crates/agentstacks/src/app/ext/add.rs        — modify official tool resolution per stream
-crates/agentstacks/src/app/update.rs         — modify per-source stream listing
+crates/agentstacks/src/app/update.rs         — unchanged: the flow was already generic over `for_source` plus `query.prefix`
 crates/agentstacks/src/types/resolve/update.rs — modify frozen-stream note
 crates/agentstacks/src/app/doctor.rs         — modify freshness half
 crates/agentstacks-cli/src/show/update.rs    — modify render new entries and notes
@@ -75,6 +75,26 @@ book/src/ch05-00-plan-and-apply.md           — modify prefix rules and migrati
 
 - The freshness half touches `doctor`'s offline contract; the riskier step is Task 3, mitigated by the degraded-mode tests running before any network code.
 - New note texts proliferate across `show` modules; the doctest-pinning in Task 2 is the single source they render.
+
+---
+
+## Review findings
+
+One agent round against this plan. All fixed in this plan before close; all 🟡, none blocking:
+
+| # | Disposition |
+|---|---|
+| 1 | Applied — `app/update.rs` needed no change (flow already generic); Files line corrected to say so. |
+| 2 | Applied — added unit test `frozen_note_text_is_pinned` asserting both Frozen wordings alongside the existing doctest. |
+| 3 | Applied — CLI test renamed to the plan's `doctor_shows_advisory_without_finding`. |
+
+`cargo make dod` green (unit, integration, doctests, lua gate), `cargo make book-build` green with updated chapters.
+
+## Deviations
+
+- 2026-11-28: board renders `Legacy chain detected under .claudestacks/sdlc`; pre-existing, carried on.
+- 2026-11-28: reviewer handoff ran through native subagent delivery, not `context-handoff` files.
+- 2026-11-28: Task 3 characterization gap — the frozen `finish` initially ran the pinned-tag membership check before reporting the frozen note, which would have misreported every frozen pin as missing upstream; fixed by gating the check on `frozen.is_none()` before any test ran green.
 
 ## Proof
 

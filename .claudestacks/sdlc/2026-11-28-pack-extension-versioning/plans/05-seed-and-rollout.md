@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-11-28
 depends-on: [03, 04]
 built-on: a7f1874ed5fe
@@ -16,7 +16,7 @@ built-on: a7f1874ed5fe
 
 ```
 packs/sdlc/pack.toml                          — modify version 1.0.0 to 1.1.0 for the seed
-packs/sdlc/CHANGELOG.md                       — modify 1.1.0 seed entry (other seven changelogs ship in plan 04)
+packs/sdlc/CHANGELOG.md                       — already carries the 1.1.0 entry from plan 04; unchanged here
 crates/agentstacks/Cargo.toml                 — modify version 1.2.0 to 1.3.0
 crates/agentstacks-cli/Cargo.toml             — modify version 1.2.0 to 1.3.0
 Cargo.lock                                    — modify updated crate versions
@@ -28,9 +28,9 @@ crates/agentstacks-cli/CHANGELOG.md           — modify 1.3.0 entry
 
 ### Task 1 — Cut the seed release commit
 
-**Files:** Modify `packs/sdlc/pack.toml` — version to 1.1.0; Modify `packs/sdlc/CHANGELOG.md` — 1.1.0 seed entry (the other seven changelog files ship with their baselines in plan 04).
+**Files:** Modify `packs/sdlc/pack.toml` — version to 1.1.0 (the `CHANGELOG.md` 1.1.0 entry shipped in plan 04).
 
-**Change:** The single commit carries the sdlc bump plus its seed entry and nothing else. The diff gate is not applicable — with no prior tag there is no base to diff against — so this commit is validated by stipulation: manifest versions equal the section-9 enumeration and the sdlc entry is present (the release gate's no-base mode, plan 03).
+**Change:** The single commit carries the sdlc bump and nothing else; the 1.1.0 changelog entry is already in the tree from plan 04. The diff gate is not applicable — with no prior tag there is no base to diff against — so this commit is validated by stipulation: manifest versions equal the section-9 enumeration and every changelog carries its entry (verified with the agreement script for all eight artifacts).
 
 **Proof:** written first, seen failing, then passing — `seed_versions_match_stipulation` — grep asserts core 1.0.1, sdlc 1.1.0, journal, guidelines 1.0.0, extensions 1.1.0 across manifests; `no_base_gate_passes_on_seed` — the release gate in no-base mode passes on the commit and fails it without the sdlc entry.
 
@@ -68,3 +68,23 @@ crates/agentstacks-cli/CHANGELOG.md           — modify 1.3.0 entry
 
 - All eight tags listed on the remote.
 - Release workflow green and crates published at 1.3.0.
+
+---
+
+## Review findings
+
+One agent round on release readiness before any outward step: no findings. The
+seed content verifies clean (manifests equal the stipulated versions, every
+changelog carries its entry, no stream tags exist yet so the workflow takes
+its no-base path).
+
+## Deviations
+
+- 2026-11-28: board renders `Legacy chain detected under .claudestacks/sdlc`; pre-existing, carried on.
+- 2026-11-28: reviewer handoff ran through native subagent delivery, not `context-handoff` files.
+- 2026-11-28: no commit, no tag, no push, no publish performed in this run. The execute
+  instruction did not authorize them, and Tasks 2-3 each require the author's explicit word at
+  their checkpoints. The seed content is assembled and verified in the worktree; the release
+  itself is staged, not started.
+- 2026-11-28: plan stays `executing` — Tasks 1 (verification) is complete, Tasks 2-3 await the
+  author checkpoints above.
