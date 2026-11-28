@@ -83,6 +83,30 @@ jobs:
         env:
           AGENTSTACKS_REQUIRE_AIRSL: "1"
 
+  release-readiness:
+    name: Manifest discipline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # The self-test needs no history and runs on every event; the range
+      # check needs the PR's merge base and runs on pull requests only.
+      - name: Self-test the release gate
+        run: |
+          sh -n scripts/release-gate.sh
+          sh -n scripts/release-artifact.sh
+          sh scripts/release-gate.sh --self-test
+          sh scripts/release-artifact.sh --self-test
+
+      - name: Check the pull request diff
+        if: github.event_name == 'pull_request'
+        run: |
+          base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          sh scripts/release-gate.sh --repo . "$base" HEAD
+
   claudevs-check:
     name: claudevs fixture corpus
     runs-on: ubuntu-latest
