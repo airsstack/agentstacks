@@ -40,11 +40,11 @@ RELEASING.md                                  — modify per-artifact placeholde
 
 ### Task 1 — Seed the eight changelogs and freeze the bundle file
 
-**Files:** Create the eight `CHANGELOG.md` files — baseline or seed entries; Modify `packs/CHANGELOG.md` — freeze note.
+**Files:** Create the eight `CHANGELOG.md` files — seven dated baselines plus an `Unreleased` seed entry for `sdlc`; Modify `packs/CHANGELOG.md` — freeze note.
 
-**Change:** Seven baselines carry current numbers forward; `packs/sdlc/CHANGELOG.md` honestly describes `1.1.0` (chain-root content, first per-stream release); the shared file gains a top note pointing at the eight successors with no history rewritten.
+**Change:** Seven baselines carry current numbers forward; `packs/sdlc/CHANGELOG.md` stages its `1.1.0` content under `## [Unreleased]`, dated and tagged by the post-merge release commit (the seed bump cannot ride a PR diff: its shipped content predates the gate, so the release commit on `main` carries the bump); the shared file gains a top note pointing at the eight successors with no history rewritten.
 
-**Proof:** written first, seen failing, then passing — `every_artifact_has_a_changelog` — all eight paths exist with a top heading matching the stipulated seed version; `bundle_file_names_successors` — grep finds all eight successor paths in the freeze note.
+**Proof:** written first, seen failing, then passing — `every_artifact_has_a_changelog` — all eight paths exist; seven carry their stipulated seed version and `sdlc` carries the `Unreleased` seed entry; `bundle_file_names_successors` — grep finds all eight successor paths in the freeze note.
 
 **Done when:** `cargo make book-build` passes and the Definition of Done is green. Commit `docs(packs): per-artifact changelogs`.
 

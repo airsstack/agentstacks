@@ -15,8 +15,8 @@ built-on: a7f1874ed5fe
 ## Files that change
 
 ```
-packs/sdlc/pack.toml                          — modify version 1.0.0 to 1.1.0 for the seed
-packs/sdlc/CHANGELOG.md                       — already carries the 1.1.0 entry from plan 04; unchanged here
+packs/sdlc/pack.toml                          — modify version 1.0.0 to 1.1.0 for the seed (on main, post-merge)
+packs/sdlc/CHANGELOG.md                       — date the Unreleased seed entry as 1.1.0 (on main, post-merge)
 crates/agentstacks/Cargo.toml                 — modify version 1.2.0 to 1.3.0
 crates/agentstacks-cli/Cargo.toml             — modify version 1.2.0 to 1.3.0
 Cargo.lock                                    — modify updated crate versions
@@ -28,11 +28,11 @@ crates/agentstacks-cli/CHANGELOG.md           — modify 1.3.0 entry
 
 ### Task 1 — Cut the seed release commit
 
-**Files:** Modify `packs/sdlc/pack.toml` — version to 1.1.0 (the `CHANGELOG.md` 1.1.0 entry shipped in plan 04).
+**Files:** On `main` after the merge — Modify `packs/sdlc/pack.toml` — version to 1.1.0; date the `CHANGELOG.md` Unreleased seed entry as `1.1.0`.
 
-**Change:** The single commit carries the sdlc bump and nothing else; the 1.1.0 changelog entry is already in the tree from plan 04. The diff gate is not applicable — with no prior tag there is no base to diff against — so this commit is validated by stipulation: manifest versions equal the section-9 enumeration and every changelog carries its entry (verified with the agreement script for all eight artifacts).
+**Change:** On `main`, after the merge and before any stream tag exists: one commit bumps the sdlc manifest to 1.1.0 and dates its staged changelog entry. The bump cannot ride a PR diff — its shipped content predates the gate (shipped on `main` by #27), so a PR-range check would misread it as a vanity bump. The release workflow's no-base path validates it instead: manifest declares the version and the changelog names it. This commit is the seed the eight tags point at.
 
-**Proof:** written first, seen failing, then passing — `seed_versions_match_stipulation` — grep asserts core 1.0.1, sdlc 1.1.0, journal, guidelines 1.0.0, extensions 1.1.0 across manifests; `no_base_gate_passes_on_seed` — the release gate in no-base mode passes on the commit and fails it without the sdlc entry.
+**Proof:** written first, seen failing, then passing — `seed_versions_match_stipulation` — the agreement check passes for all eight artifacts against their stipulated versions on the release commit; `no_base_needs_no_gate` — the release workflow skips the diff gate with no prior tag and validates manifest-equals-version plus changelog entry instead.
 
 **Done when:** the stipulation checks pass and the Definition of Done is green. Approval checkpoint: author confirms the commit before any tag. Commit `chore(packs): seed per-artifact streams`.
 

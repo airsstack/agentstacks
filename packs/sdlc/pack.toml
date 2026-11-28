@@ -2,7 +2,7 @@ exclude = ["README.md", "**/*_test.lua"]
 
 [pack]
 name        = "sdlc"
-version     = "1.1.0"
+version     = "1.0.0"
 api         = 1
 description = "Intent, spec, plan and execute chain with a status board, roadmaps and ADRs"
 
