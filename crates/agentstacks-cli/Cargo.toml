@@ -1,6 +1,6 @@
 [package]
 name                   = "agentstacks-cli"
-version                = "1.2.0"
+version                = "1.3.0"
 description            = "Sets up agentic coding tools from one tool-neutral copy of skills, agents, commands, hooks and rules."
 edition.workspace      = true
 rust-version.workspace = true
