@@ -4,6 +4,21 @@ All notable changes to `agentstacks` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Independent per-artifact release streams: packs resolve to `packs-<name>-vX.Y.Z` tags
+  and extensions to `ext-<name>-vX.Y.Z`, replacing the single `packs-v*` bundle tag
+  (frozen, still resolvable).
+- Stream-aware newest-release discovery: `init`, `update` and `ext add` find the newest
+  tag in each artifact's own stream.
+
+### Changed
+
+- `update` warns on legacy `packs-v*` pins and never rewrites them automatically.
+- `doctor` reports per-stream staleness as advisories only: exit 0, fully offline-capable.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added
