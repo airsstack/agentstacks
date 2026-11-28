@@ -107,6 +107,27 @@ mod tests {
     }
 
     #[test]
+    fn update_shows_frozen_note_verbatim() -> TestResult {
+        use agentstacks::types::project::GitUrl;
+        let frozen = UpdateEntry {
+            key: key()?,
+            current: Some(GitTag::new("packs-v1.2.0")?),
+            outcome: UpdateOutcome::Note(UpdateNote::Frozen {
+                key: key()?,
+                bundle: GitTag::new("packs-v1.2.0")?,
+                url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+                stream: "packs-core-v".to_owned(),
+                newest: Some(GitTag::new("packs-core-v1.0.3")?),
+            }),
+        };
+        assert_eq!(
+            update_text(&tags(vec![frozen])),
+            "  note     agentstacks.toml: packs.core: pinned to bundle tag packs-v1.2.0 (frozen stream); packs-core-v1.0.3 is available — retag to migrate"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn rows_keep_the_entry_order() -> TestResult {
         let text = update_text(&tags(vec![note()?, newer()?]));
         let lines: Vec<&str> = text.lines().collect();

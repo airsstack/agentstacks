@@ -365,12 +365,14 @@ plan hashes and the lock records, so re-planning an applied project is `nothing 
 whose remainder parses as semver.
 
 - `packs-v0.1.0` → prefix `packs-v`, version `0.1.0`
+- `packs-sdlc-v1.1.0` → prefix `packs-sdlc-v`, version `1.1.0`
 - `x-1.2.3-4.5.6` → prefix `x-`, version `1.2.3-4.5.6`
 
 | Case | Result |
 |---|---|
 | current tag has no such split | note `agentstacks.toml: packs.core: tag "main-latest" has no version to update from` |
 | `latest_tag` returns `None`, or nothing newer than the current tag | note `agentstacks.toml: packs.core: no newer tag than packs-v0.1.0` |
+| source pinned to a retired `packs-v*` bundle tag | frozen note naming the artifact's stream and whether it lists a newer tag, e.g. `agentstacks.toml: packs.core: pinned to bundle tag packs-v1.2.0 (frozen stream); packs-core-v1.0.3 is available — retag to migrate`; never rewritten |
 | source pinned by `rev` | note `agentstacks.toml: packs.core: pinned to rev <rev>, not updated` |
 | `path` source | nothing |
 
@@ -378,13 +380,17 @@ whose remainder parses as semver.
 note. Entries follow key order: `packs.*`, then `tools.*`.
 
 For the official repository (the URL equal to `https://github.com/airsstack/agentstacks` byte for
-byte, so a `.git` suffix makes it a third-party source) and the prefix `packs-v`, `major` is the
-`api` this agentstacks speaks: a 1.x binary updates `packs-v0.2.0` to the newest `packs-v1.*` and
-never to `packs-v2.*`. Every other source passes `None`. The `init` shorthand and `ext add`
-follow the same rule, and `init` refuses with `no packs-v1 release tag in <url>` when no tag of that major exists.
+byte, so a `.git` suffix makes it a third-party source) and a known stream prefix
+(`packs-core-v`, `ext-claude-v`, and the other six), `major` is the `api` this agentstacks
+speaks: a 1.x binary takes the newest `packs-core-v1.*` and never a `packs-core-v2.*`. Every
+other source passes `None`. The `init` shorthand and `ext add` resolve each official name under
+its own stream and refuse with `no packs-core-v1 release tag in <url>` when that stream lists no
+tag of the major. A pin to the retired `packs-v` bundle prefix on the official repository always
+takes the frozen branch instead of the newest-tag rule.
 
 The library owns writing a new tag into `agentstacks.toml` (`app/update`), shorthand expansion
-(prefix `packs-v`) and its refusal when `latest_tag` returns `None` (`app/newest`, `app/init`).
+(one stream prefix per artifact name) and its refusal when `latest_tag` returns `None`
+(`app/newest`, `app/init`).
 
 ## 11. Binaries and the airsl pin
 

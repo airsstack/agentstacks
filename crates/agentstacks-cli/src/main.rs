@@ -64,7 +64,9 @@ fn main() -> ExitCode {
             &mut console,
         ),
         Command::Apply { yes } => command::apply(&ports, yes, &mut console),
-        Command::Doctor => command::doctor(&ports.workspace, &ports.binary, &mut console),
+        Command::Doctor => {
+            command::doctor(&ports.workspace, &ports.git, &ports.binary, &mut console)
+        }
         Command::Update { yes } => command::update(&ports, yes, &mut console),
         Command::Ext(Ext::Add {
             source,

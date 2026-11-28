@@ -28,13 +28,13 @@ use crate::types::project::{
 };
 use crate::types::report::{Diagnostic, Diagnostics, FormatError, Location};
 use crate::types::resolve::FetchError;
-use crate::types::shorthand::{Argument, Flag, classify};
+use crate::types::shorthand::{Argument, Flag, classify, stream_major, stream_prefix};
 
 /// Adds the tool extension at `source` to `agentstacks.toml` and returns its name.
 ///
 /// `source` is a git URL (given with `flags.tag` or `flags.rev`, and optionally `flags.subdir`), a
 /// directory of the project, or the name of an official tool. The options apply only to a git
-/// URL. An official name is written as the official repository at its newest release tag of the
+/// URL. An official name is written as the official repository at its newest stream tag of the
 /// `api` major version, with the directory inside it. A directory is written as given, under the
 /// name in its manifest.
 ///
@@ -90,10 +90,18 @@ fn resolve<G: Git>(git: &G, source: &str, flags: &GitFlags<'_>) -> Result<Source
             if !options.is_empty() {
                 return Err(refused(options));
             }
-            let tag = newest_release(git, &url).map_err(|error| match error {
-                NewestError::Fetch(error) => placed(error, source),
-                NewestError::NoTag(error) => Diagnostic::new(at(), error),
-            })?;
+            // `classify` already refused unknown names, and every official tool has a
+            // stream, so a missing prefix names an invalid name rather than a new case.
+            let Some(prefix) = stream_prefix(Flag::Ext, source) else {
+                return Err(refused(vec![ProjectError::InvalidName]));
+            };
+            let tag =
+                newest_release(git, &url, prefix, stream_major(&url, prefix)).map_err(|error| {
+                    match error {
+                        NewestError::Fetch(error) => placed(error, source),
+                        NewestError::NoTag(error) => Diagnostic::new(at(), error),
+                    }
+                })?;
             Ok(Source::Git {
                 url,
                 pin: Pin::Tag(tag),
@@ -374,15 +382,23 @@ mod tests {
         )?
         .tags(
             &url,
-            tags(&["packs-v1.0.0", "packs-v1.2.0", "packs-v2.0.0"])?,
+            tags(&[
+                "ext-opencode-v1.0.0",
+                "ext-opencode-v1.2.0",
+                "ext-opencode-v2.0.0",
+            ])?,
         )
-        .tag(&url, &GitTag::new("packs-v1.2.0")?, &CommitId::new(REV)?);
+        .tag(
+            &url,
+            &GitTag::new("ext-opencode-v1.2.0")?,
+            &CommitId::new(REV)?,
+        );
         let name = added(&workspace, &git, "opencode")?;
         assert_eq!(name.as_str(), "opencode");
         let text = written(&workspace)?;
         assert!(
             text.contains(&format!(
-                "[tools.opencode]\ngit = \"{OFFICIAL_REPOSITORY}\"\ntag = \"packs-v1.2.0\"\nsubdir = \"extensions/opencode\"\n"
+                "[tools.opencode]\ngit = \"{OFFICIAL_REPOSITORY}\"\ntag = \"ext-opencode-v1.2.0\"\nsubdir = \"extensions/opencode\"\n"
             )),
             "{text}"
         );
@@ -742,12 +758,15 @@ mod tests {
     #[test]
     fn official_without_major_tag() -> TestResult {
         let workspace = FakeWorkspace::new().project(PROJECT);
-        let git = FakeGit::new().tags(&official()?, tags(&["packs-v0.2.0", "packs-v2.0.0"])?);
+        let git = FakeGit::new().tags(
+            &official()?,
+            tags(&["ext-claude-v0.2.0", "ext-claude-v2.0.0"])?,
+        );
         let result = add_with(&workspace, &git, "claude", None, None, None);
         assert_eq!(
             refused(result)?,
             [
-                "ext add \"claude\": no packs-v1 release tag in https://github.com/airsstack/agentstacks"
+                "ext add \"claude\": no ext-claude-v1 release tag in https://github.com/airsstack/agentstacks"
             ]
         );
         assert_eq!(workspace.project_written(), None);

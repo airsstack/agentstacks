@@ -19,6 +19,8 @@
 
 use std::fmt;
 
+use crate::types::Flag;
+use crate::types::api::API_MAJOR;
 use crate::types::manifest::PackVersion;
 use crate::types::project::CommitId;
 use crate::types::project::GitTag;
@@ -30,7 +32,9 @@ use crate::types::resolve::SourceKey;
 use crate::types::resolve::TagVersion;
 use crate::types::resolve::latest_tag;
 use crate::types::resolve::tag::precedence;
-use crate::types::shorthand::official_major;
+use crate::types::shorthand::{
+    OFFICIAL_REPOSITORY, TAG_PREFIX, official_major, stream_major, stream_prefix,
+};
 
 /// Why a git source is not updated.
 ///
@@ -73,6 +77,39 @@ pub enum UpdateNote {
         /// The pinned revision.
         rev: CommitId,
     },
+    /// The source is pinned to a retired bundle tag, which an update never rewrites.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use agentstacks::types::{GitTag, GitUrl, PackName};
+    /// use agentstacks::types::resolve::{SourceKey, UpdateNote};
+    ///
+    /// let note = UpdateNote::Frozen {
+    ///     key: SourceKey::Pack(PackName::new("core")?),
+    ///     bundle: GitTag::new("packs-v1.2.0")?,
+    ///     url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+    ///     stream: "packs-core-v".to_owned(),
+    ///     newest: Some(GitTag::new("packs-core-v1.0.3")?),
+    /// };
+    /// assert_eq!(
+    ///     note.to_string(),
+    ///     "agentstacks.toml: packs.core: pinned to bundle tag packs-v1.2.0 (frozen stream); packs-core-v1.0.3 is available — retag to migrate",
+    /// );
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    Frozen {
+        /// The entry.
+        key: SourceKey,
+        /// The pinned bundle tag.
+        bundle: GitTag,
+        /// The repository the stream would be listed from.
+        url: GitUrl,
+        /// The artifact stream prefix, such as `packs-core-v`.
+        stream: String,
+        /// The newest stream tag, when the stream lists any tag.
+        newest: Option<GitTag>,
+    },
 }
 
 impl fmt::Display for UpdateNote {
@@ -89,6 +126,24 @@ impl fmt::Display for UpdateNote {
             Self::PinnedRev { key, rev } => {
                 write!(f, "{}: pinned to rev {rev}, not updated", key.location())
             }
+            Self::Frozen {
+                key,
+                bundle,
+                url,
+                stream,
+                newest,
+            } => match newest {
+                Some(tag) => write!(
+                    f,
+                    "{}: pinned to bundle tag {bundle} (frozen stream); {tag} is available — retag to migrate",
+                    key.location()
+                ),
+                None => write!(
+                    f,
+                    "{}: pinned to bundle tag {bundle} (frozen stream); no {stream}{API_MAJOR} release tag in {url} yet",
+                    key.location()
+                ),
+            },
         }
     }
 }
@@ -111,7 +166,7 @@ pub enum UpdateOutcome {
 /// use agentstacks::types::resolve::{SourceKey, UpdateOutcome, UpdateQuery};
 ///
 /// let source = Source::Git {
-///     url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+///     url: GitUrl::new("https://github.com/acme/packs")?,
 ///     pin: Pin::Tag(GitTag::new("packs-v0.1.0")?),
 ///     subdir: None,
 /// };
@@ -120,6 +175,7 @@ pub enum UpdateOutcome {
 ///     .ok_or("a git source")?
 ///     .map_err(|entry| format!("{entry:?}"))?;
 /// assert_eq!(query.prefix, "packs-v");
+/// assert_eq!(query.frozen, None);
 /// // With no newer tag listed, the entry notes it.
 /// let entry = query.finish(&[]);
 /// assert!(matches!(entry.outcome, UpdateOutcome::Note(_)));
@@ -135,11 +191,29 @@ pub struct UpdateEntry {
     pub outcome: UpdateOutcome,
 }
 
+/// The artifact stream of a source pinned to the retired bundle prefix on the official
+/// repository, or `None` for anything else.
+///
+/// A bundle pin carries no artifact name in the tag, so the entry's key supplies it: pack names
+/// resolve under `packs-<name>-v`, tool names under `ext-<name>-v`. A name the official
+/// repository does not hold keeps the legacy query.
+fn bundle_stream(key: &SourceKey, url: &GitUrl, prefix: &str) -> Option<String> {
+    if url.as_str() != OFFICIAL_REPOSITORY || prefix != TAG_PREFIX {
+        return None;
+    }
+    let (flag, name) = match key {
+        SourceKey::Pack(name) => (Flag::Pack, name.as_str()),
+        SourceKey::Tool(name) => (Flag::Tool, name.as_str()),
+    };
+    stream_prefix(flag, name).map(str::to_owned)
+}
+
 /// What an update asks the remote of one git source pinned to a versioned tag: the tags that start
 /// with `prefix`.
 ///
-/// For the official repository and the `packs-v` prefix, [`UpdateQuery::finish`] only considers the
-/// tags of the major version of the `api`.
+/// For the official repository and a stream prefix, [`UpdateQuery::finish`] only considers the
+/// tags of the major version of the `api`. A query built from a retired bundle pin instead
+/// produces the frozen note, never a newer tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateQuery {
     /// The entry.
@@ -152,6 +226,8 @@ pub struct UpdateQuery {
     pub tag: GitTag,
     /// The version of that tag.
     pub version: PackVersion,
+    /// The retired bundle tag the entry is pinned to, when the listed prefix is its stream.
+    pub frozen: Option<GitTag>,
 }
 
 impl UpdateQuery {
@@ -188,21 +264,46 @@ impl UpdateQuery {
                 outcome: UpdateOutcome::Note(note),
             }));
         };
+        let frozen = bundle_stream(&key, url, &prefix).map(|stream| (stream, tag.clone()));
+        let (prefix, frozen) = match frozen {
+            Some((stream, bundle)) => (stream, Some(bundle)),
+            None => (prefix, None),
+        };
         Some(Ok(Self {
             key,
             url: url.clone(),
             prefix,
             tag: tag.clone(),
             version,
+            frozen,
         }))
     }
 
     /// The entry for the `tags` the remote listed: the latest tag when it is newer than the
-    /// current one, otherwise the note that nothing is. The official `packs-v` tags are limited to
-    /// the major version of the `api`; the tags of any other source are all considered.
+    /// current one, otherwise the note that nothing is. Tags under an official prefix, bundle or
+    /// stream, are limited to the major version of the `api`; the tags of any other source are
+    /// all considered. A query built from a retired bundle pin reports the frozen note, never a
+    /// newer tag.
     #[must_use]
     pub fn finish(self, tags: &[RemoteTag]) -> UpdateEntry {
-        let major = official_major(&self.url, &self.prefix);
+        if let Some(bundle) = self.frozen {
+            let newest = latest_tag(tags, &self.prefix, stream_major(&self.url, &self.prefix))
+                .map(|(tag, _)| tag);
+            let note = UpdateNote::Frozen {
+                key: self.key.clone(),
+                bundle,
+                url: self.url.clone(),
+                stream: self.prefix.clone(),
+                newest,
+            };
+            return UpdateEntry {
+                key: self.key,
+                current: Some(self.tag),
+                outcome: UpdateOutcome::Note(note),
+            };
+        }
+        let major = official_major(&self.url, &self.prefix)
+            .or_else(|| stream_major(&self.url, &self.prefix));
         let newer = latest_tag(tags, &self.prefix, major)
             .filter(|(_, version)| precedence(version, &self.version).is_gt())
             .map(|(tag, _)| tag);
@@ -399,32 +500,106 @@ mod tests {
     }
 
     #[test]
-    fn official_packs_tag_keeps_api_major() -> TestResult {
-        let outcome = outcome_at(
-            "https://github.com/airsstack/agentstacks",
-            "packs-v0.2.0",
-            &[
-                "packs-v0.2.0",
-                "packs-v1.0.0",
-                "packs-v1.4.2",
-                "packs-v2.0.0",
-            ],
-        )?;
-        assert_eq!(outcome, UpdateOutcome::NewTag(GitTag::new("packs-v1.4.2")?));
+    fn frozen_note_text_is_pinned() -> TestResult {
+        let note = UpdateNote::Frozen {
+            key: core()?,
+            bundle: GitTag::new("packs-v1.2.0")?,
+            url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+            stream: "packs-core-v".to_owned(),
+            newest: Some(GitTag::new("packs-core-v1.0.3")?),
+        };
+        assert_eq!(
+            note.to_string(),
+            "agentstacks.toml: packs.core: pinned to bundle tag packs-v1.2.0 (frozen stream); packs-core-v1.0.3 is available — retag to migrate"
+        );
+        let empty = UpdateNote::Frozen {
+            key: core()?,
+            bundle: GitTag::new("packs-v1.2.0")?,
+            url: GitUrl::new("https://github.com/airsstack/agentstacks")?,
+            stream: "packs-core-v".to_owned(),
+            newest: None,
+        };
+        assert_eq!(
+            empty.to_string(),
+            "agentstacks.toml: packs.core: pinned to bundle tag packs-v1.2.0 (frozen stream); no packs-core-v1 release tag in https://github.com/airsstack/agentstacks yet"
+        );
         Ok(())
     }
 
     #[test]
-    fn official_source_never_moves_past_the_api_major() -> TestResult {
+    fn official_bundle_pin_reports_frozen_stream() -> TestResult {
+        let query = UpdateQuery::for_source(
+            core()?,
+            &source_at("https://github.com/airsstack/agentstacks", "packs-v0.2.0")?,
+        )
+        .ok_or("a git source")?
+        .map_err(|entry| format!("{entry:?}"))?;
+        assert_eq!(query.prefix, "packs-core-v");
+        let entry = query.finish(&remotes(&["packs-core-v1.0.1", "packs-core-v1.0.2"])?);
+        assert_eq!(entry.current, Some(GitTag::new("packs-v0.2.0")?));
+        assert_eq!(
+            note_of(&entry)?,
+            "agentstacks.toml: packs.core: pinned to bundle tag packs-v0.2.0 (frozen stream); packs-core-v1.0.2 is available — retag to migrate"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn frozen_stream_without_tags_names_the_stream() -> TestResult {
+        let entry = UpdateQuery::for_source(
+            core()?,
+            &source_at("https://github.com/airsstack/agentstacks", "packs-v1.0.0")?,
+        )
+        .ok_or("a git source")?
+        .map_err(|entry| format!("{entry:?}"))?
+        .finish(&[]);
+        assert_eq!(
+            note_of(&entry)?,
+            "agentstacks.toml: packs.core: pinned to bundle tag packs-v1.0.0 (frozen stream); no packs-core-v1 release tag in https://github.com/airsstack/agentstacks yet"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn official_stream_update_finds_newer_tag() -> TestResult {
         let outcome = outcome_at(
             "https://github.com/airsstack/agentstacks",
-            "packs-v1.0.0",
-            &["packs-v1.0.0", "packs-v2.0.0"],
+            "packs-core-v1.0.1",
+            &[
+                "packs-core-v1.0.1",
+                "packs-core-v1.0.2",
+                "packs-core-v2.0.0",
+            ],
         )?;
-        assert!(matches!(
+        assert_eq!(
             outcome,
-            UpdateOutcome::Note(UpdateNote::NoNewer { .. })
+            UpdateOutcome::NewTag(GitTag::new("packs-core-v1.0.2")?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_pins_resolve_independently() -> TestResult {
+        let url = "https://github.com/airsstack/agentstacks";
+        let bundle = UpdateQuery::for_source(core()?, &source_at(url, "packs-v0.2.0")?)
+            .ok_or("a git source")?
+            .map_err(|entry| format!("{entry:?}"))?;
+        assert_eq!(bundle.prefix, "packs-core-v");
+        assert!(bundle.frozen.is_some());
+        let stream = UpdateQuery::for_source(core()?, &source_at(url, "packs-core-v1.0.1")?)
+            .ok_or("a git source")?
+            .map_err(|entry| format!("{entry:?}"))?;
+        assert_eq!(stream.prefix, "packs-core-v");
+        assert_eq!(stream.frozen, None);
+        let listed = remotes(&["packs-core-v1.0.1", "packs-core-v1.0.2"])?;
+        assert!(matches!(
+            bundle.finish(&listed).outcome,
+            UpdateOutcome::Note(UpdateNote::Frozen { .. })
         ));
+        assert_eq!(
+            stream.finish(&listed).outcome,
+            UpdateOutcome::NewTag(GitTag::new("packs-core-v1.0.2")?)
+        );
         Ok(())
     }
 

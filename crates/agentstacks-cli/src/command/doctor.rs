@@ -17,28 +17,31 @@
 use std::io::{BufRead, Write};
 
 use agentstacks::app::doctor::doctor;
-use agentstacks::port::{Binary, Workspace};
+use agentstacks::port::{Binary, Git, Workspace};
 
 use super::Console;
 use crate::exit::Outcome;
 use crate::show::doctor_text;
 
-/// Prints every finding to stdout, or `healthy`. [`Outcome::Success`] only with no finding.
-pub(crate) fn run<W, B, I, O, E>(
+/// Prints the findings, then any advisories, or `healthy`. [`Outcome::Success`] when no finding
+/// names drift; advisories never change the outcome.
+pub(crate) fn run<W, G, B, I, O, E>(
     workspace: &W,
+    git: &G,
     binary: &B,
     console: &mut Console<I, O, E>,
 ) -> Outcome
 where
     W: Workspace,
+    G: Git,
     B: Binary,
     I: BufRead,
     O: Write,
     E: Write,
 {
-    let findings = doctor(workspace, binary);
-    console.out_line(doctor_text(&findings));
-    if findings.is_empty() {
+    let report = doctor(workspace, binary, git);
+    console.out_line(doctor_text(&report));
+    if report.findings.is_empty() {
         Outcome::Success
     } else {
         Outcome::Refused
@@ -66,7 +69,12 @@ mod tests {
         let world = applied()?;
         let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let mut console = console(false, "");
-        let got = run(&world.ports.workspace, &binary, &mut console);
+        let got = run(
+            &world.ports.workspace,
+            &world.ports.git,
+            &binary,
+            &mut console,
+        );
         assert_eq!(got, Outcome::Success, "{}", out_of(&console));
         assert_eq!(out_of(&console), "healthy\n");
         assert_eq!(err_of(&console), "");
@@ -82,9 +90,39 @@ mod tests {
             .set_file(&OpPath::new(AGENT_FILE)?, b"edited");
         let binary = FakeBinary::new().airsl("airsl 0.1.5");
         let mut console = console(false, "");
-        let got = run(&world.ports.workspace, &binary, &mut console);
+        let got = run(
+            &world.ports.workspace,
+            &world.ports.git,
+            &binary,
+            &mut console,
+        );
         assert_eq!(got, Outcome::Refused);
         assert_eq!(out_of(&console), format!("changed: {AGENT_FILE}\n"));
+        Ok(())
+    }
+
+    #[test]
+    fn doctor_shows_advisory_without_finding() -> TestResult {
+        let world = World::git()?;
+        let mut apply_console = console(false, "");
+        assert_eq!(
+            apply(&world.ports, true, &mut apply_console),
+            Outcome::Success
+        );
+        let binary = FakeBinary::new().airsl("airsl 0.1.5");
+        let mut console = console(false, "");
+        let got = run(
+            &world.ports.workspace,
+            &world.ports.git,
+            &binary,
+            &mut console,
+        );
+        assert_eq!(got, Outcome::Success, "{}", out_of(&console));
+        assert_eq!(
+            out_of(&console),
+            "agentstacks.toml: packs.core: packs-v0.2.0 is available (pinned packs-v0.1.0)\n"
+        );
+        assert_eq!(err_of(&console), "");
         Ok(())
     }
 }

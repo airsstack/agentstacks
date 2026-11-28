@@ -2,8 +2,8 @@
 //!
 //! # Responsibilities
 //!
-//! - [`newest_release`] lists the `packs-v*` tags of a repository and returns the newest one whose
-//!   major version the rule of [`official_major`] allows.
+//! - [`newest_release`] lists the tags of a repository under a stream prefix and returns the
+//!   newest one of the allowed major, when one is given.
 //! - [`NewestError`] is why it found none: git refused, or no tag has the major version.
 //!
 //! # Non-responsibilities
@@ -16,7 +16,6 @@ use crate::port::Git;
 use crate::types::project::{GitTag, GitUrl, ProjectError};
 use crate::types::report::FormatError;
 use crate::types::resolve::{FetchError, latest_tag};
-use crate::types::shorthand::{TAG_PREFIX, official_major, release_prefix};
 
 /// Why no release tag was found.
 #[derive(Debug)]
@@ -36,14 +35,19 @@ impl From<NewestError> for FormatError {
     }
 }
 
-/// The newest release tag of `url`.
-pub(super) fn newest_release<G: Git>(git: &G, url: &GitUrl) -> Result<GitTag, NewestError> {
-    let tags = git.list_tags(url, TAG_PREFIX).map_err(NewestError::Fetch)?;
-    latest_tag(&tags, TAG_PREFIX, official_major(url, TAG_PREFIX))
+/// The newest release tag of `url` under `prefix`, limited to `major` when one is given.
+pub(super) fn newest_release<G: Git>(
+    git: &G,
+    url: &GitUrl,
+    prefix: &str,
+    major: Option<u64>,
+) -> Result<GitTag, NewestError> {
+    let tags = git.list_tags(url, prefix).map_err(NewestError::Fetch)?;
+    latest_tag(&tags, prefix, major)
         .map(|(tag, _)| tag)
         .ok_or_else(|| {
             NewestError::NoTag(ProjectError::NoReleaseTag {
-                prefix: release_prefix(),
+                prefix: major.map_or_else(|| prefix.to_owned(), |major| format!("{prefix}{major}")),
                 url: url.to_string(),
             })
         })
@@ -88,8 +92,8 @@ mod tests {
                 "packs-v2.0.0",
             ])?,
         );
-        let tag =
-            newest_release(&git, &url()?).map_err(|error| FormatError::from(error).to_string())?;
+        let tag = newest_release(&git, &url()?, "packs-v", Some(1))
+            .map_err(|error| FormatError::from(error).to_string())?;
         assert_eq!(tag.as_str(), "packs-v1.10.0");
         Ok(())
     }
@@ -97,7 +101,7 @@ mod tests {
     #[test]
     fn no_tag_of_the_major() -> TestResult {
         let git = FakeGit::new().tags(&url()?, listing(&["packs-v0.2.0", "packs-v2.0.0"])?);
-        let error = newest_release(&git, &url()?)
+        let error = newest_release(&git, &url()?, "packs-v", Some(1))
             .err()
             .ok_or("expected no tag")?;
         assert!(matches!(error, NewestError::NoTag(_)), "{error:?}");
@@ -111,13 +115,50 @@ mod tests {
     #[test]
     fn fetch_error_is_carried() -> TestResult {
         let git = FakeGit::new().git_missing();
-        let error = newest_release(&git, &url()?)
+        let error = newest_release(&git, &url()?, "packs-v", Some(1))
             .err()
             .ok_or("expected a fetch error")?;
         assert!(
             matches!(error, NewestError::Fetch(FetchError::GitNotFound { .. })),
             "{error:?}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn prerelease_never_wins_a_stream() -> TestResult {
+        let git = FakeGit::new().tags(
+            &url()?,
+            listing(&["packs-core-v1.1.0-rc.1", "packs-core-v1.0.0"])?,
+        );
+        let tag = newest_release(&git, &url()?, "packs-core-v", Some(1))
+            .map_err(|error| FormatError::from(error).to_string())?;
+        assert_eq!(tag.as_str(), "packs-core-v1.0.0");
+        Ok(())
+    }
+
+    #[test]
+    fn third_party_skips_major_filter() -> TestResult {
+        let other = GitUrl::new("https://github.com/airsstack/agentstacks.git")?;
+        let git = FakeGit::new().tags(
+            &other,
+            listing(&["packs-core-v1.0.0", "packs-core-v9.0.0"])?,
+        );
+        let tag = newest_release(&git, &other, "packs-core-v", None)
+            .map_err(|error| FormatError::from(error).to_string())?;
+        assert_eq!(tag.as_str(), "packs-core-v9.0.0");
+        Ok(())
+    }
+
+    #[test]
+    fn lookalike_prefix_does_not_match() -> TestResult {
+        let git = FakeGit::new().tags(
+            &url()?,
+            listing(&["packs-core-v1.0.1", "packs-core-v-extra-v1.0.0"])?,
+        );
+        let tag = newest_release(&git, &url()?, "packs-core-v", Some(1))
+            .map_err(|error| FormatError::from(error).to_string())?;
+        assert_eq!(tag.as_str(), "packs-core-v1.0.1");
         Ok(())
     }
 }
