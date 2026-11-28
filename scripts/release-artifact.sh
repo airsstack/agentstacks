@@ -146,6 +146,42 @@ self_test() {
   else
     printf 'release-artifact self-test: refuses_failed_dispatch failed: %s\n' "$out" >&2
   fi
+  rm -rf "$stubdir"
+  # 7b: a successful dispatch resolves the run id and watches it. The stub
+  # emulates gh faithfully: `run list` applies the caller's --jq filter with
+  # the real jq, exactly as gh would.
+  cases=$((cases + 1))
+  stubdir=$(mktemp -d)
+  cat > "$stubdir/gh-stub" <<'STUB'
+#!/bin/sh
+echo "$@" >> "$GH_LOG"
+if [ "$1 $2" = "workflow run" ]; then
+  exit 0
+fi
+if [ "$1 $2" = "run list" ]; then
+  runs='[{"createdAt": "2999-01-01T00:00:00Z", "databaseId": 123, "headBranch": "main"}]'
+  expr=""
+  prev=""
+  for arg in "$@"; do
+    if [ "$prev" = "--jq" ] || [ "$prev" = "-q" ]; then expr="$arg"; fi
+    prev="$arg"
+  done
+  printf '%s' "$runs" | jq -r "$expr"
+  exit $?
+fi
+if [ "$1 $2" = "run watch" ]; then
+  test "$3" = "123"
+  exit $?
+fi
+exit 0
+STUB
+  chmod +x "$stubdir/gh-stub"
+  out=$(cd "$dir" && GH_LOG="$stubdir/gh.log" GH_BIN="$stubdir/gh-stub" PATH="$BINPATH:/usr/bin:/bin" "$SELF" core 1.0.1 2>&1)
+  if [ $? -eq 0 ] && grep -q "run watch 123" "$stubdir/gh.log" 2>/dev/null; then
+    passed=$((passed + 1))
+  else
+    printf 'release-artifact self-test: watch path failed: %s\n' "$out" >&2
+  fi
   rm -rf "$stubdir" "$dir"
   printf 'release-artifact: %s/%s self-test cases passed\n' "$passed" "$cases"
   [ "$passed" = "$cases" ]
@@ -214,5 +250,15 @@ if [ "$dry_run" = "1" ]; then
   exit 0
 fi
 command -v "$GH_BIN" >/dev/null 2>&1 || fail "gh not found on PATH (install it to trigger the workflow)"
+started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "$GH_BIN" workflow run release-artifact.yml --ref main -f "artifact=$artifact" -f "version=$version" || fail "gh workflow run failed"
-"$GH_BIN" run watch --exit-status || fail "release workflow failed"
+run_id=""
+attempts=0
+while [ -z "$run_id" ] && [ "$attempts" -lt 20 ]; do
+  sleep 3
+  attempts=$((attempts + 1))
+  run_id=$("$GH_BIN" run list --workflow release-artifact.yml --branch main --limit 5 --json databaseId,createdAt,headBranch --jq "[.[] | select(.headBranch == \"main\" and .createdAt >= \"$started_at\")] | first | .databaseId // empty" 2>/dev/null)
+done
+[ -n "$run_id" ] || fail "no workflow run found after dispatch"
+echo "release-artifact: watching run $run_id"
+"$GH_BIN" run watch "$run_id" --exit-status || fail "release workflow failed"
